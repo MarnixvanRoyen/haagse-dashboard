@@ -43,6 +43,7 @@ function appsTegel(){
     <p class="s">haagsesneek.nl</p>
     <div class="trijen">
       ${tegelRij("Nieuwe spelâhs",(n.nieuw7?"+":"")+nf0.format(n.nieuw7),"laatste 7 dagen")}
+      ${GC.dag.length?(g=>tegelRij("Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+nf0.format(g.p7)+" potjes gestart"))(gcCompute()):""}
       ${tegelRij("Hoogste scoâh",n.top[0]?nf0.format(n.top[0].score):"—",n.top[0]?"@"+esc(n.top[0].insta):"")}
     </div>
     <button class="btn yellow" type="button" data-ga="apps">Kèk bè Apps</button>

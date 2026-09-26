@@ -38,20 +38,21 @@ function sneekCompute(){
 }
 
 // simpele kolommengrafiek, zelfde stijl als de muziekgrafieken
-function kolommen(el,data,kleur){
+function kolommen(el,data,kleur,aria="Nieuwe spelers per dag",eenheid="nieuw"){
   const W=Math.max(300,Math.round(el.clientWidth||1000)),H=W<600?180:220,ml=30,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=H-mt-mb;
   const top=niceMax(Math.max(1,...data.map(d=>d.v))), bw=iw/data.length;
   const y=v=>mt+ih-v/top*ih;
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nieuwe spelers per dag">`;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
   [0,top/2,top].forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
   data.forEach((d,i)=>{const h=d.v/top*ih,x=ml+i*bw+bw*.15;
     if(d.v)s+=`<path d="${roundTop(x,y(d.v),bw*.7,h,3)}" fill="var(--${kleur})"/>`;
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"><title>${dLabel(d.d,1)}: ${d.v} nieuw</title></rect>`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"><title>${dLabel(d.d,1)}: ${d.v} ${eenheid}</title></rect>`;
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }
 
 function renderSneek(){
+  renderGC();
   if(SNEEK.err){$("snStats").innerHTML=`<p class="sub">Sneek-cijfâhs ophale lukte nie: ${esc(SNEEK.err)}</p>`;return}
   const n=sneekCompute();
   if(!n.spelers){
@@ -72,5 +73,75 @@ function renderSneek(){
   const max=Math.max(...n.groepjes.map(g=>g.n));
   $("snVerdeling").innerHTML=n.groepjes.map(g=>bar(g.naam,[{v:g.n,c:"hy"}],max,nf0.format(g.n)+" · "+pct(n.spelers?g.n/n.spelers:0),`${g.n} spelâhs met ${g.naam} punte`)).join("");
 }
+
+
+/* ---------- GoatCounter: bezoekers en gebeurtenissen (tabellen gc_dag en gc_bronnen, zie 06_goatcounter.sql) ---------- */
+let GC={dag:[],bronnen:[],err:null};
+
+async function loadGC(){
+  try{
+    const since=new Date(Date.now()-70*864e5).toISOString().slice(0,10);
+    const [d,b]=await Promise.all([
+      sb.from("gc_dag").select("dag,pad,event,titel,aantal").gte("dag",since).order("dag").range(0,4999),
+      sb.from("gc_bronnen").select("dag,bron,aantal").gte("dag",since).order("dag").range(0,4999)]);
+    if(d.error)throw d.error;if(b.error)throw b.error;
+    GC={dag:d.data,bronnen:b.data,err:null};
+  }catch(e){GC={dag:[],bronnen:[],err:e.message}}
+}
+
+const dagUTC=t=>new Date(t).toISOString().slice(0,10);   // GoatCounter telt in UTC-dagen
+
+function gcCompute(){
+  const dagen=[];for(let i=29;i>=0;i--)dagen.push(dagUTC(Date.now()-i*864e5));
+  const leeg=()=>Object.fromEntries(dagen.map(d=>[d,0]));
+  const bezoek=leeg(),potjes=leeg(),gedeeld=leeg();
+  GC.dag.forEach(r=>{const d=String(r.dag).slice(0,10);if(!(d in bezoek))return;
+    if(!r.event)bezoek[d]+=+r.aantal;
+    else if(r.pad==="potje-gestart")potjes[d]+=+r.aantal;
+    else if(r.pad==="score-gedeeld")gedeeld[d]+=+r.aantal});
+  const som=(o,a,b)=>dagen.slice(a,b).reduce((s,d)=>s+o[d],0);
+  const bron=new Map();GC.bronnen.forEach(r=>{if(dagen.includes(String(r.dag).slice(0,10)))bron.set(r.bron,(bron.get(r.bron)||0)+ +r.aantal)});
+  const bronnen=[...bron].map(([naam,n])=>({naam,n})).sort((a,b)=>b.n-a.n);
+  const nieuw30=SNEEK.rows.filter(x=>dagen.includes(dagNL(x.eerst))).length;
+  return {dagen:dagen.map(d=>({d,v:bezoek[d]})),
+    b7:som(bezoek,-7),b7v:som(bezoek,-14,-7),p7:som(potjes,-7),p7v:som(potjes,-14,-7),g7:som(gedeeld,-7),g7v:som(gedeeld,-14,-7),
+    b30:som(bezoek,0),p30:som(potjes,0),g30:som(gedeeld,0),nieuw30,bronnen,
+    laatste:GC.dag.reduce((a,r)=>r.dag>a?r.dag:a,"")};
+}
+
+// mooie namen voor bronnen
+function bronNaam(n){const l=n.toLowerCase();
+  if(l==="(direct)")return "Direct";
+  if(/instagram/.test(l))return "Instagram";if(/whatsapp/.test(l))return "WhatsApp";
+  if(/facebook|fb\./.test(l))return "Facebook";if(/google/.test(l))return "Google";return n}
+
+function renderGC(){
+  const kanNie=GC.err||!GC.dag.length;
+  $("gcBlok").hidden=!!kanNie;$("gcNog").hidden=!kanNie;
+  if(kanNie){$("gcNogTekst").innerHTML=GC.err&&/gc_dag|relation|schema cache/i.test(GC.err)
+      ?"De GoatCounter-tabellen bestaan nog niet. Zet de sleutel in de Vault en draai <code>supabase/06_goatcounter.sql</code>."
+      :GC.err?"GoatCounter-cijfâhs ophale lukte nie: "+esc(GC.err):"Nog geen metingen. Draai <code>select public.gc_refresh(14);</code> in Supabase of wacht tot vannacht.";return}
+  const g=gcCompute();
+  const vs=(a,b)=>`vorige week ${nf0.format(b)}${a>b?' <span class="up">↑</span>':""}`;
+  const top=g.bronnen.find(b=>b.naam!=="(direct)")||g.bronnen[0];
+  $("gcStats").innerHTML=[
+    ["Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+vs(g.b7,g.b7v)],
+    ["Potjes gestart",nf0.format(g.p7),g.b7?`${nf2.format(g.p7/g.b7)} per bezoekâh · `+vs(g.p7,g.p7v):vs(g.p7,g.p7v)],
+    ["Scoâhs gedeeld",nf0.format(g.g7),"in een story · "+vs(g.g7,g.g7v)],
+    ["Beste bron",top?esc(bronNaam(top.naam)):"—",top&&g.b30?pct(top.n/g.bronnen.reduce((a,b)=>a+b.n,0))+" van de bezoekâhs (30 dagen)":""]
+  ].map(([k,v,s])=>`<div class="ytstat"><span class="k">${k}</span><span class="v" title="${v}">${v}</span><span class="s">${s}</span></div>`).join("");
+  $("gcSub").textContent="Uit GoatCounter, elke nacht vanzelf bijgewerkt"+(g.laatste?" · laatste meting "+dLabel(String(g.laatste).slice(0,10),1):"");
+  kolommen($("gcChart"),g.dagen,"hy","Bezoekers per dag","bezoekâhs");
+  const mb=Math.max(1,...g.bronnen.map(b=>b.n)),tb=g.bronnen.reduce((a,b)=>a+b.n,0);
+  $("gcBronnen").innerHTML=g.bronnen.length?g.bronnen.slice(0,8).map((b,i)=>bar(bronNaam(b.naam),[{v:b.n,c:"hy"}],mb,nf0.format(b.n)+" · "+pct(tb?b.n/tb:0),"",i+1)).join(""):'<p class="sub">Nog geen bronnen gemeten.</p>';
+  const stappen=[["Bezoekâhs",g.b30],["Potjes gestart",g.p30],["Nieuw op de lèst",g.nieuw30],["Scoâh gedeeld",g.g30]];
+  const mt=Math.max(1,...stappen.map(s=>s[1]));
+  $("gcTrechter").innerHTML=stappen.map(([n,v],i)=>bar(n,[{v,c:i?"groen":"hy"}],mt,nf0.format(v)+(i&&g.b30?" · "+pct(v/g.b30):""),"",i+1)).join("")+
+    '<p class="sub" style="margin:10px 0 0">Percentages t.o.v. het aantal bezoekâhs. Eén bezoekâh kan meerdere potjes spele, dus "potjes" kan boven de 100% uitkomen.</p>';
+}
+$("gcRefresh").addEventListener("click",async e=>{const b=e.target;b.disabled=true;b.textContent="Effe geduld…";
+  const {error}=await sb.rpc("gc_refresh",{dagen:3});
+  if(error)showMsg("GoatCounter verversen lukte nie: "+error.message);else{await loadGC();renderSneek();showMsg("GoatCounter bijgewerkt, âhwe!",true)}
+  b.disabled=false;b.textContent="Nâh ververse"});
 
 let snRsz;addEventListener("resize",()=>{clearTimeout(snRsz);snRsz=setTimeout(()=>{if(sectie==="apps")renderSneek()},150)});
