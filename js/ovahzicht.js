@@ -31,10 +31,20 @@ function renderOvahzicht(){
     <p class="s">Volgâhs, bereik en wat werkt, straks elke dag vanzelf bijgewerkt.</p>
     <button class="btn" type="button" data-ga="insta">Wat komt d'r?</button>
   </article>
-  <article class="tegel binnenkort">
-    <div class="tkop"><h2>Sneek</h2><span class="tag">haagsesneek.nl</span></div>
-    <p class="kd">Komt d'r an, âhwe!</p>
-    <p class="s">Bezoekâhs, potjes en spelers op de lèst.</p>
-    <button class="btn" type="button" data-ga="sneek">Wat komt d'r?</button>
+  ${appsTegel()}`;
+}
+
+function appsTegel(){
+  const n=sneekCompute();
+  return `<article class="tegel">
+    <div class="tkop"><h2>Apps</h2><span class="tag">Haagse Sneek</span></div>
+    <p class="tlbl">Sneek · spelâhs op de lèst</p>
+    <div class="tgroot">${nf0.format(n.spelers)}</div>
+    <p class="s">haagsesneek.nl</p>
+    <div class="trijen">
+      ${tegelRij("Nieuwe spelâhs",(n.nieuw7?"+":"")+nf0.format(n.nieuw7),"laatste 7 dagen")}
+      ${tegelRij("Hoogste scoâh",n.top[0]?nf0.format(n.top[0].score):"—",n.top[0]?"@"+esc(n.top[0].insta):"")}
+    </div>
+    <button class="btn yellow" type="button" data-ga="apps">Kèk bè Apps</button>
   </article>`;
 }

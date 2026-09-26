@@ -21,7 +21,7 @@ html{color-scheme:dark;font-synthesis:none}body{margin:0}img{max-width:100%}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-weight:500;font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 56px}
-.wrap{max-width:1180px;margin:0 auto;display:grid;gap:16px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 .num,td.n,.mono{font-variant-numeric:tabular-nums}
 .mono{font-family:var(--mono)}
 button,input,select{font:inherit;color:inherit}
@@ -90,10 +90,10 @@ td a{color:inherit;text-decoration-color:var(--line)}td a:hover{text-decoration-
 .note{font-size:13.5px;color:var(--ink);background:var(--warn-soft);border-radius:12px;padding:9px 14px;border-left:4px solid var(--hy)}
 
 /* ---------- tabs ---------- */
-nav.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px}
-nav.tabs button{border:1px solid transparent;background:none;padding:8px 16px;cursor:pointer;font-family:var(--display);font-weight:400;font-size:16px;letter-spacing:.02em;color:var(--muted);border-radius:999px;white-space:nowrap}
-nav.tabs button:hover{color:var(--ink);border-color:var(--line)}
-nav.tabs button[aria-selected=true]{color:var(--hy-ink);background:var(--hy)}
+nav.tabs,nav.appkeuze{display:flex;gap:6px;overflow-x:auto;padding:2px}
+nav.tabs button,nav.appkeuze button{border:1px solid transparent;background:none;padding:8px 16px;cursor:pointer;font-family:var(--display);font-weight:400;font-size:16px;letter-spacing:.02em;color:var(--muted);border-radius:999px;white-space:nowrap}
+nav.tabs button:hover,nav.appkeuze button:hover{color:var(--ink);border-color:var(--line)}
+nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{color:var(--hy-ink);background:var(--hy)}
 
 .panel{display:grid;gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0}
@@ -184,3 +184,35 @@ footer .sig{font-family:var(--display);font-weight:400;letter-spacing:.02em;colo
 .top h1 span{color:var(--ink)}
 .top .by{margin:4px 0 0;font-size:13px;color:var(--muted)}
 .top .by a{color:var(--ink-2)}
+
+/* ---------- hoofdmenu ---------- */
+nav.hoofdmenu{display:flex;gap:8px;overflow-x:auto;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;justify-self:start;max-width:100%}
+nav.hoofdmenu button{border:0;background:none;padding:10px 20px;cursor:pointer;font-family:var(--display);font-size:18px;color:var(--ink-2);border-radius:999px;white-space:nowrap}
+nav.hoofdmenu button:hover{color:var(--ink);background:var(--surface-2)}
+nav.hoofdmenu button[aria-current=page]{background:var(--hy);color:var(--hy-ink)}
+.sectie{display:grid;gap:16px}
+footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
+
+/* ---------- ovâhzicht-tegels ---------- */
+.tegels{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+.tegel{background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--hy);border-radius:18px;padding:18px;display:grid;gap:8px}
+.tegel.binnenkort{border-top-color:var(--groen);border-style:dashed;border-top-style:solid}
+.tkop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tkop h2{font-family:var(--display);font-weight:400;font-size:24px;margin:0}
+.tag{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)}
+.tlbl{margin:6px 0 0;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tgroot{font-family:var(--display);font-size:52px;line-height:1;color:var(--hy)}
+.tgroot small{font-size:.45em;vertical-align:.6em;margin-right:.08em}
+.tegel .s{margin:0;font-size:13px;color:var(--muted)}
+.trijen{display:grid;gap:2px;margin:6px 0 4px;border-top:1px solid var(--line)}
+.trij{display:grid;grid-template-columns:1fr auto;gap:0 10px;padding:8px 0;border-bottom:1px solid var(--line-2)}
+.trij .k{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.trij .v{font-family:var(--display);font-size:20px;text-align:right}
+.trij .s{grid-column:1/-1;font-size:12px}
+.tegel .btn{justify-self:start;margin-top:6px}
+.kd{font-family:var(--display);font-size:26px;line-height:1.1;color:var(--hy);margin:8px 0 0}
+.binnenkort ul{margin:4px 0 0;padding-left:20px;color:var(--ink-2);display:grid;gap:4px}
+.card.binnenkort{border-style:dashed}
+@media (max-width:480px){nav.hoofdmenu{gap:2px}nav.hoofdmenu button{padding:9px 13px;font-size:16px}}
+.card .sub a{color:var(--ink-2)}
+.sub code{font-size:.95em;background:var(--surface-2);padding:1px 5px;border-radius:5px}

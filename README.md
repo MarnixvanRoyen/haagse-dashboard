@@ -16,7 +16,8 @@ Live: https://marnixvanroyen.github.io/haagse-dashboard/
 | `js/basis.js` | Gedeelde hulpjes: bedragen/datums opmaken, tooltip, meldingen |
 | `js/muziek.js` | Alles van de muziek: SoundCloud, DJ·World, YouTube, Spotify |
 | `js/ovahzicht.js` | De tegels op de startpagina (één per onderdeel) |
-| `js/app.js` | Het hoofdmenu Ovâhzicht · Muziek · Insta · Sneek |
+| `js/apps.js` | Onderdeel Apps: Haagse Sneek (scorelèst uit Supabase) |
+| `js/app.js` | Het hoofdmenu Ovâhzicht · Muziek · Insta · Apps |
 | `js/start.js` | Verbinding met Supabase, data ophalen, inloggen (laadt als laatste) |
 | `config.js` | Adres en publieke sleutel van het Supabase-project |
 | `supabase/*.sql` | Tabellen, beveiliging en functies (archief; SQL gaat via de chat) |

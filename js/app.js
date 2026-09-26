@@ -1,6 +1,6 @@
-// app.js — het hoofdmenu: Ovâhzicht · Muziek · Insta · Sneek
+// app.js — het hoofdmenu: Ovâhzicht · Muziek · Insta · Apps
 
-const SECTIES=["ovahzicht","muziek","insta","sneek"];
+const SECTIES=["ovahzicht","muziek","insta","apps"];
 let sectie=store.get("hc_sectie");                 // onthoudt waar je laatst was
 if(!SECTIES.includes(sectie))sectie="ovahzicht";
 
@@ -10,6 +10,7 @@ function setSectie(s){
   SECTIES.forEach(x=>$("s-"+x).hidden=x!==s);
   if(s==="muziek")render();          // grafieken opnieuw tekenen nu ze zichtbaar zijn
   if(s==="ovahzicht")renderOvahzicht();
+  if(s==="apps")renderSneek();
 }
 document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));
 // knoppen op de tegels ("Kèk bè Muziek") springen naar dat onderdeel
