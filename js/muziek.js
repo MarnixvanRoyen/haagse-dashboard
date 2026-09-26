@@ -91,7 +91,7 @@ function renderKPIs(d){
   const vibe=d.total>=50?"Lekker bezig, jonguh.":d.total>=10?"Gaat de goeie kant op.":d.total>0?"Elke cent telt, toch?":"Niks te zien hier.";
   $("kpis").innerHTML=`
   <div>
-    <p class="total-lbl">Alles bij mekaar binnengehaald</p>
+    <p class="total-lbl">Alles bè mekaâh binnegehaald</p>
     <div class="total"><small>€</small>${parts}</div>
     <p class="total-sub"><b>${mLabel(state.from,1)} – ${mLabel(state.to,1)}</b> · ${vibe}</p>
     <div class="splitbar" role="img" aria-label="${pct(scShare)} SoundCloud, ${pct(1-scShare)} label"><span style="width:${scShare*100}%;background:var(--sc)"></span><span style="width:${(1-scShare)*100}%;background:var(--lb)"></span></div>
@@ -99,7 +99,7 @@ function renderKPIs(d){
   <div class="stats">
     <div class="stat"><span class="k"><i class="dot sc"></i>SoundCloud</span><span class="v">${eur(d.scEUR)}</span><span class="s">${usd(d.scUSD)} · ${nf0.format(d.units)} plays</span></div>
     <div class="stat"><span class="k"><i class="dot lb"></i>Label ${state.basis==="net"?"netto":"bruto"}</span><span class="v">${eur(d.lb)}</span><span class="s">${useLB()?`${nf0.format(d.lbStreams)} streams · ${nf0.format(d.lbDl)} downloads`:(state.source==="sc"?"uitgefilterd":"niet per artiest")}</span></div>
-    <div class="stat"><span class="k">Beste nummer</span><span class="v" title="${best?esc(best.track):""}">${best?esc(best.track):"—"}</span><span class="s">${best?eur(best.total)+" · "+pct(d.total?best.total/d.total:0)+" van alles":""}</span></div>
+    <div class="stat"><span class="k">Beste nummâh</span><span class="v" title="${best?esc(best.track):""}">${best?esc(best.track):"—"}</span><span class="s">${best?eur(best.total)+" · "+pct(d.total?best.total/d.total:0)+" van alles":""}</span></div>
     <div class="stat"><span class="k">Beste maand</span><span class="v">${bestM?mLabel(bestM.m,1):"—"}</span><span class="s">${bestM?eur(bestM.sc+bestM.lb):""}</span></div>
   </div>`;
 }

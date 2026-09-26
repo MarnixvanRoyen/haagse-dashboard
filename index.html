@@ -4,10 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Muziekinkomsten Marnix</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<title>Haagse Content Performance Dashboard</title>
 <link rel="stylesheet" href="stijl.css">
 </head>
 <body>
@@ -17,28 +14,34 @@
     <div class="flag" aria-hidden="true"><i></i><i></i></div>
     <div class="login-in">
       <span class="ghost" aria-hidden="true">070</span>
-      <div class="eyebrow"><b>070</b> Muziekinkomste · Den Haag</div>
-      <h1 class="login-title">Effe inloggen, jonguh</h1>
+      <div class="eyebrow"><b>070</b> Haagse Content · Den Haag</div>
+      <h1 class="login-title">Effe inlogge, jonguh</h1>
       <form id="loginForm" class="login-form">
         <label for="email">E-mail</label>
         <input id="email" type="email" autocomplete="username" required>
         <label for="password">Wachtwoord</label>
         <input id="password" type="password" autocomplete="current-password" required>
-        <button class="btn yellow" id="loginBtn" type="submit">Inloggen</button>
+        <button class="btn yellow" id="loginBtn" type="submit">Kom d'r in</button>
       </form>
       <p class="login-err" id="loginErr" role="alert" hidden></p>
     </div>
   </div>
 </main>
-<div class="loading" id="loading">Gegevens ophalen…</div>
+<div class="loading" id="loading">Effe de cijfâhs ophale…</div>
 <div class="wrap" id="app" hidden>
+  <header class="top">
+    <div><h1>Haagse Content <span>Performance Dashboard</span></h1>
+      <p class="by">Hoe gaat 't met je muziek, je Insta en je spellegies? · <a href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener">@the_hague_beachlife</a></p></div>
+    <button class="logout" id="logout" type="button">Uitlogge</button>
+  </header>
+
   <header class="hero">
     <div class="flag" aria-hidden="true"><i></i><i></i></div>
     <div class="hero-in">
       <span class="ghost" aria-hidden="true">070</span>
       <div class="hero-top">
-        <div class="eyebrow"><b>070</b> Muziekinkomste · Den Haag</div>
-        <div class="artists"><span>Marreman Rojas</span><span>Beuk</span><button class="logout" id="logout" type="button">Uitloggen</button></div>
+        <div class="eyebrow"><b>070</b> Muziek · wat levert 't op?</div>
+        <div class="artists"><span>Marreman Rojas</span><span>Beuk</span></div>
       </div>
       <div class="hero-main" id="kpis"></div>
     </div>
@@ -61,7 +64,7 @@
       </div></div>
     <div class="f"><label for="fRate">1 USD = € </label><input id="fRate" type="number" step="0.01" min="0.5" max="1.5"></div>
     <span class="spacer"></span>
-    <div class="f"><span class="lbl">Nieuw rapport inladen</span>
+    <div class="f"><span class="lbl">Nieuw rappoâht inlade</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <label class="btn yellow" for="fFile" style="display:inline-flex;align-items:center;gap:6px"><i class="dot sc"></i>SoundCloud-CSV</label>
         <input id="fFile" type="file" accept=".csv,text/csv" hidden>
@@ -75,32 +78,32 @@
 
 
   <nav class="tabs" role="tablist" aria-label="Weergave">
-    <button role="tab" data-tab="overzicht" aria-selected="true">Overzicht</button>
-    <button role="tab" data-tab="nummers" aria-selected="false">Per nummer</button>
+    <button role="tab" data-tab="overzicht" aria-selected="true">Ovâhzicht</button>
+    <button role="tab" data-tab="nummers" aria-selected="false">Per nummâh</button>
     <button role="tab" data-tab="bronnen" aria-selected="false">Per bron</button>
     <button role="tab" data-tab="landen" aria-selected="false">Per land</button>
     <button role="tab" data-tab="youtube" aria-selected="false">YouTube</button>
     <button role="tab" data-tab="sclive" aria-selected="false">SoundCloud live</button>
     <button role="tab" data-tab="spotify" aria-selected="false">Spotify</button>
-    <button role="tab" data-tab="kansen" aria-selected="false">Waar zit nog wat</button>
+    <button role="tab" data-tab="kansen" aria-selected="false">Waâh zit nog wat?</button>
   </nav>
 
   <section class="panel" id="p-overzicht">
     <div class="card">
-      <div class="cardhead"><div><h2>Inkomsten per maand</h2><p class="sub" id="chartSub"></p></div>
+      <div class="cardhead"><div><h2>Inkomste per maand</h2><p class="sub" id="chartSub"></p></div>
         <div class="legend"><span><i class="dot sc"></i>SoundCloud</span><span><i class="dot lb"></i>Label</span></div></div>
       <div class="chart" id="monthChart"></div>
     </div>
     <div class="grid2">
-      <div class="card"><h2>Top nummers</h2><p class="sub">Wat je per nummer ontving in de gekozen periode</p><div class="bars" id="topTracks"></div></div>
+      <div class="card"><h2>Top nummâhs</h2><p class="sub">Wat je per nummer ontving in de gekozen periode</p><div class="bars" id="topTracks"></div></div>
       <div class="card"><h2>Top platforms</h2><p class="sub">Waar het geld vandaan komt</p><div class="bars" id="topPartners"></div></div>
     </div>
   </section>
 
   <section class="panel" id="p-nummers" hidden>
     <div class="card">
-      <div class="cardhead"><div><h2>Alle nummers</h2><p class="sub">Klik op een kolomkop om te sorteren. Streams = SoundCloud-plays plus label-streams. € per 1.000 streams (zonder downloads) staat er vanaf 25 streams.</p></div>
-        <input class="search" id="trackSearch" type="search" placeholder="Zoek nummer…" aria-label="Zoek nummer"></div>
+      <div class="cardhead"><div><h2>Alle nummâhs</h2><p class="sub">Klik op een kolomkop om te sorteren. Streams = SoundCloud-plays plus label-streams. € per 1.000 streams (zonder downloads) staat er vanaf 25 streams.</p></div>
+        <input class="search" id="trackSearch" type="search" placeholder="Zoek 'n nummâh…" aria-label="Zoek nummer"></div>
       <div class="tablewrap"><table id="trackTable"></table></div>
     </div>
   </section>
@@ -120,17 +123,17 @@
   <section class="panel" id="p-youtube" hidden>
     <div class="card">
       <div class="cardhead"><div><h2><i class="dot yt"></i> YouTube</h2><p class="sub" id="ytSub">Openbare cijfers, elke nacht automatisch bijgewerkt. De filters hierboven gelden hier niet.</p></div>
-        <button class="btn" id="ytRefresh" type="button">Nu verversen</button></div>
+        <button class="btn" id="ytRefresh" type="button">Nâh ververse</button></div>
       <div class="ytstats" id="ytStats"></div>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Erbij per dag</h2><p class="sub" id="ytChartSub">Hoeveel weergaven er per dag bij kwamen, alle tracks samen</p></div>
+      <div class="cardhead"><div><h2>Erbè per dag</h2><p class="sub" id="ytChartSub">Hoeveel weergaven er per dag bij kwamen, alle tracks samen</p></div>
         <div class="legend"><span><i class="dot yt"></i>Nieuwe weergaven</span></div></div>
       <div class="chart" id="ytChart"></div>
     </div>
     <div class="grid2">
-      <div class="card"><h2>Meest bekeken</h2><p class="sub">Totaal aantal weergaven, zelfde titels samengeteld</p><div class="bars" id="ytTop"></div></div>
-      <div class="card"><h2>Groeiers</h2><p class="sub" id="ytGrowSub">Weergaven erbij in de laatste 7 dagen</p><div class="bars" id="ytGrow"></div></div>
+      <div class="card"><h2>Meest bekeke</h2><p class="sub">Totaal aantal weergaven, zelfde titels samengeteld</p><div class="bars" id="ytTop"></div></div>
+      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="ytGrowSub">Weergaven erbij in de laatste 7 dagen</p><div class="bars" id="ytGrow"></div></div>
     </div>
     <div class="card">
       <div class="cardhead"><div><h2>YouTube vs. SoundCloud-afrekening</h2><p class="sub" id="cmpSub">Weergaven op YouTube naast wat SoundCloud daarvoor afrekent</p></div></div>
@@ -148,26 +151,26 @@
   <section class="panel" id="p-sclive" hidden>
     <div class="card">
       <div class="cardhead"><div><h2><i class="dot sc"></i> SoundCloud live</h2><p class="sub" id="sclSub">Openbare cijfers van je SoundCloud-profiel, elke nacht automatisch bijgewerkt. De filters hierboven gelden hier niet.</p></div>
-        <button class="btn" id="sclRefresh" type="button">Nu verversen</button></div>
+        <button class="btn" id="sclRefresh" type="button">Nâh ververse</button></div>
       <div class="ytstats" id="sclStats"></div>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Erbij per dag</h2><p class="sub">Hoeveel plays er per dag bij kwamen, alle nummers samen</p></div>
+      <div class="cardhead"><div><h2>Erbè per dag</h2><p class="sub">Hoeveel plays er per dag bij kwamen, alle nummers samen</p></div>
         <div class="legend"><span><i class="dot sc"></i>Nieuwe plays</span></div></div>
       <div class="chart" id="sclChart"></div>
     </div>
     <div class="grid2">
       <div class="card"><h2>Meest beluisterd</h2><p class="sub">Totaal aantal plays op SoundCloud</p><div class="bars" id="sclTop"></div></div>
-      <div class="card"><h2>Groeiers</h2><p class="sub" id="sclGrowSub">Plays erbij in de laatste 7 dagen</p><div class="bars" id="sclGrow"></div></div>
+      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="sclGrowSub">Plays erbij in de laatste 7 dagen</p><div class="bars" id="sclGrow"></div></div>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Van plays naar geld</h2><p class="sub" id="sclMoneySub">Openbare plays naast wat SoundCloud zelf daarvoor afrekent</p></div></div>
+      <div class="cardhead"><div><h2>Van plays naâh poen</h2><p class="sub" id="sclMoneySub">Openbare plays naast wat SoundCloud zelf daarvoor afrekent</p></div></div>
       <div class="ytstats" id="sclMoneyStats"></div>
       <div class="tablewrap" style="margin-top:14px"><table id="sclMoneyTable"></table></div>
       <p class="sub" style="margin:12px 0 0">Alleen plays van betalende abonnees en plays met reclame worden betaald, en SoundCloud rekent 1–2 maanden later af. Een laag percentage is dus normaal; het verschil tussen nummers is het interessante deel.</p>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Alle nummers</h2><p class="sub">Klik op een titel om hem op SoundCloud te openen</p></div></div>
+      <div class="cardhead"><div><h2>Alle nummâhs</h2><p class="sub">Klik op een titel om hem op SoundCloud te openen</p></div></div>
       <div class="tablewrap"><table id="sclTable"></table></div>
     </div>
   </section>
@@ -175,15 +178,15 @@
   <section class="panel" id="p-spotify" hidden>
     <div class="card">
       <div class="cardhead"><div><h2><i class="dot sp"></i> Spotify</h2><p class="sub" id="spSub">Uit je Spotify for Artists-export. De filters hierboven gelden hier niet.</p></div>
-        <label class="btn" for="fSp">Nieuwe export inladen</label></div>
+        <label class="btn" for="fSp">Nieuwe export inlade</label></div>
       <div class="ytstats" id="spStats"></div>
     </div>
     <div class="grid2">
       <div class="card"><h2>Meest gestreamd</h2><p class="sub">Totaal aantal streams sinds release</p><div class="bars" id="spTop"></div></div>
-      <div class="card"><h2>Groeiers</h2><p class="sub" id="spGrowSub">Streams erbij sinds de vorige import</p><div class="bars" id="spGrow"></div></div>
+      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="spGrowSub">Streams erbij sinds de vorige import</p><div class="bars" id="spGrow"></div></div>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Van streams naar geld</h2><p class="sub" id="spMoneySub">Spotify-streams naast wat SoundCloud en DJ·World daarvoor afrekenen</p></div></div>
+      <div class="cardhead"><div><h2>Van streams naâh poen</h2><p class="sub" id="spMoneySub">Spotify-streams naast wat SoundCloud en DJ·World daarvoor afrekenen</p></div></div>
       <div class="ytstats" id="spMoneyStats"></div>
       <div id="spMoneyNote"></div>
       <div class="tablewrap" style="margin-top:14px"><table id="spMoneyTable"></table></div>
@@ -191,7 +194,7 @@
       <span class="chip good">Klopt</span> 70% of meer afgerekend · <span class="chip warn">Loopt achter</span> minder dan 70% · <span class="chip mute">Onder 1.000-grens</span> Spotify betaalt pas vanaf 1.000 streams per nummer in 12 maanden · <span class="chip warn">Spotify ontbreekt</span> boven de grens, maar geen Spotify-geld via SoundCloud · <span class="chip lb">Via label</span> DJ·World telt minstens zoveel streams (alle platforms samen) · <span class="chip warn">Label telt minder</span> DJ·World telt minder streams dan Spotify alleen · <span class="chip mute">Nog te vroeg</span> jonger dan 3 maanden · <span class="chip warn">Geen afrekening</span> nergens geld gevonden</p>
     </div>
     <div class="card">
-      <div class="cardhead"><div><h2>Alle nummers</h2><p class="sub">Stand van de laatste import</p></div></div>
+      <div class="cardhead"><div><h2>Alle nummâhs</h2><p class="sub">Stand van de laatste import</p></div></div>
       <div class="tablewrap"><table id="spTable"></table></div>
     </div>
   </section>
@@ -203,7 +206,7 @@
   <footer><div style="display:grid;gap:4px;max-width:80ch">
     <span id="srcInfo"></span>
     <span>SoundCloud-bedragen staan in USD in het rapport en worden met de koers hierboven omgerekend. Label-periodes zijn afrekenperiodes, geen luistermaanden.</span>
-  </div><span class="sig">Gemaakt in 070</span></footer>
+  </div><span class="sig">Gemaakt in 070, âhwe!</span></footer>
 </div>
 <div id="tip" hidden></div>
 

@@ -1,17 +1,23 @@
-# Muziekinkomsten
+# Haagse Content Performance Dashboard
 
-Dashboard voor mijn inkomsten van SoundCloud en label DJ·World (Marreman Rojas & Beuk).
+Eén Haags dashboard voor de performance van @the_hague_beachlife: muziek (Marreman Rojas & Beuk), Insta en apps (Haagse Sneek).
+Live: https://marnixvanroyen.github.io/haagse-dashboard/
 
 - **Voorkant** (deze map): een gewone webpagina, gehost op GitHub Pages.
-- **Data**: in een Supabase-database. Je moet inloggen om iets te zien.
+- **Data**: in Supabase (het project van Sneek). Je moet inloggen om iets te zien.
 
 ## Wat zit waar
 
 | Bestand | Wat het doet |
 |---|---|
-| `index.html` | De app zelf (opmaak, grafieken, inloggen, CSV inladen) |
-| `config.js` | Adres en publieke sleutel van je Supabase-project |
-| `supabase/01_schema.sql` | Maakt de tabellen, de beveiliging en de importfuncties (SoundCloud-CSV en label-PDF) |
+| `index.html` | Het skelet: inlogscherm, kop, tabbladen en de lege vakken |
+| `stijl.css` | Alle opmaak in de Haagse huisstijl (zee-blauw, geel, groen) |
+| `fonts/` | Titan One + Nunito, zelf gehost (geen Google) + licenties |
+| `js/basis.js` | Gedeelde hulpjes: bedragen/datums opmaken, tooltip, meldingen |
+| `js/muziek.js` | Alles van de muziek: SoundCloud, DJ·World, YouTube, Spotify |
+| `js/start.js` | Verbinding met Supabase, data ophalen, inloggen (laadt als laatste) |
+| `config.js` | Adres en publieke sleutel van het Supabase-project |
+| `supabase/*.sql` | Tabellen, beveiliging en functies (archief; SQL gaat via de chat) |
 | `.gitignore` | Zorgt dat CSV- en PDF-bestanden nooit op GitHub komen |
 
 ## Eenmalig instellen
@@ -25,7 +31,7 @@ Dashboard voor mijn inkomsten van SoundCloud en label DJ·World (Marreman Rojas 
 
 ### 2. GitHub
 ```bash
-cd ~/Documents/"Muziek Inkomsten"/muziekinkomsten-app
+cd ~/Documents/"Haagse Content"/haagse-dashboard
 git init
 git add .
 git commit -m "Eerste versie muziekinkomsten"

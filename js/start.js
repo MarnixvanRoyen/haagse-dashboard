@@ -40,10 +40,10 @@ async function start(){
   catch(err){showScreen("login");$("loginErr").hidden=false;$("loginErr").textContent="Data ophalen lukte niet: "+err.message}
 }
 $("loginForm").addEventListener("submit",async e=>{
-  e.preventDefault();const btn=$("loginBtn");btn.disabled=true;btn.textContent="Even geduld…";$("loginErr").hidden=true;
+  e.preventDefault();const btn=$("loginBtn");btn.disabled=true;btn.textContent="Effe geduld…";$("loginErr").hidden=true;
   const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
-  btn.disabled=false;btn.textContent="Inloggen";
-  if(error){$("loginErr").hidden=false;$("loginErr").textContent=error.message==="Invalid login credentials"?"E-mail of wachtwoord klopt niet.":error.message;return}
+  btn.disabled=false;btn.textContent="Kom d'r in";
+  if(error){$("loginErr").hidden=false;$("loginErr").textContent=error.message==="Invalid login credentials"?"E-mail of wachtwoord klopt nie, jonguh.":error.message;return}
   $("password").value="";start();
 });
 $("logout").addEventListener("click",async()=>{await sb.auth.signOut();SC=[];showScreen("login")});
