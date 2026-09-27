@@ -216,3 +216,5 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 @media (max-width:480px){nav.hoofdmenu{gap:2px}nav.hoofdmenu button{padding:9px 13px;font-size:16px}}
 .card .sub a{color:var(--ink-2)}
 .sub code{font-size:.95em;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+.dot.hy{background:var(--hy)}
+#gcBlok{gap:16px}

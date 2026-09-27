@@ -63,7 +63,8 @@ begin
 end;
 $$;
 
--- 4. Hoofdfunctie: haal de laatste X dagen op (standaard 3) en werk de tabellen bij
+-- 4. Hoofdfunctie: haal de laatste X dagen op (standaard 3) en werk de tabellen bij.
+--    Per dag een aparte vraag: werkt één dag niet (bijv. vóór de start van de teller), dan gaan de andere gewoon door.
 create or replace function public.gc_refresh(dagen integer default 3)
 returns jsonb
 language plpgsql
@@ -72,46 +73,52 @@ set search_path = public, extensions
 as $$
 declare
   vandaag date := (now() at time zone 'utc')::date;   -- GoatCounter rekent in UTC
-  van    date := vandaag - (greatest(dagen, 1) - 1);
-  d      date;
-  j      jsonb;
-  h      jsonb;
-  s      jsonb;
-  n_dag  int := 0;
-  n_bron int := 0;
-  iso    text := 'YYYY-MM-DD"T"00:00:00"Z"';
-  -- 'nu' afgerond op het hele uur: GoatCounter wil geen eindtijd in de toekomst
-  nu     text := to_char(date_trunc('hour', now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24":00:00Z"');
+  van     date := vandaag - (greatest(dagen, 1) - 1);
+  d       date;
+  j       jsonb;
+  h       jsonb;
+  s       jsonb;
+  bereik  text;
+  n_dag   int := 0;
+  n_bron  int := 0;
+  fouten  text[] := '{}';
+  iso     text := 'YYYY-MM-DD"T"00:00:00"Z"';
 begin
-  -- a. bezoekers en gebeurtenissen per dag
-  j := gc_get('stats/hits?group=day&limit=200&start=' || to_char(van, iso)
-              || '&end=' || nu);
-  for h in select * from jsonb_array_elements(coalesce(j->'hits', '[]')) loop
-    for s in select * from jsonb_array_elements(coalesce(h->'stats', '[]')) loop
-      insert into gc_dag (dag, pad, event, titel, aantal)
-      values ((s->>'day')::date, h->>'path', coalesce((h->>'event')::boolean, false),
-              coalesce(h->>'title', ''), coalesce((s->>'daily')::int, 0))
-      on conflict (dag, pad) do update
-        set aantal = excluded.aantal, event = excluded.event, titel = excluded.titel;
-      n_dag := n_dag + 1;
-    end loop;
-  end loop;
-
-  -- b. bronnen per dag (1 vraag per dag; GoatCounter staat max 4 vragen per seconde toe)
   d := van;
   while d <= vandaag loop
-    j := gc_get('stats/toprefs?limit=100&start=' || to_char(d, iso) || '&end=' || case when d = vandaag then nu else to_char(d + 1, iso) end);
-    delete from gc_bronnen where dag = d;
-    insert into gc_bronnen (dag, bron, aantal)
-    select d, coalesce(nullif(x->>'name', ''), '(direct)'), sum((x->>'count')::int)
-      from jsonb_array_elements(coalesce(j->'stats', '[]')) x
-     group by 2;
-    get diagnostics n_bron = row_count;
-    perform pg_sleep(0.3);
+    bereik := 'start=' || to_char(d, iso) || '&end=' || to_char(d + 1, iso);
+    begin
+      -- a. bezoekers en gebeurtenissen van deze dag
+      j := gc_get('stats/hits?limit=100&' || bereik);
+      for h in select * from jsonb_array_elements(coalesce(j->'hits', '[]')) loop
+        for s in select * from jsonb_array_elements(coalesce(h->'stats', '[]')) loop
+          continue when (s->>'day')::date <> d;
+          insert into gc_dag (dag, pad, event, titel, aantal)
+          values (d, h->>'path', coalesce((h->>'event')::boolean, false),
+                  coalesce(h->>'title', ''), coalesce((s->>'daily')::int, 0))
+          on conflict (dag, pad) do update
+            set aantal = excluded.aantal, event = excluded.event, titel = excluded.titel;
+          n_dag := n_dag + 1;
+        end loop;
+      end loop;
+      perform pg_sleep(0.3);   -- GoatCounter staat max 4 vragen per seconde toe
+
+      -- b. bronnen van deze dag (Instagram, WhatsApp, direct, ...)
+      j := gc_get('stats/toprefs?limit=100&' || bereik);
+      delete from gc_bronnen where dag = d;
+      insert into gc_bronnen (dag, bron, aantal)
+      select d, coalesce(nullif(x->>'name', ''), '(direct)'), sum((x->>'count')::int)
+        from jsonb_array_elements(coalesce(j->'stats', '[]')) x
+       group by 2;
+      get diagnostics n_bron = row_count;
+      perform pg_sleep(0.3);
+    exception when others then
+      fouten := fouten || (to_char(d, 'YYYY-MM-DD') || ': ' || left(sqlerrm, 60));
+    end;
     d := d + 1;
   end loop;
 
-  return jsonb_build_object('van', van, 'dag_regels', n_dag, 'bronnen_laatste_dag', n_bron);
+  return jsonb_build_object('van', van, 'dag_regels', n_dag, 'bronnen_laatste_dag', n_bron, 'fouten', fouten);
 end;
 $$;
 revoke execute on function public.gc_get(text)          from public, anon, authenticated;

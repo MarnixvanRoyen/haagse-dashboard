@@ -100,7 +100,7 @@ function gcCompute(){
     else if(r.pad==="potje-gestart")potjes[d]+=+r.aantal;
     else if(r.pad==="score-gedeeld")gedeeld[d]+=+r.aantal});
   const som=(o,a,b)=>dagen.slice(a,b).reduce((s,d)=>s+o[d],0);
-  const bron=new Map();GC.bronnen.forEach(r=>{if(dagen.includes(String(r.dag).slice(0,10)))bron.set(r.bron,(bron.get(r.bron)||0)+ +r.aantal)});
+  const bron=new Map();GC.bronnen.forEach(r=>{if(!dagen.includes(String(r.dag).slice(0,10)))return;const k=bronNaam(r.bron);bron.set(k,(bron.get(k)||0)+ +r.aantal)});  // facebook.com + www.facebook.com = Facebook
   const bronnen=[...bron].map(([naam,n])=>({naam,n})).sort((a,b)=>b.n-a.n);
   const nieuw30=SNEEK.rows.filter(x=>dagen.includes(dagNL(x.eerst))).length;
   return {dagen:dagen.map(d=>({d,v:bezoek[d]})),
@@ -113,9 +113,10 @@ function gcCompute(){
 function bronNaam(n){const l=n.toLowerCase();
   if(l==="(direct)")return "Direct";
   if(/instagram/.test(l))return "Instagram";if(/whatsapp/.test(l))return "WhatsApp";
-  if(/facebook|fb\./.test(l))return "Facebook";if(/google/.test(l))return "Google";return n}
+  if(/facebook|fb\.|m\.facebook/.test(l))return "Facebook";if(/^(www\.)?haagsesneek\.nl/.test(l))return "Eigen site";if(/google/.test(l))return "Google";return n}
 
 function renderGC(){
+  if(!$("gcBlok"))return;   // oude index.html in de cache? dan niet vastlopen
   const kanNie=GC.err||!GC.dag.length;
   $("gcBlok").hidden=!!kanNie;$("gcNog").hidden=!kanNie;
   if(kanNie){$("gcNogTekst").innerHTML=GC.err&&/gc_dag|relation|schema cache/i.test(GC.err)
@@ -123,7 +124,7 @@ function renderGC(){
       :GC.err?"GoatCounter-cijfâhs ophale lukte nie: "+esc(GC.err):"Nog geen metingen. Draai <code>select public.gc_refresh(14);</code> in Supabase of wacht tot vannacht.";return}
   const g=gcCompute();
   const vs=(a,b)=>`vorige week ${nf0.format(b)}${a>b?' <span class="up">↑</span>':""}`;
-  const top=g.bronnen.find(b=>b.naam!=="(direct)")||g.bronnen[0];
+  const top=g.bronnen.find(b=>b.naam!=="Direct")||g.bronnen[0];
   $("gcStats").innerHTML=[
     ["Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+vs(g.b7,g.b7v)],
     ["Potjes gestart",nf0.format(g.p7),g.b7?`${nf2.format(g.p7/g.b7)} per bezoekâh · `+vs(g.p7,g.p7v):vs(g.p7,g.p7v)],

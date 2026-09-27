@@ -244,10 +244,26 @@
       <div class="card"><h2>Haagse Toppâhs</h2><p class="sub">De top 10 van de lèst</p><div class="tablewrap"><table id="snTop"></table></div></div>
       <div class="card"><h2>Hoe ver komme ze?</h2><p class="sub">Beste scoâh per spelâh, in groepjes. Zegt iets oâh hoe moeilijk het spel is.</p><div class="bars" id="snVerdeling"></div></div>
     </div>
-    <div class="card binnenkort">
+    <div id="gcBlok" class="sectie">
+      <div class="card">
+        <div class="cardhead"><div><h2>Bezoekâhs &amp; potjes</h2><p class="sub" id="gcSub">Uit GoatCounter, elke nacht vanzelf bijgewerkt</p></div>
+          <button class="btn" id="gcRefresh" type="button">Nâh ververse</button></div>
+        <div class="ytstats" id="gcStats"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Bezoekâhs per dag</h2><p class="sub">Laatste 30 dagen</p></div>
+          <div class="legend"><span><i class="dot hy"></i>Bezoekâhs</span></div></div>
+        <div class="chart" id="gcChart"></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h2>Waâh komme ze vandaan?</h2><p class="sub">Laatste 30 dagen, per bron</p><div class="bars" id="gcBronnen"></div></div>
+        <div class="card"><h2>Van bezoek naâh de lèst</h2><p class="sub">Laatste 30 dagen: hoeveel haken er onderweg af?</p><div class="bars" id="gcTrechter"></div></div>
+      </div>
+    </div>
+    <div class="card binnenkort" id="gcNog" hidden>
       <h2>Bezoekâhs &amp; potjes</h2>
       <p class="kd">Komt d'r an, âhwe!</p>
-      <p class="sub">Uit GoatCounter: bezoekâhs per dag, waar ze vandaan komen (Insta, WhatsApp, direct), potjes gestart en scores gedeeld. Daarvoor zetten we straks je GoatCounter-sleutel veilig in de Supabase Vault.</p>
+      <p class="sub" id="gcNogTekst">Uit GoatCounter: bezoekâhs per dag, waar ze vandaan komen, potjes gestart en scores gedeeld.</p>
     </div>
   </section>
 
