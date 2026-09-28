@@ -209,6 +209,7 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .trij .k{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 .trij .v{font-family:var(--display);font-size:20px;text-align:right}
 .trij .s{grid-column:1/-1;font-size:12px}
+.trij .tot{grid-column:2;text-align:right;font-size:13px;font-weight:800;color:var(--ink-2);margin-top:-2px}
 .tegel .btn{justify-self:start;margin-top:6px}
 .kd{font-family:var(--display);font-size:26px;line-height:1.1;color:var(--hy);margin:8px 0 0}
 .binnenkort ul{margin:4px 0 0;padding-left:20px;color:var(--ink-2);display:grid;gap:4px}

@@ -36,7 +36,7 @@ async function start(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){showScreen("login");return}
   showScreen("loading");
-  try{await loadData();showScreen("app")}
+  try{await loadData();showScreen("app");muziekLive()}
   catch(err){showScreen("login");$("loginErr").hidden=false;$("loginErr").textContent="Data ophalen lukte niet: "+err.message}
 }
 $("loginForm").addEventListener("submit",async e=>{
