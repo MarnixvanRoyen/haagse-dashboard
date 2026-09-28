@@ -426,15 +426,17 @@ function ytCompute(){
 function renderYouTube(){
   if(YT.err){$("ytStats").innerHTML=`<p class="sub">YouTube-cijfers ophalen lukte niet: ${esc(YT.err)}</p>`;return}
   const y=ytCompute();
-  if(!y.last){$("ytStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nu verversen".</p>';$("ytChart").innerHTML="";$("ytTop").innerHTML="";$("ytGrow").innerHTML="";$("ytTable").innerHTML="";$("cmpStats").innerHTML="";$("cmpTable").innerHTML="";return}
+  if(!y.last){$("ytStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nâh ververse".</p>';$("ytChart").innerHTML="";$("ytTop").innerHTML="";$("ytGrow").innerHTML="";$("ytTable").innerHTML="";$("cmpStats").innerHTML="";$("cmpTable").innerHTML="";return}
   const views=y.vids.reduce((a,v)=>a+v.views,0),likes=y.vids.reduce((a,v)=>a+v.likes,0),grow=y.vids.reduce((a,v)=>a+v.grow,0);
   const days=Math.round((new Date(y.last)-new Date(y.base))/864e5);
   const tracks=y.vids.filter(v=>!v.own).length, own=y.vids.length-tracks;
   const best=[...y.groups].sort((a,b)=>b.views-a.views)[0];
-  $("ytSub").textContent=`Openbare cijfers, elke nacht automatisch bijgewerkt · laatste meting ${dLabel(y.last,1)}. De filters hierboven gelden hier niet.`;
+  const g=dagGroei(YT.snaps,"video_id","views"),li=liveInfo("yt",g),vd=g&&g.vandaag;
+  $("ytSub").textContent=`Openbare cijfers, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("yt",g)}. De filters hierboven gelden hier niet.`;
   $("ytStats").innerHTML=`
+    <div class="ytstat"><span class="k">Vandaag erbè</span><span class="v">${li.v}</span><span class="s">${li.s.replace(/^vandaag erbè \((.*?)\)/,"$1")}</span></div>
     <div class="ytstat"><span class="k">Weergaven totaal</span><span class="v">${nf0.format(views)}</span><span class="s">${y.vids.length} tracks en video's</span></div>
-    <div class="ytstat"><span class="k">Erbij ${y.multiDay?(days>=7?"laatste 7 dagen":"sinds "+dLabel(y.base)):""}</span><span class="v">${y.multiDay?"+"+nf0.format(grow):"—"}</span><span class="s">${y.multiDay?(days?nf0.format(grow/days)+" per dag gemiddeld":""):"vanaf morgen te zien"}</span></div>
+    <div class="ytstat"><span class="k">Erbè ${y.multiDay?(days>=7?"laatste 7 dagen":"sinds "+dLabel(y.base)):""}</span><span class="v">${y.multiDay?"+"+nf0.format(grow):"—"}</span><span class="s">${y.multiDay?(days?nf0.format(grow/days)+" per dag gemiddeld":""):"vanaf morgen te zien"}</span></div>
     <div class="ytstat"><span class="k">Best bekeken</span><span class="v" style="font-size:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${best?esc(best.title):""}">${best?esc(best.title):"—"}</span><span class="s">${best?nf0.format(best.views)+" weergaven":""}</span></div>
     <div class="ytstat"><span class="k">Likes</span><span class="v">${nf0.format(likes)}</span><span class="s">${tracks} tracks · ${own} eigen video${own===1?"":"'s"}</span></div>`;
   // grafiek: erbij per dag
@@ -452,7 +454,7 @@ function renderYouTube(){
       s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
     $("ytChart").innerHTML=s+"</svg>";
     $("ytChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
-      showTip(e,`<div class="t">${dLabel(o.d,1)}</div><div class="r"><span><i class="dot yt"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
+      showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot yt"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
       r.addEventListener("mouseleave",hideTip)});
   }
   // top en groeiers
@@ -463,13 +465,13 @@ function renderYouTube(){
   $("ytGrow").innerHTML=!y.multiDay?'<p class="sub">Vanaf de tweede meting (vannacht) zie je hier welke tracks groeien.</p>':gr.length?gr.map((g,i)=>bar(g.title,[{v:g.grow,c:"yt"}],mg,"+"+nf0.format(g.grow),null,i+1)).join(""):'<p class="sub">Nog geen nieuwe weergaven in deze periode.</p>';
   // tabel
   const list=[...y.vids].sort((a,b)=>b.views-a.views);
-  $("ytTable").innerHTML=`<thead><tr><th>Titel</th><th>Soort</th><th>Uitgebracht</th><th class="n">Weergaven</th><th class="n">${y.multiDay?"Erbij":"—"}</th><th class="n">Likes</th><th class="n">Reacties</th></tr></thead><tbody>`+
+  $("ytTable").innerHTML=`<thead><tr><th>Titel</th><th>Soort</th><th>Uitgebracht</th><th class="n">Weergaven</th>${vd?'<th class="n">Vandaag</th>':""}<th class="n">${y.multiDay?(days>=7?"7 dagen":"Erbij"):"—"}</th><th class="n">Likes</th><th class="n">Reacties</th></tr></thead><tbody>`+
     list.map(v=>`<tr><td><a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener"><b>${esc(v.title)}</b></a></td>
       <td>${v.own?'<span class="chip mute">Eigen video</span>':'<span class="chip yt">Track</span>'}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${v.pub?dLabel(v.pub,1):"—"}</td>
-      <td class="n"><b>${nf0.format(v.views)}</b></td><td class="n">${y.multiDay?(v.grow>0?`<span class="up">+${nf0.format(v.grow)}</span>`:"0"):"—"}</td>
+      <td class="n"><b>${nf0.format(v.views)}</b></td>${vd?`<td class="n">${(g.per.get(v.id)||0)>0?`<span class="up">+${nf0.format(g.per.get(v.id))}</span>`:"0"}</td>`:""}<td class="n">${y.multiDay?(v.grow>0?`<span class="up">+${nf0.format(v.grow)}</span>`:"0"):"—"}</td>
       <td class="n">${nf0.format(v.likes)}</td><td class="n">${nf0.format(v.comments)}</td></tr>`).join("")+
-    `</tbody><tfoot><tr><td>Totaal (${list.length})</td><td></td><td></td><td class="n">${nf0.format(views)}</td><td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(list.reduce((a,v)=>a+v.comments,0))}</td></tr></tfoot>`;
+    `</tbody><tfoot><tr><td>Totaal (${list.length})</td><td></td><td></td><td class="n">${nf0.format(views)}</td>${vd?`<td class="n">+${nf0.format(g.erbe)}</td>`:""}<td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(list.reduce((a,v)=>a+v.comments,0))}</td></tr></tfoot>`;
   renderYtCompare(y);
 }
 /* ---------- YouTube vs. SoundCloud-afrekening ---------- */
@@ -522,11 +524,11 @@ function renderYtCompare(y){
     `</tbody><tfoot><tr><td>Totaal (${rows.length})</td><td></td><td class="n">${nf0.format(views)}</td><td class="n">${nf0.format(paid)}</td><td class="n">${nf0.format(other)}</td><td class="n">${views?pct(paid/views):""}</td><td class="n">${eur(ex(usdT))}</td><td class="n">${paid?eur(ex(usdT)/paid*1000):""}</td><td></td></tr></tfoot>`;
 }
 $("ytRefresh").addEventListener("click",async()=>{
-  const b=$("ytRefresh");b.disabled=true;b.textContent="Bezig…";
+  const b=$("ytRefresh");b.disabled=true;b.textContent="Effe geduld…";
   const {data,error}=await sb.rpc("yt_refresh");
-  b.disabled=false;b.textContent="Nu verversen";
+  b.disabled=false;b.textContent="Nâh ververse";
   if(error){showMsg("Verversen lukte niet: "+error.message);return}
-  await loadYT();renderYouTube();
+  liveNetVervers("yt");await loadYT();renderYouTube();
   showMsg(`YouTube bijgewerkt: ${data.videos} tracks en video's gemeten.${data.fouten&&data.fouten.length?" Let op: "+data.fouten.join("; "):""}`,!(data.fouten&&data.fouten.length));
 });
 
@@ -581,17 +583,19 @@ function renderSCLive(){
   const clear=()=>["sclChart","sclTop","sclGrow","sclTable","sclMoneyStats","sclMoneyTable"].forEach(i=>$(i).innerHTML="");
   if(SCL.err){$("sclStats").innerHTML=`<p class="sub">SoundCloud-cijfers ophalen lukte niet: ${esc(SCL.err)}</p>`;clear();return}
   const y=sclCompute();
-  if(!y.last){$("sclStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nu verversen".</p>';clear();return}
+  if(!y.last){$("sclStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nâh ververse".</p>';clear();return}
   const L=y.list,plays=L.reduce((a,t)=>a+(t.plays||0),0),likes=L.reduce((a,t)=>a+t.likes,0),reposts=L.reduce((a,t)=>a+t.reposts,0),
     comments=L.reduce((a,t)=>a+t.comments,0),grow=L.reduce((a,t)=>a+t.grow,0);
   const days=Math.round((new Date(y.last)-new Date(y.base))/864e5);
   const byPlays=[...L].sort((a,b)=>(b.plays||0)-(a.plays||0));
   const best=byPlays[0];
   const fresh=L.filter(t=>t.age!=null&&t.age<=60&&t.perDay!=null).sort((a,b)=>b.perDay-a.perDay)[0];
-  $("sclSub").textContent=`Openbare cijfers van je SoundCloud-profiel, elke nacht automatisch bijgewerkt · laatste meting ${dLabel(y.last,1)}. De filters hierboven gelden hier niet.`;
+  const g=dagGroei(SCL.snaps,"track_id","plays"),li=liveInfo("sc",g),vd=g&&g.vandaag;
+  $("sclSub").textContent=`Openbare cijfers van je SoundCloud-profiel, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("sc",g)}. De filters hierboven gelden hier niet.`;
   $("sclStats").innerHTML=`
+    <div class="ytstat"><span class="k">Vandaag erbè</span><span class="v">${li.v}</span><span class="s">${li.s.replace(/^vandaag erbè \((.*?)\)/,"$1")}</span></div>
     <div class="ytstat"><span class="k">Plays totaal</span><span class="v">${nf0.format(plays)}</span><span class="s">${L.length} openbare nummers</span></div>
-    <div class="ytstat"><span class="k">Erbij ${y.multiDay?(days>=7?"laatste 7 dagen":"sinds "+dLabel(y.base)):""}</span><span class="v">${y.multiDay?"+"+nf0.format(grow):"—"}</span><span class="s">${y.multiDay?(days?nf0.format(grow/days)+" per dag gemiddeld":""):"vanaf morgen te zien"}</span></div>
+    <div class="ytstat"><span class="k">Erbè ${y.multiDay?(days>=7?"laatste 7 dagen":"sinds "+dLabel(y.base)):""}</span><span class="v">${y.multiDay?"+"+nf0.format(grow):"—"}</span><span class="s">${y.multiDay?(days?nf0.format(grow/days)+" per dag gemiddeld":""):"vanaf morgen te zien"}</span></div>
     <div class="ytstat"><span class="k">Best beluisterd</span><span class="v" style="font-size:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${best?esc(best.title):""}">${best?esc(best.title):"—"}</span><span class="s">${best?nf0.format(best.plays||0)+" plays · "+pct((best.plays||0)/(plays||1))+" van alles":""}</span></div>
     <div class="ytstat"><span class="k">Snelste nieuwe release</span><span class="v" style="font-size:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${fresh?esc(fresh.title):""}">${fresh?esc(fresh.title):"—"}</span><span class="s">${fresh?nf0.format(fresh.perDay)+" plays per dag sinds upload ("+fresh.age+" dagen)":"geen release in de laatste 60 dagen"}</span></div>
     <div class="ytstat"><span class="k">Likes</span><span class="v">${nf0.format(likes)}</span><span class="s">${nf0.format(reposts)} reposts · ${nf0.format(comments)} reacties</span></div>`;
@@ -609,7 +613,7 @@ function renderSCLive(){
       s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
     $("sclChart").innerHTML=s+"</svg>";
     $("sclChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
-      showTip(e,`<div class="t">${dLabel(o.d,1)}</div><div class="r"><span><i class="dot sc"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
+      showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot sc"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
       r.addEventListener("mouseleave",hideTip)});
   }
   const top=byPlays.slice(0,10),mx=top[0]?top[0].plays||0:0;
@@ -636,20 +640,20 @@ function renderSCLive(){
         <td class="mono" style="font-size:13px;white-space:nowrap">${t.last?mLabel(t.last):"—"}</td></tr>`).join("")+
       `</tbody><tfoot><tr><td>Totaal (${mRows.length})</td><td class="n">${nf0.format(plays)}</td><td class="n">${nf0.format(paid)}</td><td class="n">${pPlays?pct(paid/pPlays):""}</td><td class="n">${eur(ex(usdT))}</td><td class="n">${pPlays?eur(ex(usdT)/pPlays*1000):""}</td><td></td></tr></tfoot>`;
   }
-  $("sclTable").innerHTML=`<thead><tr><th>Titel</th><th>Geüpload</th><th class="n">Plays</th><th class="n">${y.multiDay?"Erbij":"—"}</th><th class="n" title="Plays gedeeld door het aantal dagen sinds upload">Per dag</th><th class="n">Likes</th><th class="n">Reposts</th><th class="n">Reacties</th><th class="n">Downloads</th></tr></thead><tbody>`+
+  $("sclTable").innerHTML=`<thead><tr><th>Titel</th><th>Geüpload</th><th class="n">Plays</th>${vd?'<th class="n">Vandaag</th>':""}<th class="n">${y.multiDay?(days>=7?"7 dagen":"Erbij"):"—"}</th><th class="n" title="Plays gedeeld door het aantal dagen sinds upload">Per dag</th><th class="n">Likes</th><th class="n">Reposts</th><th class="n">Reacties</th><th class="n">Downloads</th></tr></thead><tbody>`+
     byPlays.map(t=>`<tr><td>${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a>`:`<b>${esc(t.title)}</b>`}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${t.up?dLabel(t.up,1):"—"}</td>
-      <td class="n"><b>${t.plays!=null?nf0.format(t.plays):"—"}</b></td><td class="n">${y.multiDay?(t.grow>0?`<span class="up">+${nf0.format(t.grow)}</span>`:"0"):"—"}</td>
+      <td class="n"><b>${t.plays!=null?nf0.format(t.plays):"—"}</b></td>${vd?`<td class="n">${(g.per.get(t.id)||0)>0?`<span class="up">+${nf0.format(g.per.get(t.id))}</span>`:"0"}</td>`:""}<td class="n">${y.multiDay?(t.grow>0?`<span class="up">+${nf0.format(t.grow)}</span>`:"0"):"—"}</td>
       <td class="n">${t.perDay!=null?(t.perDay>=10?nf0.format(t.perDay):nf2.format(t.perDay)):"—"}</td>
       <td class="n">${nf0.format(t.likes)}</td><td class="n">${nf0.format(t.reposts)}</td><td class="n">${nf0.format(t.comments)}</td><td class="n">${nf0.format(t.downloads)}</td></tr>`).join("")+
-    `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(plays)}</td><td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td></td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(reposts)}</td><td class="n">${nf0.format(comments)}</td><td class="n">${nf0.format(L.reduce((a,t)=>a+t.downloads,0))}</td></tr></tfoot>`;
+    `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(plays)}</td>${vd?`<td class="n">+${nf0.format(g.erbe)}</td>`:""}<td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td></td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(reposts)}</td><td class="n">${nf0.format(comments)}</td><td class="n">${nf0.format(L.reduce((a,t)=>a+t.downloads,0))}</td></tr></tfoot>`;
 }
 $("sclRefresh").addEventListener("click",async()=>{
-  const b=$("sclRefresh");b.disabled=true;b.textContent="Bezig…";
+  const b=$("sclRefresh");b.disabled=true;b.textContent="Effe geduld…";
   const {data,error}=await sb.rpc("sc_refresh");
-  b.disabled=false;b.textContent="Nu verversen";
+  b.disabled=false;b.textContent="Nâh ververse";
   if(error){showMsg("Verversen lukte niet: "+error.message);return}
-  await loadSCL();renderSCLive();
+  liveNetVervers("sc");await loadSCL();renderSCLive();
   showMsg(`SoundCloud bijgewerkt: ${data.tracks} nummers gemeten.`,true);
 });
 
@@ -685,7 +689,7 @@ function spCompute(){
     // tempo: bij voorkeur sinds de vorige import, anders gemiddeld sinds release
     t.perMonth=prev&&days>=14?t.grow/days*30.4:(t.perDay!=null?t.perDay*30.4:null);
   });
-  return {dates,last,prev,old,list,file:(cur[0]||{}).source_file||""};
+  return {dates,last,prev,old,days,list,file:(cur[0]||{}).source_file||""};
 }
 // Titels koppelen: eerst exact, daarna "titel bevat" — elke afrekening hoort bij maximaal één nummer
 function spMatch(list,map){
@@ -744,7 +748,7 @@ function renderSpotify(){
   $("spSub").textContent=`Stand van ${dLabel(y.last,1)}${y.file?" · "+y.file:""}. Spotify heeft geen koppeling: je werkt dit bij door af en toe een nieuwe export in te laden. De filters hierboven gelden hier niet.`;
   $("spStats").innerHTML=`
     <div class="ytstat"><span class="k">Streams totaal</span><span class="v">${nf0.format(streams)}</span><span class="s">${L.length} nummers, sinds release</span></div>
-    <div class="ytstat"><span class="k">Erbij</span><span class="v">${y.prev?"+"+nf0.format(grow):"—"}</span><span class="s">${y.prev?"sinds je import van "+dLabel(y.prev,1):"zie je na je volgende import"}</span></div>
+    <div class="ytstat"><span class="k">Erbè sinds vorige CSV</span><span class="v">${y.prev?"+"+nf0.format(grow):"—"}</span><span class="s">${y.prev?`tussen ${dLabel(y.prev)} en ${dLabel(y.last)} · ≈ ${nf0.format(grow/(y.days||1))} per dag · alleen bij een nieuwe CSV`:"zie je na je volgende CSV (Spotify heeft geen live koppeling)"}</span></div>
     <div class="ytstat"><span class="k">Best gestreamd</span><span class="v" style="font-size:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${best?esc(best.title):""}">${best?esc(best.title):"—"}</span><span class="s">${best?nf0.format(best.streams)+" streams · "+pct(best.streams/(streams||1))+" van alles":""}</span></div>
     <div class="ytstat"><span class="k">Snelste nieuwe release</span><span class="v" style="font-size:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${fresh?esc(fresh.title):""}">${fresh?esc(fresh.title):"—"}</span><span class="s">${fresh?nf2.format(fresh.perDay)+" streams per dag sinds release ("+fresh.age+" dagen)":"geen release tussen 1 week en 60 dagen oud"}</span></div>`;
   const top=byS.slice(0,10),mx=top[0]?top[0].streams:0;
