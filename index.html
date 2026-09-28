@@ -40,6 +40,7 @@
     <button type="button" data-s="muziek">Muziek</button>
     <button type="button" data-s="insta">Insta</button>
     <button type="button" data-s="apps">Apps</button>
+    <button type="button" data-s="kansen">Kansâh</button>
   </nav>
 
   <section class="sectie" id="s-ovahzicht" hidden>
@@ -212,7 +213,7 @@
   </section>
 
   <section class="panel" id="p-kansen" hidden>
-    <div class="insights" id="insights"></div>
+    <div id="insights"></div>
   </section>
 
   <footer><div style="display:grid;gap:4px;max-width:80ch">
@@ -314,6 +315,21 @@
     </div>
   </section>
 
+  <section class="sectie" id="s-kansen" hidden>
+    <div class="card khero">
+      <div class="cardhead"><div><h2>Waâh zit nog wat?</h2><p class="sub" id="kansSub"></p></div>
+        <div class="seg" id="kansFilter" role="group" aria-label="Filter">
+          <button type="button" data-v="alles" aria-pressed="true">Alles <span></span></button>
+          <button type="button" data-v="muziek" aria-pressed="false"><i class="dot sc"></i>Muziek <span></span></button>
+          <button type="button" data-v="insta" aria-pressed="false"><i class="dot hy"></i>Insta <span></span></button>
+          <button type="button" data-v="sneek" aria-pressed="false"><i class="dot groen"></i>Sneek <span></span></button>
+        </div></div>
+      <div class="ktop"><h3>Doe dit deze week</h3><ol id="kansTop"></ol></div>
+    </div>
+    <div id="kansLijst"></div>
+    <p class="sub">Klik <b>Mee bezig</b> of <b>Gedaan</b>: dan onthoudt het dashboard de stand van dat moment en zie je bij de kaart of het betâh gaat. <b>Nie voor mij</b> zet een kans weg. Samenhang is geen bewijs: kijk ook naar hoe zeker een kaart is.</p>
+  </section>
+
   <footer class="eind"><span class="sig">Gemaakt in 070, âhwe!</span></footer>
 </div>
 <div id="tip" hidden></div>
@@ -325,6 +341,7 @@
 <script src="js/muziek.js"></script>
 <script src="js/apps.js"></script>
 <script src="js/insta.js"></script>
+<script src="js/kansen.js"></script>
 <script src="js/ovahzicht.js"></script>
 <script src="js/app.js"></script>
 <script src="js/start.js"></script>

@@ -66,6 +66,7 @@ function hertekenLive(){
   else if(sectie==="muziek"&&(state.tab==="youtube"||state.tab==="sclive"))render();
   else if(sectie==="apps")renderSneek();
   else if(sectie==="insta")renderInsta();
+  else if(sectie==="kansen")renderKansen();
 }
 // statusstukje achter een live-getal: bezig / fout / wanneer bijgewerkt
 function liveStatus(bron,sqlNaam){const L=LIVE[bron]||{};

@@ -42,7 +42,8 @@ function renderOvahzicht(){
     <button class="btn yellow" type="button" data-ga="muziek">Kèk bè Muziek</button>
   </article>
   ${instaTegel()}
-  ${appsTegel()}`;
+  ${appsTegel()}
+  ${kansTegel()}`;
 }
 
 function appsTegel(){

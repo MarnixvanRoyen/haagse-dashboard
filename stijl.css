@@ -242,3 +242,30 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 #igAlleenLeeg[aria-pressed=true]{background:var(--groen);border-color:var(--groen);color:#fff}
 @media (max-width:620px){.igpost{grid-template-columns:52px minmax(0,1fr)}.igthumb{width:52px;height:52px}.igsel{grid-column:1/-1}}
 #igKies{flex-wrap:wrap;max-width:100%}
+
+/* ---------- Kansâh ---------- */
+#s-kansen{gap:16px}
+#insights{display:grid;gap:16px}
+.kkop{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip.kbron{background:color-mix(in srgb,var(--c) 22%,var(--surface));color:var(--ink);border:1px solid color-mix(in srgb,var(--c) 55%,transparent)}
+.kans h3 b,.kans h3 code{color:var(--hy)}
+.kans .act .btn{margin-left:4px;min-height:30px;padding:3px 10px;font-size:13px}
+.kvoort{font-size:13px;color:var(--ink-2);border-top:1px dashed var(--line);padding-top:8px}
+.kknop{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.kknop .btn{min-height:32px;padding:4px 10px;font-size:13px}
+.kknop .btn[aria-pressed=true]{background:var(--groen);border-color:var(--groen);color:#fff}
+.kknop .kweg{background:none;color:var(--muted)}
+.kans.k-gedaan{opacity:.85;border-style:dashed}
+.kans.k-bezig{border-color:var(--hy)}
+.kans.k-verborgen{opacity:.55}
+.kgroep{font-family:var(--display);font-weight:400;font-size:20px;margin:22px 0 10px}
+.ktop{margin-top:14px;padding:12px 16px;background:var(--surface-2);border-left:5px solid var(--hy);border-radius:12px}
+.ktop h3{margin:0 0 6px;font-family:var(--display);font-weight:400;font-size:20px;color:var(--hy)}
+.ktop ol{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:14.5px}
+.ktop li b:first-child{color:var(--hy);margin-right:4px}
+#kansFilter{flex-wrap:wrap;max-width:100%}
+#kansFilter span{font-size:12px;opacity:.8}
+.tegel .trij .chip.kbron{font-size:11px}
+.ins a,.ktop a{color:var(--hy)}
+@media (max-width:480px){nav.hoofdmenu button{padding:8px 10px;font-size:15px}}
+@media (max-width:480px){nav.hoofdmenu{flex-wrap:wrap;border-radius:22px;justify-content:center}}
