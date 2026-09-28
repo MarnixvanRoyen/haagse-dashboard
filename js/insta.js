@@ -5,6 +5,7 @@ let IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:null};
 let igKies="soort";            // "Wat werkt": waarop vergelijken
 let igLabelAantal=20;          // hoeveel posts in de muziek-lijst
 let igAlleenLeeg=false;        // alleen posts zonder muziek-label tonen
+let igSorteer="nieuw";         // muziek-lijst: "nieuw" of "bereik"
 
 async function igAlles(maak){   // haalt alles op, 1000 per keer (Supabase geeft max 1000 regels per vraag)
   let out=[],from=0;
@@ -22,6 +23,7 @@ async function loadIG(){
       sb.from("ig_story").select("media_id,soort,gepost_om,permalink,cijfers,fout").gte("gepost_om",since).order("gepost_om",{ascending:false}).range(0,499)]);
     for(const r of [a,p,d,s])if(r.error)throw r.error;
     IG={acc:a.data[0]||null,profiel:p.data,dag:d.data.map(x=>({dag:String(x.dag).slice(0,10),c:x.cijfers||{}})),posts:m,stories:s.data,err:null};
+    igBadge();
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
 }
 
@@ -233,27 +235,52 @@ function renderIgSneek(){
     :'<tbody><tr><td class="sub">Nog geen bezoek via een eigen link. Maak er hierboven een en zet hem in je story of bio.</td></tr></tbody>';
 }
 
-function renderIgMuziek(){
-  const titels=igTrackTitels();
+// Wachtkamâh: nieuwe posts (vanaf IG_WACHT_VANAF) zonder muziek-keuze. Ze gaan eruit zodra je iets kiest (ook "Geen eigen muziek").
+const IG_WACHT_VANAF="2026-09-22";
+function igWachtend(){return IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=IG_WACHT_VANAF&&!labelsVan(p,"muziek").length)}
+function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="insta"]');if(!b)return;
+  const n=igWachtend().length;let s=b.querySelector(".badge");
+  if(!n){if(s)s.remove();return}
+  if(!s){s=document.createElement("span");s.className="badge";b.appendChild(s)}
+  s.textContent=n;s.title=n+" nieuwe post"+(n>1?"s wachten":" wacht")+" op muziek";}
+function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
-  const opties=`<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option>`+
+  return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option>`+
     (recent.length?`<optgroup label="Laatst gekozen">${recent.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`:"")+
     `<optgroup label="Alle nummâhs (SoundCloud)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
-  let lijst=IG.posts.filter(p=>p.gepost_om);
-  if(igAlleenLeeg)lijst=lijst.filter(p=>!labelsVan(p,"muziek").length);
-  const zonder=IG.posts.filter(p=>!labelsVan(p,"muziek").length).length;
-  $("igLabelSub").innerHTML=`Meta vertelt niet welk geluid onder een post zit, dus dat kies je hier zelf. Nog ${nf0.format(zonder)} van de ${nf0.format(IG.posts.length)} posts zonder keuze. Begin bij de nieuwste: daar heb je de meeste cijfâhs van.`;
-  $("igLabels").innerHTML=lijst.slice(0,igLabelAantal).map(p=>{
-    const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
-    const eff=m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null;
-    const effTxt=eff?`<span class="igeff" title="SoundCloud-plays van dit nummâh">♪ na de post: ${plus(eff.na)} plays in ${eff.dagenNa} dag${eff.dagenNa>1?"en":""}${eff.voor!=null?` (week ervoor ${plus(eff.voor)})`:""}</span>`:"";
-    return `<div class="igpost" data-id="${esc(p.media_id)}">
+}
+function igPostRij(p,opties,titels){
+  const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
+  const eff=m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null;
+  const effTxt=eff?`<span class="igeff" title="SoundCloud-plays van dit nummâh">♪ na de post: ${plus(eff.na)} plays in ${eff.dagenNa} dag${eff.dagenNa>1?"en":""}${eff.voor!=null?` (week ervoor ${plus(eff.voor)})`:""}</span>`:"";
+  return `<div class="igpost" data-id="${esc(p.media_id)}">
       <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
-      <div class="iginfo"><b>${dLabel(dagNL(p.gepost_om),1)}</b> · ${p.bereik==null?"nog geen cijfâhs":"bereik "+nf0.format(p.bereik)+(p.kwaliteit!=null?" · kwaliteit "+nf0.format(p.kwaliteit):"")}
+      <div class="iginfo"><span><b>${dLabel(dagNL(p.gepost_om),1)}</b> · ${p.bereik==null?"nog geen cijfâhs":"bereik "+nf0.format(p.bereik)+(p.kwaliteit!=null?" · kwaliteit "+nf0.format(p.kwaliteit):"")}</span>
         <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,90))}</span>
         <span class="igchips">${ond.map(o=>`<span class="chip mute">${esc(o)}</span>`).join("")}${effTxt}</span></div>
       <select class="igsel" aria-label="Muziek onder deze post">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&m!=="(geen)"&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>
-    </div>`}).join("")||'<p class="sub">Alle posts hebben een keuze. Top, âhwe!</p>';
+    </div>`;
+}
+function renderIgMuziek(){
+  const titels=igTrackTitels(),opties=igMuziekOpties(titels);
+  // 1. wachtkamâh (nieuwste eerst)
+  const wacht=igWachtend();
+  $("igWacht").hidden=!wacht.length;
+  if(wacht.length){
+    $("igWachtSub").innerHTML=`${wacht.length} nieuwe post${wacht.length>1?"s wachten":" wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat; dan telt hij mee bij de vergelijking.`;
+    $("igWachtLijst").innerHTML=wacht.map(p=>igPostRij(p,opties,titels)).join("");
+  }
+  igBadge();
+  // 2. archief (zonder de wachtende posts)
+  const wachtId=new Set(wacht.map(p=>p.media_id));
+  let lijst=IG.posts.filter(p=>p.gepost_om&&!wachtId.has(p.media_id));
+  if(igAlleenLeeg)lijst=lijst.filter(p=>!labelsVan(p,"muziek").length);
+  if(igSorteer==="bereik")lijst=[...lijst].sort((a,b)=>(b.bereik??-1)-(a.bereik??-1)||(a.gepost_om<b.gepost_om?1:-1));
+  document.querySelectorAll("#igSorteer button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igSorteer));
+  const zonder=IG.posts.filter(p=>!labelsVan(p,"muziek").length&&!wachtId.has(p.media_id)).length;
+  $("igLabelSub").innerHTML=`Meta vertelt niet welk geluid onder een post zit, dus dat kies je hier zelf. Nog ${nf0.format(zonder)} oudere posts zonder keuze.`+
+    (igSorteer==="bereik"?" Gesorteerd op bereik: je grootste posts eerst, daar zit de meeste potentie.":" Tip: sorteer op <b>Meeste bereik</b> en zet <b>Alleen zonder keuze</b> aan, dan werk je de belangrijkste eerst af.");
+  $("igLabels").innerHTML=lijst.slice(0,igLabelAantal).map(p=>igPostRij(p,opties,titels)).join("")||'<p class="sub">Alle posts hebben een keuze. Top, âhwe!</p>';
   $("igMeer").hidden=lijst.length<=igLabelAantal;
 }
 
@@ -272,6 +299,7 @@ async function igZetMuziek(id,nieuw){
 document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)igZetMuziek(s.closest(".igpost").dataset.id,s.value)});
 document.addEventListener("click",async e=>{
   const k=e.target.closest("#igKies button");if(k){igKies=k.dataset.v;renderInsta();return}
+  const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}
   if(e.target.closest("#igMeer")){igLabelAantal+=20;renderIgMuziek();return}
   if(e.target.closest("#igAlleenLeeg")){igAlleenLeeg=!igAlleenLeeg;e.target.setAttribute("aria-pressed",igAlleenLeeg);igLabelAantal=20;renderIgMuziek();return}
   const l=e.target.closest("[data-iglink]");if(l){
@@ -305,6 +333,7 @@ function instaTegel(){
       ${tegelRij("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")+liveStatus("ig","09b_insta_extra.sql"))}
       ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie")}
       ${tegelRij("Naâh Sneek",nf0.format(g.d7),"bezoekâhs via Insta + Facebook, laatste 7 dagen")}
+      ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
     </div>
     <button class="btn yellow" type="button" data-ga="insta">Kèk bè Insta</button>
   </article>`;

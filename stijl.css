@@ -269,3 +269,8 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .ins a,.ktop a{color:var(--hy)}
 @media (max-width:480px){nav.hoofdmenu button{padding:8px 10px;font-size:15px}}
 @media (max-width:480px){nav.hoofdmenu{flex-wrap:wrap;border-radius:22px;justify-content:center}}
+
+/* wachtkamer */
+.igwacht{border-color:var(--hy);border-width:2px}
+.igwacht h2{color:var(--hy)}
+nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--yt);color:#fff;font-family:var(--body);font-weight:800;font-size:12px;line-height:18px;text-align:center;vertical-align:2px}
