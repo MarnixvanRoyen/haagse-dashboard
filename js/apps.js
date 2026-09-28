@@ -76,7 +76,7 @@ function renderSneek(){
 
 
 /* ---------- GoatCounter: bezoekers en gebeurtenissen (tabellen gc_dag en gc_bronnen, zie 06_goatcounter.sql) ---------- */
-let GC={dag:[],bronnen:[],err:null};
+let GC={dag:[],bronnen:[],uur:null,err:null};
 
 async function loadGC(){
   try{
@@ -85,8 +85,19 @@ async function loadGC(){
       sb.from("gc_dag").select("dag,pad,event,titel,aantal").gte("dag",since).order("dag").range(0,4999),
       sb.from("gc_bronnen").select("dag,bron,aantal").gte("dag",since).order("dag").range(0,4999)]);
     if(d.error)throw d.error;if(b.error)throw b.error;
-    GC={dag:d.data,bronnen:b.data,err:null};
-  }catch(e){GC={dag:[],bronnen:[],err:e.message}}
+    GC={dag:d.data,bronnen:b.data,uur:null,err:null};
+    // per uur (08_goatcounter_live.sql): nodig om "vandaag" op Haagse tijd te tellen; ontbreekt de tabel, dan UTC-dag
+    const u=await sb.from("gc_uur").select("uur,pad,event,aantal").gte("uur",new Date(Date.now()-3*864e5).toISOString()).range(0,4999);
+    if(!u.error)GC.uur=u.data;
+  }catch(e){GC={dag:[],bronnen:[],uur:null,err:e.message}}
+}
+// vandaag (Haagse tijd): bezoekâhs, hoeveel daarvan een potje speelden, en gedeelde scoâhs
+function gcVandaag(){
+  const vandaag=vandaagAms();let rows,exact=true;
+  if(GC.uur)rows=GC.uur.filter(r=>dagNL(r.uur)===vandaag);
+  else{exact=false;const d=dagUTC(Date.now());rows=GC.dag.filter(r=>String(r.dag).slice(0,10)===d)}
+  const som=f=>rows.filter(f).reduce((a,r)=>a+(+r.aantal||0),0);
+  return {bezoek:som(r=>!r.event),speelden:som(r=>r.pad==="potje-gestart"),gedeeld:som(r=>r.pad==="score-gedeeld"),exact};
 }
 
 const dagUTC=t=>new Date(t).toISOString().slice(0,10);   // GoatCounter telt in UTC-dagen
@@ -125,24 +136,26 @@ function renderGC(){
   const g=gcCompute();
   const vs=(a,b)=>`vorige week ${nf0.format(b)}${a>b?' <span class="up">↑</span>':""}`;
   const top=g.bronnen.find(b=>b.naam!=="Direct")||g.bronnen[0];
+  const v=gcVandaag();
   $("gcStats").innerHTML=[
+    ["Vandaag",nf0.format(v.bezoek)+" bezoekâhs",`${nf0.format(v.speelden)} speelden een potje${v.bezoek?" ("+pct(Math.min(1,v.speelden/v.bezoek))+")":""}${v.gedeeld?" · "+nf0.format(v.gedeeld)+" scoâhs gedeeld":""}${liveStatus("gc","08_goatcounter_live.sql")}`],
     ["Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+vs(g.b7,g.b7v)],
-    ["Potjes gestart",nf0.format(g.p7),g.b7?`${nf2.format(g.p7/g.b7)} per bezoekâh · `+vs(g.p7,g.p7v):vs(g.p7,g.p7v)],
+    ["Speelden een potje",nf0.format(g.p7),g.b7?`${pct(Math.min(1,g.p7/g.b7))} van de bezoekâhs · `+vs(g.p7,g.p7v):vs(g.p7,g.p7v)],
     ["Scoâhs gedeeld",nf0.format(g.g7),"in een story · "+vs(g.g7,g.g7v)],
     ["Beste bron",top?esc(bronNaam(top.naam)):"—",top&&g.b30?pct(top.n/g.bronnen.reduce((a,b)=>a+b.n,0))+" van de bezoekâhs (30 dagen)":""]
   ].map(([k,v,s])=>`<div class="ytstat"><span class="k">${k}</span><span class="v" title="${v}">${v}</span><span class="s">${s}</span></div>`).join("");
-  $("gcSub").textContent="Uit GoatCounter, elke nacht vanzelf bijgewerkt"+(g.laatste?" · laatste meting "+dLabel(String(g.laatste).slice(0,10),1):"");
+  $("gcSub").textContent="Uit GoatCounter, ververst zodra je het dashboard opent (hooguit 1x per 10 min)"+(g.laatste?" · laatste meting "+dLabel(String(g.laatste).slice(0,10),1):"");
   kolommen($("gcChart"),g.dagen,"hy","Bezoekers per dag","bezoekâhs");
   const mb=Math.max(1,...g.bronnen.map(b=>b.n)),tb=g.bronnen.reduce((a,b)=>a+b.n,0);
   $("gcBronnen").innerHTML=g.bronnen.length?g.bronnen.slice(0,8).map((b,i)=>bar(bronNaam(b.naam),[{v:b.n,c:"hy"}],mb,nf0.format(b.n)+" · "+pct(tb?b.n/tb:0),"",i+1)).join(""):'<p class="sub">Nog geen bronnen gemeten.</p>';
-  const stappen=[["Bezoekâhs",g.b30],["Potjes gestart",g.p30],["Nieuw op de lèst",g.nieuw30],["Scoâh gedeeld",g.g30]];
+  const stappen=[["Bezoekâhs",g.b30],["Speelden een potje",g.p30],["Nieuw op de lèst",g.nieuw30],["Scoâh gedeeld",g.g30]];
   const mt=Math.max(1,...stappen.map(s=>s[1]));
   $("gcTrechter").innerHTML=stappen.map(([n,v],i)=>bar(n,[{v,c:i?"groen":"hy"}],mt,nf0.format(v)+(i&&g.b30?" · "+pct(v/g.b30):""),"",i+1)).join("")+
-    '<p class="sub" style="margin:10px 0 0">Percentages t.o.v. het aantal bezoekâhs. Eén bezoekâh kan meerdere potjes spele, dus "potjes" kan boven de 100% uitkomen.</p>';
+    '<p class="sub" style="margin:10px 0 0">Percentages t.o.v. het aantal bezoekâhs. GoatCounter telt elke bezoekâh 1 keer per 8 uur, ook als die meerdere potjes speelt.</p>';
 }
 $("gcRefresh").addEventListener("click",async e=>{const b=e.target;b.disabled=true;b.textContent="Effe geduld…";
   const {error}=await sb.rpc("gc_refresh",{dagen:3});
-  if(error)showMsg("GoatCounter verversen lukte nie: "+error.message);else{await loadGC();renderSneek();showMsg("GoatCounter bijgewerkt, âhwe!",true)}
+  if(error)showMsg("GoatCounter verversen lukte nie: "+error.message);else{LIVE.gc={...(LIVE.gc||{}),om:new Date().toISOString(),fout:null};await loadGC();renderSneek();showMsg("GoatCounter bijgewerkt, âhwe!",true)}
   b.disabled=false;b.textContent="Nâh ververse"});
 
 let snRsz;addEventListener("resize",()=>{clearTimeout(snRsz);snRsz=setTimeout(()=>{if(sectie==="apps")renderSneek()},150)});

@@ -16,6 +16,11 @@ function spotifyRij(label){
   const erbe=cur.reduce((a,s)=>a+(+s.streams||0)-(prevBy.get(s.song)||0),0);
   return streamRij(label,(erbe>0?"+":"")+nf0.format(erbe),tot,`erbè tussen CSV ${dLabel(prev)} en ${dLabel(last)} (alleen bij een nieuwe CSV)`);
 }
+// Sneek vandaag: bezoekâhs groot, eronder hoeveel er een potje speelden
+function bezoekRij(v){
+  const pctS=v.bezoek?" ("+pct(Math.min(1,v.speelden/v.bezoek))+")":"";
+  return `<div class="trij"><span class="k">Bezoekâhs vandaag</span><span class="v">${nf0.format(v.bezoek)}</span><span class="tot">${nf0.format(v.speelden)} speelden${pctS}</span><span class="s">${v.exact?"sinds 00:00":"sinds "+tijdAms(dagUTC(Date.now())+"T00:00:00Z")}${v.gedeeld?" · "+nf0.format(v.gedeeld)+" scoâhs gedeeld":""}${liveStatus("gc","08_goatcounter_live.sql")}</span></div>`;
+}
 // rij met groot getal (erbè) en het totaal eronder
 function streamRij(k,v,tot,s){return `<div class="trij"><span class="k">${k}</span><span class="v">${v}</span><span class="tot">totaal ${nf0.format(tot)}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
 function tegelRij(k,v,s){return `<div class="trij"><span class="k">${k}</span><span class="v">${v}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
@@ -53,8 +58,9 @@ function appsTegel(){
     <div class="tgroot">${nf0.format(n.spelers)}</div>
     <p class="s">haagsesneek.nl</p>
     <div class="trijen">
+      ${GC.dag.length?(v=>bezoekRij(v))(gcVandaag()):""}
       ${tegelRij("Nieuwe spelâhs",(n.nieuw7?"+":"")+nf0.format(n.nieuw7),"laatste 7 dagen")}
-      ${GC.dag.length?(g=>tegelRij("Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+nf0.format(g.p7)+" potjes gestart"))(gcCompute()):""}
+      ${GC.dag.length?(g=>tegelRij("Bezoekâhs",nf0.format(g.b7),"laatste 7 dagen · "+nf0.format(g.p7)+" speelden een potje"))(gcCompute()):""}
       ${tegelRij("Hoogste scoâh",n.top[0]?nf0.format(n.top[0].score):"—",n.top[0]?"@"+esc(n.top[0].insta):"")}
     </div>
     <button class="btn yellow" type="button" data-ga="apps">Kèk bè Apps</button>

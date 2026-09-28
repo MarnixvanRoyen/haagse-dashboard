@@ -4,7 +4,7 @@
    YouTube en SoundCloud: bij het openen vraagt de app Supabase om nieuwe cijfers (rpc muziek_live,
    hooguit 1x per 10 min). "Vandaag erbè" = laatste meting van vandaag min de laatste meting van de dag ervoor.
    Spotify heeft geen API: daar is het verschil tussen de laatste twee CSV-exports. */
-const LIVE={yt:null,sc:null,bezig:false,t:0};
+const LIVE={yt:null,sc:null,gc:null,bezig:false,t:0};
 store.del("hc_muziek_gezien");                         // oude "sinds je vorige bezoek"-telling opruimen
 function vandaagAms(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Amsterdam"}).format(new Date())}
 function tijdAms(ts){return ts?new Date(ts).toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Amsterdam"}):""}
@@ -47,15 +47,16 @@ function liveInfo(bron,g){
 // laatste meettijd van vandaag, voor de uitleg bovenaan de tabbladen
 function laatsteMeting(bron,g){const L=LIVE[bron]||{};
   return g?dLabel(g.last,1)+(L.om&&g.last===(L.vandaag||vandaagAms())?" "+tijdAms(L.om):""):"nog geen"}
+// YouTube, SoundCloud en GoatCounter (Sneek-bezoekers) tegelijk verversen, elk een eigen vraag (i.v.m. tijdslimiet)
 async function muziekLive(){
   if(!sb||LIVE.bezig||Date.now()-LIVE.t<10*60e3)return;
   LIVE.bezig=true;LIVE.t=Date.now();hertekenLive();
-  const bronnen=["yt","sc"];
-  const res=await Promise.all(bronnen.map(b=>sb.rpc("muziek_live",{bron:b}).then(r=>r,e=>({error:e}))));
+  const bronnen=["yt","sc","gc"];
+  const res=await Promise.all(bronnen.map(b=>(b==="gc"?sb.rpc("gc_live"):sb.rpc("muziek_live",{bron:b})).then(r=>r,e=>({error:e}))));
   const laden=[];
   res.forEach((r,i)=>{const b=bronnen[i];
     LIVE[b]=r.error?{fout:r.error.message||String(r.error)}:r.data;
-    if(r.data&&r.data.ververst)laden.push(b==="yt"?loadYT():loadSCL());});
+    if(r.data&&r.data.ververst)laden.push(b==="yt"?loadYT():b==="sc"?loadSCL():loadGC());});
   await Promise.all(laden);
   LIVE.bezig=false;
   hertekenLive();
@@ -63,6 +64,13 @@ async function muziekLive(){
 function hertekenLive(){
   if(sectie==="ovahzicht")renderOvahzicht();
   else if(sectie==="muziek"&&(state.tab==="youtube"||state.tab==="sclive"))render();
+  else if(sectie==="apps")renderSneek();
+}
+// statusstukje achter een live-getal: bezig / fout / wanneer bijgewerkt
+function liveStatus(bron,sqlNaam){const L=LIVE[bron]||{};
+  if(LIVE.bezig)return " · effe bèwerke…";
+  if(L.fout)return new RegExp(bron==="gc"?"gc_live|gc_uur":"muziek_live").test(L.fout)?` · live staat nog uit (draai ${sqlNaam})`:" · live ophalen lukte nie";
+  return L.om?" · bègewerkt "+tijdAms(L.om):"";
 }
 // na "Nâh ververse" op een tabblad: tijdstip bijwerken
 function liveNetVervers(bron){LIVE[bron]={...(LIVE[bron]||{}),om:new Date().toISOString(),fout:null,vandaag:vandaagAms()}}
