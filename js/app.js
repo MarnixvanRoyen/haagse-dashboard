@@ -1,11 +1,11 @@
 // app.js — het hoofdmenu: Ovâhzicht · Muziek · Insta · Apps
 
 const SECTIES=["ovahzicht","muziek","insta","apps"];
-let sectie=store.get("hc_sectie");                 // onthoudt waar je laatst was
-if(!SECTIES.includes(sectie))sectie="ovahzicht";
+let sectie="ovahzicht";                            // bij openen altijd op het Ovâhzicht beginnen
+store.del("hc_sectie");                            // oude "laatste plek" opruimen
 
 function setSectie(s){
-  sectie=s;store.set("hc_sectie",s);
+  sectie=s;
   document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.setAttribute("aria-current",b.dataset.s===s?"page":"false"));
   SECTIES.forEach(x=>$("s-"+x).hidden=x!==s);
   if(s==="muziek")render();          // grafieken opnieuw tekenen nu ze zichtbaar zijn
