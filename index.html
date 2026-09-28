@@ -222,11 +222,58 @@
   </section>
 
   <section class="sectie" id="s-insta" hidden>
-    <div class="card binnenkort">
+    <div id="igBlok" class="sectie">
+      <div class="card">
+        <div class="cardhead"><div><h2>Insta · @the_hague_beachlife</h2><p class="sub" id="igSub"></p></div>
+          <button class="btn" id="igRefresh" type="button">Nâh ververse</button></div>
+        <div class="ytstats" id="igStats"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Bereik per dag</h2><p class="sub">Laatste 30 Meta-dagen. Hoeveel verschillende mensen je die dag zagen.</p></div>
+          <div class="legend"><span><i class="dot groen"></i>Volgâhs</span><span><i class="dot hy"></i>Nieuwe mensen</span><span><i class="dot muted"></i>Nog nie opgesplitst</span></div></div>
+        <div class="chart" id="igChart"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Wat werkt?</h2><p class="sub" id="igWwSub"></p></div>
+          <div class="seg" id="igKies" role="group" aria-label="Vergelijk op">
+            <button type="button" data-v="soort" aria-pressed="true">Soort</button>
+            <button type="button" data-v="onderwerp" aria-pressed="false">Onderwerp</button>
+            <button type="button" data-v="dag" aria-pressed="false">Dag</button>
+            <button type="button" data-v="tijd" aria-pressed="false">Tijdstip</button>
+            <button type="button" data-v="muziek" aria-pressed="false">Muziek</button>
+          </div></div>
+        <div class="tablewrap"><table id="igWw"></table></div>
+        <p class="sub" style="margin:12px 0 0">Het archief vult zich elke nacht met 60 oudere posts (compleet rond half oktober). Samenhang is geen bewijs: kijk vooral naar groepen met <span class="chip good">betrouwbaar</span>.</p>
+      </div>
+      <div class="card"><h2>Je toppâhs</h2><p class="sub">Beste posts van de laatste 90 dagen, op bereik. Klik om de post te openen.</p><div class="tablewrap"><table id="igTop"></table></div></div>
+      <div class="card"><h2>Stories</h2><p class="sub">Laatste 7 dagen, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken.</p><div id="igStories"></div></div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Van Insta naâh Sneek</h2><p class="sub">Uit GoatCounter. De Insta-app opent links in z'n eigen browser, dus een deel komt binnen als "Direct": zie dit als ondergrens.</p></div></div>
+        <div class="ytstats" id="igSnStats"></div>
+        <div class="chart" id="igSnChart" style="margin-top:14px"></div>
+        <div class="legend" style="margin-top:6px"><span><i class="dot hy"></i>Insta (ook eigen links)</span><span><i class="dot lb"></i>Facebook</span></div>
+        <div class="iglinkmaker">
+          <p class="sub" style="margin:0"><b>Maak een eigen link</b> voor je story, post of bio: dan zie je precies hoeveel bezoekâhs die ene story oplevert.</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn yellow" type="button" data-iglink="story">Link voor story</button>
+            <button class="btn" type="button" data-iglink="post">Link voor post</button>
+            <button class="btn" type="button" data-iglink="bio">Link voor bio</button>
+          </div>
+          <input class="search" id="igLinkUit" readonly hidden aria-label="Gemaakte link" style="width:min(420px,100%)">
+        </div>
+        <div class="tablewrap" style="margin-top:12px"><table id="igSnLinks"></table></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Welk nummâh zat eronder?</h2><p class="sub" id="igLabelSub"></p></div>
+          <button class="btn" id="igAlleenLeeg" type="button" aria-pressed="false">Alleen zonder keuze</button></div>
+        <div class="iglabels" id="igLabels"></div>
+        <button class="btn" id="igMeer" type="button" style="margin-top:10px">Meer posts</button>
+      </div>
+    </div>
+    <div class="card binnenkort" id="igNog" hidden>
       <h2>Insta · @the_hague_beachlife</h2>
       <p class="kd">Komt d'r an, âhwe!</p>
-      <p class="sub">Hier komt straks elke dag vanzelf te staan:</p>
-      <ul><li>Volgâhs erbè of eraf, per dag en per week</li><li>Bereik en weergaven van je posts, reels en stories</li><li>Wat werkt: je beste posts en de beste dagen en tijden</li><li>Tikken op de link-sticker (bijvoorbeeld naar Sneek)</li></ul>
+      <p class="sub" id="igNogTekst"></p>
     </div>
   </section>
 
@@ -277,6 +324,7 @@
 <script src="js/live.js"></script>
 <script src="js/muziek.js"></script>
 <script src="js/apps.js"></script>
+<script src="js/insta.js"></script>
 <script src="js/ovahzicht.js"></script>
 <script src="js/app.js"></script>
 <script src="js/start.js"></script>

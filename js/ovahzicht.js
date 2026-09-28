@@ -41,12 +41,7 @@ function renderOvahzicht(){
     </div>
     <button class="btn yellow" type="button" data-ga="muziek">Kèk bè Muziek</button>
   </article>
-  <article class="tegel binnenkort">
-    <div class="tkop"><h2>Insta</h2><span class="tag">@the_hague_beachlife</span></div>
-    <p class="kd">Komt d'r an, âhwe!</p>
-    <p class="s">Volgâhs, bereik en wat werkt, straks elke dag vanzelf bijgewerkt.</p>
-    <button class="btn" type="button" data-ga="insta">Wat komt d'r?</button>
-  </article>
+  ${instaTegel()}
   ${appsTegel()}`;
 }
 

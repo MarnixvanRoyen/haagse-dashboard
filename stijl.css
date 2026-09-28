@@ -219,3 +219,26 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .sub code{font-size:.95em;background:var(--surface-2);padding:1px 5px;border-radius:5px}
 .dot.hy{background:var(--hy)}
 #gcBlok{gap:16px}
+
+/* ---------- Insta ---------- */
+#igBlok{gap:16px}
+.dot.groen{background:var(--groen)}.dot.muted{background:var(--muted)}
+.down{color:var(--yt);font-weight:700}
+.igidx{display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.igidxbar{display:inline-block;width:70px;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.igidxbar i{display:block;height:100%;border-radius:4px}
+.igcap{display:block;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:48ch}
+.iglinkmaker{display:grid;gap:8px;margin-top:14px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line);border-radius:14px}
+.iglabels{display:grid;gap:8px}
+.igpost{display:grid;grid-template-columns:64px minmax(0,1fr) minmax(150px,240px);gap:12px;align-items:center;padding:8px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+.igthumb{position:relative;display:block;width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--line-2);text-decoration:none}
+.igthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.igthumb span{position:absolute;left:3px;bottom:3px;font-size:10px;font-weight:700;background:rgba(0,0,0,.6);color:#fff;padding:1px 5px;border-radius:5px}
+.iginfo{min-width:0;display:grid;gap:3px;font-size:14px}
+.iginfo .igcap{max-width:none}
+.igchips{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.igeff{font-size:12px;font-weight:700;color:var(--hy)}
+.igsel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-height:38px;color:var(--ink);font:inherit;font-size:14px;width:100%}
+#igAlleenLeeg[aria-pressed=true]{background:var(--groen);border-color:var(--groen);color:#fff}
+@media (max-width:620px){.igpost{grid-template-columns:52px minmax(0,1fr)}.igthumb{width:52px;height:52px}.igsel{grid-column:1/-1}}
+#igKies{flex-wrap:wrap;max-width:100%}

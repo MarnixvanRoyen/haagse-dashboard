@@ -11,6 +11,7 @@ function setSectie(s){
   if(s==="muziek")render();          // grafieken opnieuw tekenen nu ze zichtbaar zijn
   if(s==="ovahzicht")renderOvahzicht();
   if(s==="apps")renderSneek();
+  if(s==="insta")renderInsta();
 }
 document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));
 // knoppen op de tegels ("Kèk bè Muziek") springen naar dat onderdeel
