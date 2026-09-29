@@ -240,6 +240,7 @@ function render(){
   if(state.tab==="youtube")renderYouTube();
   if(state.tab==="sclive")renderSCLive();
   if(state.tab==="spotify")renderSpotify();
+  if(state.tab==="nieuw")renderVerschil();
   $("srcInfo").textContent=`Uit Supabase: ${nf0.format(SC.length)} SoundCloud-regels${LAST_IMPORT?" (laatste import: "+LAST_IMPORT+")":""} · DJ·World-overzicht ${LABEL.generated?LABEL.generated:"nog niet ingeladen"}.`;
 }
 
@@ -258,7 +259,7 @@ function fillSelects(){
 }
 function syncSeg(id,val){$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===val))}
 function setTab(t){state.tab=t;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t));
-  ["overzicht","nummers","bronnen","landen","youtube","sclive","spotify","kansen"].forEach(x=>$("p-"+x).hidden=x!==t);saveState();render()}
+  ["overzicht","nieuw","nummers","bronnen","landen","youtube","sclive","spotify","kansen"].forEach(x=>{if($("p-"+x))$("p-"+x).hidden=x!==t});saveState();render()}
 
 $("fFrom").addEventListener("change",e=>{state.from=e.target.value;if(state.to<state.from){state.to=state.from;$("fTo").value=state.to}render()});
 $("fTo").addEventListener("change",e=>{state.to=e.target.value;if(state.from>state.to){state.from=state.to;$("fFrom").value=state.from}render()});
@@ -298,7 +299,8 @@ $("fFile").addEventListener("change",async e=>{
   const {data,error}=await sb.rpc("import_soundcloud",{rows:payload,file_name:file.name});
   if(error){showMsg("Opslaan lukte niet: "+error.message);return}
   await loadData();
-  showMsg(`${file.name} opgeslagen: ${nf0.format(data.inserted)} regels erin, ${nf0.format(data.deleted)} oude regels van dezelfde afrekenperiodes vervangen.`,true);
+  if(!IMP.err&&IMP.lijst.filter(i=>i.bron==="sc").length>1)setTab("nieuw");   // meteen laten zien wat er veranderd is
+  showMsg(`${file.name} opgeslagen: ${nf0.format(data.inserted)} regels erin, ${nf0.format(data.deleted)} oude regels van dezelfde afrekenperiodes vervangen.${!IMP.err&&IMP.lijst.filter(i=>i.bron==="sc").length>1?" Kèk bij 'Wat is d'r nieuw?' wat er veranderd is.":""}`,true);
 });
 
 /* init */
@@ -384,6 +386,7 @@ $("fPdf").addEventListener("change",async e=>{
     if(!r.periods.length||!r.tracks.length){showMsg("Dit lijkt geen DJ·World totaaloverzicht in het nieuwe format (met streams per nummer). "+r.warnings.join(" "));return}
     if(!r.statement_date){showMsg("De datum 'Opgemaakt op' niet gevonden in de PDF.");return}
     showMsg(`Opslaan: ${r.periods.length} periodes en ${r.tracks.length} nummers…`,true,true);
+    r.bestand=file.name;                              // voor de momentopname (Wat is d'r nieuw?)
     const {data,error}=await sb.rpc("import_djworld",{doc:r});
     if(error){showMsg("Opslaan lukte niet: "+error.message);return}
     await loadData();

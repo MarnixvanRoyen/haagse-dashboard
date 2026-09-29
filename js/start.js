@@ -24,7 +24,7 @@ async function loadData(){
   LABEL={periods:lp.map(p=>({m:String(p.period_month).slice(0,7),name:p.name,gross:+p.gross,agg:+p.aggregator,djw:+p.djworld,net:+p.net,status:p.status||""})).sort((a,b)=>a.m<b.m?-1:1),
     tracks:lt.map(x=>({t:x.track,v:x.version||"",a:x.artist||"",sc:+x.stream_count||0,dc:+x.download_count||0,streams:+x.streams,downloads:+x.downloads,gross:+x.gross,net:+x.net})),
     generated:s?new Date(s.statement_date).toLocaleDateString("nl-NL"):null,paidOut:s?+s.paid_out:0,toBook:s?+s.to_book:0,outside:s?+s.outside_tool:0};
-  await Promise.all([loadYT(),loadSCL(),loadSP(),loadSneek(),loadGC(),loadIG(),loadKansen()]);
+  await Promise.all([loadYT(),loadSCL(),loadSP(),loadSneek(),loadGC(),loadImports(),loadIG(),loadKansen()]);
   fillSelects();setTab(state.tab);setSectie(sectie);
   if(!SC.length&&!LABEL.periods.length)showMsg("Je database is nog leeg. Klik op 'SoundCloud-CSV' of 'Label-PDF' en kies je rapport.",false,true);
 }

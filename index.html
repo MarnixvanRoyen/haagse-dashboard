@@ -92,6 +92,7 @@
 
   <nav class="tabs" role="tablist" aria-label="Weergave">
     <button role="tab" data-tab="overzicht" aria-selected="true">Per maand</button>
+    <button role="tab" data-tab="nieuw" aria-selected="false">Wat is d'r nieuw?</button>
     <button role="tab" data-tab="nummers" aria-selected="false">Per nummâh</button>
     <button role="tab" data-tab="bronnen" aria-selected="false">Per bron</button>
     <button role="tab" data-tab="landen" aria-selected="false">Per land</button>
@@ -111,6 +112,10 @@
       <div class="card"><h2>Top nummâhs</h2><p class="sub">Wat je per nummer ontving in de gekozen periode</p><div class="bars" id="topTracks"></div></div>
       <div class="card"><h2>Top platforms</h2><p class="sub">Waar het geld vandaan komt</p><div class="bars" id="topPartners"></div></div>
     </div>
+  </section>
+
+  <section class="panel" id="p-nieuw" hidden>
+    <div id="vsInhoud"></div>
   </section>
 
   <section class="panel" id="p-nummers" hidden>
@@ -355,6 +360,7 @@
 <script src="js/basis.js"></script>
 <script src="js/live.js"></script>
 <script src="js/muziek.js"></script>
+<script src="js/verschil.js"></script>
 <script src="js/apps.js"></script>
 <script src="js/insta.js"></script>
 <script src="js/kansen.js"></script>
