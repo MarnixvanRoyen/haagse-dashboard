@@ -106,6 +106,12 @@ function igSom(van,tot){   // van t/m tot (JJJJ-MM-DD)
   return s;
 }
 
+// nieuwe volgers per 1.000 bereikte niet-volgers over een reeks Meta-dagen (alleen dagen mét opsplitsing volgers/nieuw)
+function igPer1kNieuw(van,tot){
+  const r=IG.dag.filter(x=>x.dag>=van&&x.dag<=tot&&x.c.reach_nieuw!=null);
+  const n=r.reduce((a,x)=>a+x.c.reach_nieuw,0);
+  return r.length>=3&&n?r.reduce((a,x)=>a+(x.c.follows||0),0)*1000/n:null;   // minstens 3 dagen, anders zegt het te weinig
+}
 function igCompute(){
   const vandaag=vandaagLA(),gist=dagMin(vandaag,1);
   const w=igSom(dagMin(vandaag,7),gist), vw=igSom(dagMin(vandaag,14),dagMin(vandaag,8)), nu=igSom(vandaag,vandaag);
@@ -121,6 +127,7 @@ function igCompute(){
     // nieuwe volgers per 1.000 bereik (bereik = opgeteld per dag, net als bij 'Bereik per dag'; zelfde rekensom voor beide weken, dus eerlijk te vergelijken)
     volg1k:w.reach?(w.follows||0)*1000/w.reach:null, volg1kV:vw.reach?(vw.follows||0)*1000/vw.reach:null,
     volg1kNieuw:nieuw?metSplit.reduce((a,r)=>a+(r.c.follows||0),0)*1000/nieuw:null,   // alleen niet-volgers kunnen volger worden
+    volg1kNieuwV:igPer1kNieuw(dagMin(vandaag,14),dagMin(vandaag,8)),   // zelfde voor de week ervoor (null als er toen nog geen opsplitsing was)
     laatstePost:IG.posts.find(p=>p.gepost_om)};
 }
 
@@ -500,12 +507,22 @@ document.addEventListener("click",async e=>{
 let igRsz;addEventListener("resize",()=>{clearTimeout(igRsz);igRsz=setTimeout(()=>{if(sectie==="insta")renderInsta()},150)});
 
 /* ---------- tegel op het Ovâhzicht ---------- */
+// Nieuwe volgers per 1.000 niet-volgers die je zagen: vooral of het stijgt of daalt t.o.v. de week ervoor
+function igTrendRij(c){
+  const nu=c.volg1kNieuw,voor=c.volg1kNieuwV,k="Volgâhs uit nieuw bereik";
+  if(nu==null)return tegelRij(k,"—","nieuwe volgâhs per 1.000 niet-volgers die je zagen · komt zodra er 3 dagen met opsplitsing zijn");
+  const uitleg=`${igNf1.format(nu)} nieuwe volgâhs per 1.000 niet-volgers die je zagen (laatste 7 dagen)`;
+  if(voor==null)return tegelRij(k,igNf1.format(nu),"nieuwe volgâhs per 1.000 niet-volgers die je zagen (laatste 7 dagen) · stijging of daling zie je zodra de week ervoor ook gemeten is");
+  const d=voor?nu/voor-1:(nu>0?1:0);   // vorige week 0: elke nieuwe volger is een stijging
+  const pijl=d>0.05?`<span class="up">↑ ${voor?pct(d):""}</span>`:d<-0.05?`<span class="down">↓ ${pct(-d)}</span>`:`<span class="sub">≈ gelijk</span>`;
+  return tegelRij(k,pijl,`${uitleg}, vorige week ${igNf1.format(voor)}`);
+}
 function instaTegel(){
   if(IG.err||!IG.acc)return `<article class="tegel binnenkort">
     <div class="tkop"><h2>Insta</h2><span class="tag">@the_hague_beachlife</span></div>
     <p class="kd">Nog geen cijfâhs</p><p class="s">${IG.err?"Ophalen lukte nie: "+esc(IG.err):"Wacht tot vannacht, dan staan ze erin."}</p>
     <button class="btn" type="button" data-ga="insta">Kèk bè Insta</button></article>`;
-  const c=igCompute(),g=igSneek();
+  const c=igCompute();
   return `<article class="tegel">
     <div class="tkop"><h2>Insta</h2><span class="tag">@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")}</span></div>
     <p class="tlbl">Volgâhs</p>
@@ -514,7 +531,7 @@ function instaTegel(){
     <div class="trijen">
       ${tegelRij("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")+liveStatus("ig","09b_insta_extra.sql"))}
       ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie")}
-      ${tegelRij("Naâh Sneek",nf0.format(g.d7),"bezoekâhs via Insta + Facebook, laatste 7 dagen")}
+      ${igTrendRij(c)}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
     </div>
     <button class="btn yellow" type="button" data-ga="insta">Kèk bè Insta</button>
