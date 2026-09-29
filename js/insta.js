@@ -116,9 +116,30 @@ function igWatWerkt(kies){
 }
 
 /* ---------- Muziek: plays van dat nummer na de post ---------- */
+// Sleutel om dezelfde titel uit verschillende bronnen samen te voegen:
+// hoofdletters, spaties, accenten, leestekens en "(Original Mix)" tellen niet mee; versies (Chilled/Spiced, Remix) wel.
+function igTitelKey(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .replace(/[([]?\s*(original|extended|radio|club) (mix|edit|version)\s*[)\]]?/g," ").replace(/[^a-z0-9]+/g,"")}
+// YouTube-titel opschonen: "Marreman Rojas - Nummer (Official Video)" → "Nummer"
+function igYtTitel(t){return String(t||"").replace(/^\s*(marreman( rojas)?|beuk)\s*[-–—:|]\s*/i,"")
+  .replace(/\s*[([][^)\]]*(official|video|audio|visuali[sz]er|lyric|clip)[^)\]]*[)\]]/gi,"").replace(/\s*\|.*$/,"").trim()}
+// Alle nummers uit alle muziekdata. Bij dubbele titels wint de eerste bron in deze volgorde
+// (al gebruikte labels eerst, zodat bestaande keuzes precies blijven kloppen).
+function igTrackBronnen(){
+  const lijst=[];const zet=(titel,bron)=>{titel=String(titel||"").trim();if(titel)lijst.push({titel,bron})};
+  (IG.posts||[]).forEach(p=>labelsVan(p,"muziek").forEach(l=>{if(l!=="(geen)"&&l!=="(eigen muziek)")zet(l,"label")}));
+  (SCL.tracks||[]).forEach(x=>zet(x.title,"SoundCloud"));
+  (SP.snaps||[]).forEach(x=>zet(x.song,"Spotify"));
+  (LABEL.tracks||[]).forEach(x=>zet(x.t+(/^((original|extended|radio|club)\s*)?(mix|edit|version)?$/i.test(String(x.v||"").trim())?"":" ("+String(x.v).trim()+")"),"DJ·World"));
+  (SC||[]).forEach(r=>zet(r.track,"SoundCloud-rapport"));
+  const own=YT.own||[];(YT.videos||[]).forEach(v=>{if(!own.length||own.includes(v.channel_id))zet(igYtTitel(v.title),"YouTube")});
+  const per=new Map();
+  lijst.forEach(({titel,bron})=>{const k=igTitelKey(titel);if(!k)return;
+    let o=per.get(k);if(!o){o={titel,bronnen:new Set()};per.set(k,o)}if(bron!=="label")o.bronnen.add(bron)});
+  return per;
+}
 function igTrackTitels(){
-  const t=new Set();(SCL.tracks||[]).forEach(x=>x.title&&t.add(x.title.trim()));
-  return [...t].sort((a,b)=>a.localeCompare(b,"nl"));
+  return [...igTrackBronnen().values()].map(o=>o.titel).sort((a,b)=>a.localeCompare(b,"nl"));
 }
 // Effect van een post op de plays/weergaven van dat nummer.
 // "Normaal" = gemiddeld per dag in de (max.) 14 dagen vóór de post. Daarna vensters van 7, 14 en 30 dagen vanaf de postdag.
@@ -148,7 +169,7 @@ function igEffectBron(reeks,postDag){
 }
 function igPlaysEffect(titel,postDag){
   const t=titel.trim().toLowerCase(),uit={bronnen:[]};
-  const tr=(SCL.tracks||[]).filter(x=>x.title&&x.title.trim().toLowerCase()===t);
+  const tk=igTitelKey(titel),tr=(SCL.tracks||[]).filter(x=>x.title&&igTitelKey(x.title)===tk);
   if(tr.length){const e=igEffectBron(igReeks(SCL.snaps||[],new Set(tr.map(x=>x.track_id)),"plays"),postDag);
     if(e)uit.bronnen.push({bron:"SoundCloud",eenheid:"plays",url:tr[0].permalink_url,...e})}
   const yv=t.length>=4?(YT.videos||[]).filter(v=>v.title&&v.title.toLowerCase().includes(t)):[];
@@ -172,10 +193,10 @@ function igEffectHTML(eff){
 /* ---------- tekenen ---------- */
 function igKolommen(el,data,aria){   // gestapelde kolommen: data=[{d,parts:[{v,c}]}]
   const W=Math.max(300,Math.round(el.clientWidth||1000)),H=W<600?180:220,ml=40,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=H-mt-mb;
-  const top=niceMax(Math.max(1,...data.map(d=>d.parts.reduce((a,p)=>a+p.v,0)))),bw=iw/data.length;
+  const sch=schaal(Math.max(...data.map(d=>d.parts.reduce((a,p)=>a+p.v,0))),3),top=sch.top,bw=iw/data.length;
   const y=v=>mt+ih-v/top*ih;
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
-  [0,top/2,top].forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
+  sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
   data.forEach((d,i)=>{let acc=0;const x=ml+i*bw+bw*.15;
     const vis=d.parts.filter(p=>p.v>0);
     vis.forEach((p,j)=>{const h=p.v/top*ih;const yt=y(acc+p.v);
@@ -285,7 +306,7 @@ function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
   return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option>`+
     (recent.length?`<optgroup label="Laatst gekozen">${recent.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`:"")+
-    `<optgroup label="Alle nummâhs (SoundCloud)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
+    `<optgroup label="Alle nummâhs (SoundCloud, Spotify, DJ·World, YouTube)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
 }
 function igPostRij(p,opties,titels){
   const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");

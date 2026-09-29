@@ -65,7 +65,7 @@ button,input,select{font:inherit;color:inherit}
 .f select,.f input{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-height:38px}
 .f input[type=number]{width:84px}
 .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
-.seg button{border:0;background:transparent;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;min-height:30px}
+.seg button{border:0;background:transparent;padding:4px 12px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;line-height:1.5;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;min-height:30px}
 .seg button:hover{color:var(--ink)}
 .seg button[aria-pressed=true]{background:var(--groen);color:#fff}
 .dot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
@@ -73,10 +73,13 @@ button,input,select{font:inherit;color:inherit}
 .chip.yt{background:var(--yt-soft);color:var(--ink)}
 .dot.sp{background:var(--sp)}.chip.sp{background:var(--sp-soft);color:var(--ink)}
 .ytstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.ytstat{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:2px}
+.ytstat{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:2px;align-content:start;min-width:0}
+@supports (grid-template-rows:subgrid){.ytstat{grid-row:span 3;grid-template-rows:subgrid;row-gap:2px;align-content:normal}.ytstat .v{align-self:end}}
 .ytstat .k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .ytstat .v{font-family:var(--display);font-weight:400;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
-.ytstat .s{font-size:12.5px;color:var(--muted)}
+.ytstat .s{font-size:12.5px;color:var(--muted);overflow-wrap:break-word}
+.ytstat .v{overflow-wrap:break-word}
+@media (max-width:480px){.ytstat{padding:11px 12px}.ytstat .v{font-size:22px}}
 .up{color:var(--good);font-weight:700}
 .grens{display:inline-block;width:70px;height:7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:8px;overflow:hidden}.grens i{display:block;height:100%;background:var(--sp)}
 td a{color:inherit;text-decoration-color:var(--line)}td a:hover{text-decoration-color:var(--yt)}
@@ -98,11 +101,17 @@ nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{colo
 .panel{display:grid;gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0}
 .card h2{font-family:var(--display);font-weight:400;font-size:21px;letter-spacing:.005em;line-height:1.1;margin:0}
-.card .sub{margin:3px 0 14px;font-size:13.5px;color:var(--muted)}
-.cardhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
+.sub{font-size:13.5px;color:var(--muted)}
+.card .sub{margin:3px 0 14px}
+.sectie>p.sub{margin:0}
+.card h2 .dot{width:11px;height:11px;border-radius:3px;vertical-align:.1em;margin-right:2px}
+.cardhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px;margin-bottom:14px}
+.cardhead>div:first-child{flex:1 1 320px;min-width:0}
+.cardhead .sub{margin-bottom:0}
+.cardhead>:not(:first-child){flex:none;max-width:100%}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-.legend{display:flex;gap:14px;font-size:13px;color:var(--ink-2);align-items:center}
-.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink-2);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 
 /* chart */
 .chart{position:relative;width:100%}
@@ -139,7 +148,8 @@ th[aria-sort]{color:var(--ink)}
 th[aria-sort=descending]::after{content:" ↓"}
 th[aria-sort=ascending]::after{content:" ↑"}
 td{padding:9px 10px;border-bottom:1px solid var(--line-2);vertical-align:middle}
-td.n,th.n{white-space:nowrap;text-align:right;font-family:var(--mono);font-size:13px}
+td.n,th.n{white-space:nowrap;text-align:right;font-family:var(--mono)}
+td.n{font-size:13px}
 tbody tr:hover td{background:color-mix(in srgb,var(--hy) 12%,var(--surface))}
 tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
@@ -179,7 +189,9 @@ footer .sig{font-family:var(--display);font-weight:400;letter-spacing:.02em;colo
 .loading{min-height:60vh;display:grid;place-items:center;color:var(--muted);font-weight:600}
 
 /* ---------- kop van het dashboard ---------- */
-.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px 16px}
+.top>div{min-width:0}
+.top .logout{flex:none;margin-top:4px}
 .top h1{font-family:var(--display);font-weight:400;font-size:clamp(22px,3.2vw,32px);line-height:1.05;margin:0;color:var(--hy)}
 .top h1 span{color:var(--ink)}
 .top .by{margin:4px 0 0;font-size:13px;color:var(--muted)}
@@ -194,12 +206,12 @@ nav.hoofdmenu button[aria-current=page]{background:var(--hy);color:var(--hy-ink)
 footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 
 /* ---------- ovâhzicht-tegels ---------- */
-.tegels{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+.tegels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .tegel{background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--hy);border-radius:18px;padding:18px;display:grid;gap:8px}
 .tegel.binnenkort{border-top-color:var(--groen);border-style:dashed;border-top-style:solid}
-.tkop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tkop{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .tkop h2{font-family:var(--display);font-weight:400;font-size:24px;margin:0}
-.tag{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)}
+.tag{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .tlbl{margin:6px 0 0;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .tgroot{font-family:var(--display);font-size:52px;line-height:1;color:var(--hy)}
 .tgroot small{font-size:.45em;vertical-align:.6em;margin-right:.08em}
@@ -209,12 +221,16 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .trij .k{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 .trij .v{font-family:var(--display);font-size:20px;text-align:right}
 .trij .s{grid-column:1/-1;font-size:12px}
-.trij .tot{grid-column:2;text-align:right;font-size:13px;font-weight:800;color:var(--ink-2);margin-top:-2px}
-.tegel .btn{justify-self:start;margin-top:6px}
+.trij .tot{grid-column:1/-1;text-align:right;font-size:13px;font-weight:800;color:var(--ink-2);margin-top:-2px}
+.tegel .btn{justify-self:start;align-self:end;margin-top:6px}
+@supports (grid-template-rows:subgrid){
+  .tegel{grid-row:span 6;grid-template-rows:subgrid;row-gap:8px}
+  .tegel>.tkop{grid-row:1}.tegel>.tlbl{grid-row:2}.tegel>.tgroot,.tegel>.kd{grid-row:3}.tegel>.s{grid-row:4}.tegel>.trijen{grid-row:5;align-self:start}.tegel>.btn{grid-row:6}
+  .tegel>.tlbl+.trijen{grid-row:3/6;align-self:start}  /* Kansâh-tegel: geen groot getal, lijstje direct onder het kopje */
+}
 .kd{font-family:var(--display);font-size:26px;line-height:1.1;color:var(--hy);margin:8px 0 0}
 .binnenkort ul{margin:4px 0 0;padding-left:20px;color:var(--ink-2);display:grid;gap:4px}
 .card.binnenkort{border-style:dashed}
-@media (max-width:480px){nav.hoofdmenu{gap:2px}nav.hoofdmenu button{padding:9px 13px;font-size:16px}}
 .card .sub a{color:var(--ink-2)}
 .sub code{font-size:.95em;background:var(--surface-2);padding:1px 5px;border-radius:5px}
 .dot.hy{background:var(--hy)}
@@ -251,7 +267,8 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kans h3 b,.kans h3 code{color:var(--hy)}
 .kans .act .btn{margin-left:4px;min-height:30px;padding:3px 10px;font-size:13px}
 .kvoort{font-size:13px;color:var(--ink-2);border-top:1px dashed var(--line);padding-top:8px}
-.kknop{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.ins.kans{display:flex;flex-direction:column}
+.kknop{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:2px}
 .kknop .btn{min-height:32px;padding:4px 10px;font-size:13px}
 .kknop .btn[aria-pressed=true]{background:var(--groen);border-color:var(--groen);color:#fff}
 .kknop .kweg{background:none;color:var(--muted)}
@@ -259,7 +276,7 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kans.k-bezig{border-color:var(--hy)}
 .kans.k-verborgen{opacity:.55}
 .kgroep{font-family:var(--display);font-weight:400;font-size:20px;margin:22px 0 10px}
-.ktop{margin-top:14px;padding:12px 16px;background:var(--surface-2);border-left:5px solid var(--hy);border-radius:12px}
+.ktop{margin-top:0;padding:12px 16px;background:var(--surface-2);border-left:5px solid var(--hy);border-radius:12px}
 .ktop h3{margin:0 0 6px;font-family:var(--display);font-weight:400;font-size:20px;color:var(--hy)}
 .ktop ol{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:14.5px}
 .ktop li b:first-child{color:var(--hy);margin-right:4px}
@@ -267,14 +284,17 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 #kansFilter span{font-size:12px;opacity:.8}
 .tegel .trij .chip.kbron{font-size:11px}
 .ins a,.ktop a{color:var(--hy)}
-@media (max-width:480px){nav.hoofdmenu button{padding:8px 10px;font-size:15px}}
-@media (max-width:480px){nav.hoofdmenu{flex-wrap:wrap;border-radius:22px;justify-content:center}}
 
 /* wachtkamer */
 .igwacht{border-color:var(--hy);border-width:2px}
 .igwacht h2{color:var(--hy)}
 nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--yt);color:#fff;font-family:var(--body);font-weight:800;font-size:12px;line-height:18px;text-align:center;vertical-align:2px}
+/* telefoon: alle vijf op één regel, even breed verdeeld */
+@media (max-width:560px){nav.hoofdmenu{gap:0;justify-self:stretch}nav.hoofdmenu button{flex:1 1 auto;padding:9px 6px;font-size:14.5px}nav.hoofdmenu .badge{margin-left:3px;min-width:17px;padding:0 4px;font-size:11px;line-height:16px}}
+@media (max-width:400px){nav.hoofdmenu button{padding:8px 4px;font-size:13.5px}}
 .igchips .igeff{flex-basis:100%}
 .igeff .ignorm{font-weight:600;color:var(--muted)}
 .igtoprij{display:flex;gap:10px;align-items:center}
 .igthumb.klein{width:48px;height:48px;flex:none}
+
+#igStories td:first-child,#igSnLinks td:first-child{white-space:nowrap}

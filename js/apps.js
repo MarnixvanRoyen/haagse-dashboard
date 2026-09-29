@@ -40,10 +40,10 @@ function sneekCompute(){
 // simpele kolommengrafiek, zelfde stijl als de muziekgrafieken
 function kolommen(el,data,kleur,aria="Nieuwe spelers per dag",eenheid="nieuw"){
   const W=Math.max(300,Math.round(el.clientWidth||1000)),H=W<600?180:220,ml=30,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=H-mt-mb;
-  const top=niceMax(Math.max(1,...data.map(d=>d.v))), bw=iw/data.length;
+  const sch=schaal(Math.max(...data.map(d=>d.v)),3),top=sch.top, bw=iw/data.length;
   const y=v=>mt+ih-v/top*ih;
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
-  [0,top/2,top].forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
+  sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
   data.forEach((d,i)=>{const h=d.v/top*ih,x=ml+i*bw+bw*.15;
     if(d.v)s+=`<path d="${roundTop(x,y(d.v),bw*.7,h,3)}" fill="var(--${kleur})"/>`;
     s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"><title>${dLabel(d.d,1)}: ${d.v} ${eenheid}</title></rect>`;

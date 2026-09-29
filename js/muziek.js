@@ -118,7 +118,7 @@ function renderChart(d){
     const gap=(hs>0&&hl>0)?2:0;
     if(hs>0)s+=`<path fill="var(--sc)" d="${roundTop(x,y(o.sc),bar,hs,hl>0?0:Math.min(4,hs))}"/>`;
     if(hl>0)s+=`<path fill="var(--lb)" d="${roundTop(x,y(tot)-0,bar,Math.max(0.5,hl-gap),Math.min(4,hl))}"/>`;
-    if(i%every===0||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${mLabel(o.m)}</text>`;
+    if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${mLabel(o.m)}</text>`;
     s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`;
   });
   s+="</svg>";
@@ -444,13 +444,13 @@ function renderYouTube(){
   if(pts.length<1){$("ytChart").innerHTML='<p class="sub" style="margin:0">Na de tweede meting (vannacht) zie je hier per dag hoeveel weergaven erbij kwamen.</p>'}
   else{
     const W=Math.max(300,Math.round($("ytChart").clientWidth||1000)),H=W<600?200:240,ml=46,mr=8,mt=12,mb=30,iw=W-ml-mr,ih=H-mt-mb;
-    const n=pts.length,max=niceMax(Math.max(1,...pts.map(o=>o.add))),yy=v=>mt+ih-v/max*ih,bw=iw/n,bar=Math.max(2,Math.min(36,bw*0.66));
+    const n=pts.length,sch=schaal(Math.max(...pts.map(o=>o.add)),4),max=sch.top,yy=v=>mt+ih-v/max*ih,bw=iw/n,bar=Math.max(2,Math.min(36,bw*0.66));
     let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nieuwe YouTube-weergaven per dag">`;
-    for(let i=0;i<=4;i++){const v=max*i/4,t=yy(v);s+=`<line class="${i?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${t}" y2="${t}"/><text x="${ml-8}" y="${t+4}" text-anchor="end">${v>=10||Number.isInteger(v)?nf0.format(v):nf2.format(v)}</text>`}
+    sch.lijnen.forEach((v,i)=>{const t=yy(v);s+=`<line class="${i?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${t}" y2="${t}"/><text x="${ml-8}" y="${t+4}" text-anchor="end">${nf0.format(v)}</text>`})
     const every=Math.ceil(n/(W<600?6:12));
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--yt)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
-      if(i%every===0||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
+      if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
       s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
     $("ytChart").innerHTML=s+"</svg>";
     $("ytChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
@@ -603,13 +603,13 @@ function renderSCLive(){
   if(pts.length<1){$("sclChart").innerHTML='<p class="sub" style="margin:0">Na de tweede meting (vannacht) zie je hier per dag hoeveel plays erbij kwamen.</p>'}
   else{
     const W=Math.max(300,Math.round($("sclChart").clientWidth||1000)),H=W<600?200:240,ml=46,mr=8,mt=12,mb=30,iw=W-ml-mr,ih=H-mt-mb;
-    const n=pts.length,max=niceMax(Math.max(1,...pts.map(o=>o.add))),yy=v=>mt+ih-v/max*ih,bw=iw/n,bar=Math.max(2,Math.min(36,bw*0.66));
+    const n=pts.length,sch=schaal(Math.max(...pts.map(o=>o.add)),4),max=sch.top,yy=v=>mt+ih-v/max*ih,bw=iw/n,bar=Math.max(2,Math.min(36,bw*0.66));
     let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nieuwe SoundCloud-plays per dag">`;
-    for(let i=0;i<=4;i++){const v=max*i/4,t=yy(v);s+=`<line class="${i?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${t}" y2="${t}"/><text x="${ml-8}" y="${t+4}" text-anchor="end">${v>=10||Number.isInteger(v)?nf0.format(v):nf2.format(v)}</text>`}
+    sch.lijnen.forEach((v,i)=>{const t=yy(v);s+=`<line class="${i?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${t}" y2="${t}"/><text x="${ml-8}" y="${t+4}" text-anchor="end">${nf0.format(v)}</text>`})
     const every=Math.ceil(n/(W<600?6:12));
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--sc)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
-      if(i%every===0||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
+      if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
       s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
     $("sclChart").innerHTML=s+"</svg>";
     $("sclChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];

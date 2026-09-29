@@ -18,6 +18,10 @@ function cName(c){if(!c)return "Onbekend";try{return regionNames?regionNames.of(
 
 const $=id=>document.getElementById(id);
 
+// nette schaalverdeling: stap = 1, 2, 2½ of 5 × 10ⁿ, maar altijd een heel getal (dus nooit 12,5 of 2,5)
+function schaal(max,stappen){const m=Math.max(max,1),ruw=m/stappen,p=Math.pow(10,Math.floor(Math.log10(ruw)));
+  const stap=Math.max(1,[1,2,2.5,5,10].map(x=>x*p).find(x=>x>=ruw&&Number.isInteger(x)));
+  const top=stap*Math.ceil(m/stap),lijnen=[];for(let v=0;v<=top+1e-9;v+=stap)lijnen.push(v);return {top,lijnen}}
 function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));for(const s of [1,2,2.5,5,10]){if(s*p>=v)return s*p}return 10*p}
 
 function roundTop(x,yTop,w,h,r){r=Math.min(r,h,w/2);const yb=yTop+h;
