@@ -274,3 +274,5 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .igwacht{border-color:var(--hy);border-width:2px}
 .igwacht h2{color:var(--hy)}
 nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--yt);color:#fff;font-family:var(--body);font-weight:800;font-size:12px;line-height:18px;text-align:center;vertical-align:2px}
+.igchips .igeff{flex-basis:100%}
+.igeff .ignorm{font-weight:600;color:var(--muted)}

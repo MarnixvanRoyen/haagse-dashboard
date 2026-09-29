@@ -176,11 +176,13 @@ function kansenInsta(){
     a:'<b>Doe:</b> label in de tab Insta je laatste 20 posts (2 minuten werk, één keuze per post). <button class="btn" type="button" data-ga="insta">Naâh Insta</button>',
     meet:{naam:"gelabelde posts",waarde:gelabeld,beter:"hoger"}});
   // 7. wat doet een Insta-post voor je plays?
-  const eff=IG.posts.map(p=>{const m=labelsVan(p,"muziek")[0];return m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null}).filter(e=>e&&e.voor!=null&&e.dagenNa>=7);
-  if(eff.length>=3){const na=kMed(eff.map(e=>e.na)),voor=kMed(eff.map(e=>e.voor));
-    out.push({id:"insta-naar-plays",bron:"insta",impact:na>voor?35:20,n:eff.length,big:kPlus(na-voor),h:"plays in de week na een Insta-post met dat nummer (vs de week ervoor)",
-      p:`Middelste post: ${kPlus(na)} plays erna, ${kPlus(voor)} ervoor (${eff.length} posts gemeten).`,
-      a:na>voor?"<b>Doe:</b> het werkt: zet vaker een link naar SoundCloud in je story als je een post met je eigen muziek plaatst.":"<b>Doe:</b> de muziek onder een post levert nog weinig plays op. Noem het nummer in je bijschrift (\"♪ Umoya – Marreman Rojas\") en zet een SoundCloud-link in je story."})}
+  const eff=IG.posts.map(p=>{const m=labelsVan(p,"muziek")[0];return m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null}).filter(e=>e&&e.x7!=null);
+  if(eff.length>=3){const x=kMed(eff.map(e=>e.x7)),na=kMed(eff.map(e=>e.na7));
+    out.push({id:"insta-naar-plays",bron:"insta",impact:x>=1.3?40:x>=1?25:20,n:eff.length*2,big:"×"+nf1k.format(x),h:"zoveel plays per dag krijgt een nummâh in de week na een Insta-post ermee, vergeleken met de 2 weken ervoor",
+      p:`Middelste post: ${kPlus(na)} plays in 7 dagen (${eff.length} posts gemeten). Metingen per dag bestaan sinds eind september, dus dit wordt elke week preciezer.`,
+      a:x>=1.2?"<b>Doe:</b> het werkt: plaats vaker een post met je eigen muziek en zet er dezelfde dag een SoundCloud-link in je story bij."
+              :"<b>Doe:</b> de muziek onder een post levert nog weinig extra plays op. Noem het nummer in je bijschrift (\"♪ Umoya – Marreman Rojas\") en zet een SoundCloud-link in je story.",
+      meet:{naam:"× plays na een post",waarde:Math.round(x*10)/10,beter:"hoger"}})}
   // 8. stories: waar haken ze af?
   const perDag=new Map();IG.stories.forEach(s=>{if(!s.cijfers||s.cijfers.reach==null)return;const d=dagNL(s.gepost_om);if(!perDag.has(d))perDag.set(d,[]);perDag.get(d).push(s)});
   const reeks=[...perDag.values()].filter(r=>r.length>=3);

@@ -120,15 +120,53 @@ function igTrackTitels(){
   const t=new Set();(SCL.tracks||[]).forEach(x=>x.title&&t.add(x.title.trim()));
   return [...t].sort((a,b)=>a.localeCompare(b,"nl"));
 }
+// Effect van een post op de plays/weergaven van dat nummer.
+// "Normaal" = gemiddeld per dag in de (max.) 14 dagen vóór de post. Daarna vensters van 7, 14 en 30 dagen vanaf de postdag.
+// Het venster groeit vanzelf mee: elke nacht komt er een meting bij. Metingen per dag bestaan pas sinds eind sep 2026.
+const IG_VENSTERS=[7,14,30];
+function igReeks(snaps,ids,veld){   // stand op dag d = som van de laatste meting ≤ d per id (null als een id nog geen meting had)
+  const per=new Map();snaps.forEach(x=>{if(!ids.has(x.video_id??x.track_id))return;const id=x.video_id??x.track_id;if(!per.has(id))per.set(id,[]);per.get(id).push(x)});
+  per.forEach(r=>r.sort((a,b)=>a.snap_date<b.snap_date?-1:1));
+  const eerste=[...per.values()].reduce((m,r)=>!m||r[0].snap_date>m?r[0].snap_date:m,null);   // vanaf hier hebben alle ids een meting
+  return {eerste,op:d=>{if(!per.size||!eerste||d<eerste)return null;let t=0;
+    for(const r of per.values()){let v=null;for(const x of r){if(x.snap_date<=d)v=+x[veld];else break}if(v==null)return null;t+=v}return t}};
+}
+function igEffectBron(reeks,postDag){
+  const vandaag=vandaagAms(),dag0=dagMin(postDag,1),v0=reeks.op(dag0);
+  if(v0==null)return null;
+  // normaal: tot 14 dagen terug, zo ver als er metingen zijn (minstens 3 dagen)
+  let voorDagen=Math.min(14,Math.round((Date.parse(dag0)-Date.parse(reeks.eerste))/864e5)),voorPerDag=null;
+  if(voorDagen>=3){const vB=reeks.op(dagMin(dag0,voorDagen));if(vB!=null)voorPerDag=(v0-vB)/voorDagen}else voorDagen=0;
+  const vensters=[];
+  for(const w of IG_VENSTERS){const eind=dagMin(postDag,-(w-1));
+    if(eind<=vandaag){const v=reeks.op(eind);if(v==null)break;const na=v-v0;
+      vensters.push({dagen:w,na,perDag:na/w,x:voorPerDag>0?(na/w)/voorPerDag:null,klaar:true})}
+    else{const gedaan=Math.round((Date.parse(vandaag)-Date.parse(postDag))/864e5)+1,v=reeks.op(vandaag);
+      if(v!=null&&gedaan>=1)vensters.push({dagen:w,na:v-v0,perDag:(v-v0)/gedaan,x:voorPerDag>0?((v-v0)/gedaan)/voorPerDag:null,klaar:false,gedaan});
+      break}}
+  return vensters.length?{voorPerDag,voorDagen,vensters}:null;
+}
 function igPlaysEffect(titel,postDag){
-  const tr=(SCL.tracks||[]).find(x=>x.title&&x.title.trim().toLowerCase()===titel.toLowerCase());if(!tr)return null;
-  const s=(SCL.snaps||[]).filter(x=>x.track_id===tr.track_id).sort((a,b)=>a.snap_date<b.snap_date?-1:1);
-  const op=d=>{let v=null;for(const x of s){if(x.snap_date<=d)v=+x.plays;else break}return v};
-  const vandaag=vandaagAms(),eind=dagMin(postDag,-6)<vandaag?dagMin(postDag,-6):vandaag;
-  const v0=op(dagMin(postDag,1)),vMin=op(dagMin(postDag,8)),v1=op(eind);
-  if(v0==null||v1==null)return null;
-  const dagenNa=Math.max(1,Math.round((Date.parse(eind)-Date.parse(dagMin(postDag,1)))/864e5));
-  return {na:v1-v0,dagenNa,voor:vMin==null?null:v0-vMin,url:tr.permalink_url};
+  const t=titel.trim().toLowerCase(),uit={bronnen:[]};
+  const tr=(SCL.tracks||[]).filter(x=>x.title&&x.title.trim().toLowerCase()===t);
+  if(tr.length){const e=igEffectBron(igReeks(SCL.snaps||[],new Set(tr.map(x=>x.track_id)),"plays"),postDag);
+    if(e)uit.bronnen.push({bron:"SoundCloud",eenheid:"plays",url:tr[0].permalink_url,...e})}
+  const yv=t.length>=4?(YT.videos||[]).filter(v=>v.title&&v.title.toLowerCase().includes(t)):[];
+  if(yv.length){const e=igEffectBron(igReeks(YT.snaps||[],new Set(yv.map(v=>v.video_id)),"views"),postDag);
+    if(e)uit.bronnen.push({bron:"YouTube",eenheid:"weergaven",...e})}
+  if(!uit.bronnen.length)return null;
+  // voor de kansen-kaart: SoundCloud (of YouTube) na 7 dagen
+  const h=uit.bronnen[0],w7=h.vensters.find(v=>v.dagen===7&&v.klaar);
+  uit.x7=w7?w7.x:null;uit.na7=w7?w7.na:null;uit.voorPerDag=h.voorPerDag;
+  return uit;
+}
+const nf1i=new Intl.NumberFormat("nl-NL",{maximumFractionDigits:1});
+function igEffectHTML(eff){
+  return eff.bronnen.map(b=>{
+    const norm=b.voorPerDag!=null?`normaal ${nf1i.format(b.voorPerDag)} ${b.eenheid} per dag (${b.voorDagen} dagen ervoor)`:"nog geen meting van vóór de post, dus geen vergelijking";
+    const delen=b.vensters.map(v=>{const x=v.x!=null&&(v.klaar||v.gedaan>=3)?` <b class="${v.x>=1.2?"up":v.x<=0.8?"down":""}">×${nf1i.format(v.x)}</b>`:"";
+      return v.klaar?`${v.dagen} d ${plus(v.na)}${x}`:`${v.dagen} d loopt (dag ${v.gedaan}): ${plus(v.na)}${x}`});
+    return `<span class="igeff" title="×2 = twee keer zoveel ${b.eenheid} per dag als normaal · ${norm}">♪ ${b.bron}: ${delen.join(" · ")}<span class="ignorm"> · ${b.voorPerDag!=null?"normaal "+nf1i.format(b.voorPerDag)+"/dag":"nog geen 'normaal'"}</span></span>`}).join("");
 }
 
 /* ---------- tekenen ---------- */
@@ -252,7 +290,7 @@ function igMuziekOpties(titels){
 function igPostRij(p,opties,titels){
   const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
   const eff=m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null;
-  const effTxt=eff?`<span class="igeff" title="SoundCloud-plays van dit nummâh">♪ na de post: ${plus(eff.na)} plays in ${eff.dagenNa} dag${eff.dagenNa>1?"en":""}${eff.voor!=null?` (week ervoor ${plus(eff.voor)})`:""}</span>`:"";
+  const effTxt=eff?igEffectHTML(eff):"";
   return `<div class="igpost" data-id="${esc(p.media_id)}">
       <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
       <div class="iginfo"><span><b>${dLabel(dagNL(p.gepost_om),1)}</b> · ${p.bereik==null?"nog geen cijfâhs":"bereik "+nf0.format(p.bereik)+(p.kwaliteit!=null?" · kwaliteit "+nf0.format(p.kwaliteit):"")}</span>
