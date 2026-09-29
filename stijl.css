@@ -119,6 +119,9 @@ nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{colo
 .chart text{fill:var(--muted);font-size:11px;font-family:var(--body)}
 .chart .grid{stroke:var(--line-2);stroke-width:1;stroke-dasharray:2 4}
 .chart .base{stroke:var(--line);stroke-width:1}
+.chart .strook{fill:var(--ink-2);font-size:12px;font-weight:800}
+.chart .strookgetal{fill:var(--ink-2);font-size:10px;font-weight:700}
+.dot.good{background:var(--good)}
 .chart .hit{fill:transparent;cursor:crosshair}
 .chart .hit:hover,.chart .hit.aan{fill:color-mix(in srgb,var(--hy) 9%,transparent)}
 /* getal boven een staaf: verschijnt bij aanwijzen (muis) of aantikken (vinger), zie staafGetal() in basis.js */

@@ -61,6 +61,9 @@ function igCompute(){
     nieuwPct:nieuw+volg?nieuw/(nieuw+volg):null, viewsNieuwPct:vNieuw+vVolg?vNieuw/(vNieuw+vVolg):null,
     kwal:w.reach?((w.shares||0)+(w.saves||0))*1000/w.reach:null, kwalV:vw.reach?((vw.shares||0)+(vw.saves||0))*1000/vw.reach:null,
     follows:w.follows||0, unfollows:w.unfollows||0, posts7:posts7.length,
+    // nieuwe volgers per 1.000 bereik (bereik = opgeteld per dag, net als bij 'Bereik per dag'; zelfde rekensom voor beide weken, dus eerlijk te vergelijken)
+    volg1k:w.reach?(w.follows||0)*1000/w.reach:null, volg1kV:vw.reach?(vw.follows||0)*1000/vw.reach:null,
+    volg1kNieuw:nieuw?metSplit.reduce((a,r)=>a+(r.c.follows||0),0)*1000/nieuw:null,   // alleen niet-volgers kunnen volger worden
     laatstePost:IG.posts.find(p=>p.gepost_om)};
 }
 
@@ -192,23 +195,34 @@ function igEffectHTML(eff){
 }
 
 /* ---------- tekenen ---------- */
-function igKolommen(el,data,aria){   // gestapelde kolommen: data=[{d,parts:[{v,c}]}]
-  const W=Math.max(300,Math.round(el.clientWidth||1000)),H=W<600?180:220,ml=40,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=H-mt-mb;
+function igKolommen(el,data,aria,onder){   // gestapelde kolommen: data=[{d,parts:[{v,c}],o}]; onder={naam,c} = strook eronder met één getal per dag (bijv. nieuwe volgers)
+  const W=Math.max(300,Math.round(el.clientWidth||1000)),ml=40,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=(W<600?180:220)-mt-mb;
+  const og=onder?24:0,oh=onder?(W<600?40:52):0,H=mt+ih+og+oh+mb;   // og = ruimte voor het kopje van de strook, oh = hoogte strook
   const sch=schaal(Math.max(...data.map(d=>d.parts.reduce((a,p)=>a+p.v,0))),3),top=sch.top,bw=iw/data.length;
   const y=v=>mt+ih-v/top*ih;
+  const oTop=onder?Math.max(1,...data.map(d=>d.o||0)):1,ob=mt+ih+og+oh,met=bw>=20,oa=oh-(met?13:0);   // ob = onderkant strook, oa = hoogte hoogste staaf (met = ruimte voor getallen)
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
   sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
+  if(onder)s+=`<text x="${ml}" y="${mt+ih+og-6}" text-anchor="start" class="strook">${onder.naam}</text><line class="base" x1="${ml}" x2="${W-mr}" y1="${ob}" y2="${ob}"/>${met?"":`<text x="${ml-6}" y="${ob-oa+4}" text-anchor="end">${nf0.format(oTop)}</text>`}`;
   data.forEach((d,i)=>{let acc=0;const x=ml+i*bw+bw*.15;
     const vis=d.parts.filter(p=>p.v>0);
     vis.forEach((p,j)=>{const h=p.v/top*ih;const yt=y(acc+p.v);
       s+=j===vis.length-1?`<path d="${roundTop(x,yt,bw*.7,h,3)}" fill="var(--${p.c})"/>`:`<rect x="${x}" y="${yt}" width="${bw*.7}" height="${h}" fill="var(--${p.c})"/>`;acc+=p.v});
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(acc),nf0.format(acc))}><title>${d.tip}</title></rect>`;
+    let getal=nf0.format(acc);
+    if(onder&&d.o!=null){getal+=` · +${nf0.format(d.o)}`;
+      if(d.o>0){const h=d.o/oTop*oa;s+=`<path d="${roundTop(x,ob-h,bw*.7,h,2)}" fill="var(--${onder.c})"/>`;
+        if(met)s+=`<text x="${ml+i*bw+bw/2}" y="${ob-h-3}" text-anchor="middle" class="strookgetal">${nf0.format(d.o)}</text>`}}
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ob-mt}"${staafGetal(ml+i*bw+bw/2,y(acc),getal)}><title>${d.tip}</title></rect>`;
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }
 function igStat(k,v,s){return `<div class="ytstat"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`}
 function igVs(a,b,pctMode){if(a==null||b==null||!b)return "";const d=a/b-1;
   return ` · vorige week ${pctMode?nf0.format(b):nf0.format(b)}${d>0.05?' <span class="up">↑ '+pct(d)+"</span>":d<-0.05?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
+
+const igNf1=new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1});
+function igVs1(a,b){if(a==null||b==null||!b)return "";const d=a/b-1;   // als igVs, maar met 1 cijfer achter de komma
+  return ` · vorige week ${igNf1.format(b)}${d>0.05?' <span class="up">↑ '+pct(d)+"</span>":d<-0.05?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
 
 function renderInsta(){
   if(!$("igStats"))return;
@@ -224,6 +238,7 @@ function renderInsta(){
   $("igStats").innerHTML=[
     igStat("Volgâhs",nf0.format(IG.acc.volgers||0),`${plus(c.follows-c.unfollows)} netto laatste 7 dagen (+${nf0.format(c.follows)} erbè, −${nf0.format(c.unfollows)} eraf)`),
     igStat("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")),
+    igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)+(c.volg1kNieuw!=null?` · ${igNf1.format(c.volg1kNieuw)} per 1.000 nieuwe mensen`:"")),
     igStat("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie"+(c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:"")),
     igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · delen/bewaren weegt zwaar bij Insta`),
     igStat("Posts",nf0.format(c.posts7),"laatste 7 dagen"+(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:""))
@@ -234,7 +249,7 @@ function renderInsta(){
   const per=new Map(IG.dag.map(r=>[r.dag,r.c]));
   igKolommen($("igChart"),dagen.map(d=>{const x=per.get(d)||{};const split=x.reach_nieuw!=null;
     const parts=split?[{v:x.reach_volgers||0,c:"groen"},{v:x.reach_nieuw||0,c:"hy"}]:[{v:x.reach||0,c:"muted"}];
-    return {d,parts,tip:`${dLabel(d,1)}${d===c.vandaag?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(x.follows!=null?` · +${x.follows} / −${x.unfollows||0} volgâhs`:"")}}),"Bereik per dag");
+    return {d,parts,o:x.follows!=null?x.follows:null,tip:`${dLabel(d,1)}${d===c.vandaag?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(x.follows!=null?` · +${x.follows} / −${x.unfollows||0} volgâhs`+(x.reach?` (${igNf1.format(x.follows*1000/x.reach)} per 1.000 bereik)`:""):"")}}),"Bereik per dag",{naam:"Nieuwe volgâhs per dag",c:"good"});
 
   // 3. wat werkt
   document.querySelectorAll("#igKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igKies));
