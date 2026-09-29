@@ -6,6 +6,7 @@ let igKies="soort";            // "Wat werkt": waarop vergelijken
 let igLabelAantal=20;          // hoeveel posts in de muziek-lijst
 let igAlleenLeeg=false;        // alleen posts zonder muziek-label tonen
 let igSorteer="nieuw";         // muziek-lijst: "nieuw" of "bereik"
+let igTopPeriode="90";         // toppâhs: "90" (laatste 90 dagen) of "alles" (allâh tijde)
 
 async function igAlles(maak){   // haalt alles op, 1000 per keer (Supabase geeft max 1000 regels per vraag)
   let out=[],from=0;
@@ -249,16 +250,35 @@ function renderInsta(){
       <td class="n">${r.kw==null?"—":nf0.format(r.kw)}</td><td class="n">${nf0.format(r.nv)}</td><td>${zeker(r.n)}</td></tr>`}).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${igKies==="muziek"?"Nog geen posts met een muziek-label. Kies hieronder per post welk nummâh eronder zat.":"Nog geen posts met cijfâhs."}</td></tr></tbody>`;
 
-  // 4. toppers laatste 90 dagen
-  const t90=IG.posts.filter(p=>p.bereik!=null&&Date.parse(p.gepost_om)>Date.now()-90*864e5).sort((a,b)=>b.bereik-a.bereik).slice(0,10);
-  $("igTop").innerHTML=t90.length?`<thead><tr><th class="n">#</th><th>Post</th><th class="n">Bereik</th><th class="n">Kwaliteit</th><th class="n">Volgâhs erbè</th><th class="n">Profielbezoek</th></tr></thead><tbody>`+
-    t90.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om))} · ${soortNaam(p)}</a> <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,70))}</span></div></div></td>
-      <td class="n">${nf0.format(p.bereik)}</td><td class="n">${p.kwaliteit==null?"—":nf0.format(p.kwaliteit)}</td><td class="n">${p.nieuwe_volgers==null?"—":nf0.format(p.nieuwe_volgers)}</td><td class="n">${p.profielbezoeken==null?"—":nf0.format(p.profielbezoeken)}</td></tr>`).join("")+"</tbody>"
-    :'<tbody><tr><td class="sub">Nog geen posts met cijfâhs in de laatste 90 dagen.</td></tr></tbody>';
+  // 4. toppâhs (laatste 90 dagen of allâh tijde)
+  renderIgTop();
 
   renderIgStories();
   renderIgSneek();
   renderIgMuziek();
+}
+
+/* ---------- toppâhs: top 10 op bereik, laatste 90 dagen of allâh tijde ---------- */
+function renderIgTop(){
+  if(!$("igTop"))return;
+  const alles=igTopPeriode==="alles";
+  const metCijfers=IG.posts.filter(p=>p.bereik!=null);
+  const lijst=(alles?metCijfers:metCijfers.filter(p=>Date.parse(p.gepost_om)>Date.now()-90*864e5))
+    .sort((a,b)=>b.bereik-a.bereik||(a.gepost_om<b.gepost_om?-1:1)).slice(0,10);   // gelijk bereik: oudste eerst
+  document.querySelectorAll("#igTopKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igTopPeriode));
+  if($("igTopSub")){
+    const oudste=metCijfers.reduce((m,p)=>!m||p.gepost_om<m?p.gepost_om:m,null);
+    const zonder=IG.posts.length-metCijfers.length;
+    $("igTopSub").innerHTML=alles
+      ?`Je 10 beste posts ooit, op bereik. Gekeken naâh ${nf0.format(metCijfers.length)} posts met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
+        +(zonder?(zonder===1?" 1 post heb (nog) geen cijfâhs en telt nie mee.":` ${nf0.format(zonder)} posts hebbe (nog) geen cijfâhs en telle nie mee.`):"")
+        +" Het archief vult zich elke nacht verder aan, dus oude toppâhs kunne d'r nog bij komme."
+      :"Beste posts van de laatste 90 dagen, op bereik. Klik om de post te openen.";
+  }
+  $("igTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th><th class="n">Bereik</th><th class="n">Kwaliteit</th><th class="n">Volgâhs erbè</th><th class="n">Profielbezoek</th></tr></thead><tbody>`+
+    lijst.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,70))}</span></div></div></td>
+      <td class="n">${nf0.format(p.bereik)}</td><td class="n">${p.kwaliteit==null?"—":nf0.format(p.kwaliteit)}</td><td class="n">${p.nieuwe_volgers==null?"—":nf0.format(p.nieuwe_volgers)}</td><td class="n">${p.profielbezoeken==null?"—":nf0.format(p.profielbezoeken)}</td></tr>`).join("")+"</tbody>"
+    :`<tbody><tr><td class="sub">${alles?"Nog geen posts met cijfâhs.":"Nog geen posts met cijfâhs in de laatste 90 dagen."}</td></tr></tbody>`;
 }
 
 function renderIgStories(){
@@ -358,6 +378,7 @@ async function igZetMuziek(id,nieuw){
 document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)igZetMuziek(s.closest(".igpost").dataset.id,s.value)});
 document.addEventListener("click",async e=>{
   const k=e.target.closest("#igKies button");if(k){igKies=k.dataset.v;renderInsta();return}
+  const tp=e.target.closest("#igTopKies button");if(tp){igTopPeriode=tp.dataset.v;renderIgTop();return}
   const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}
   if(e.target.closest("#igMeer")){igLabelAantal+=20;renderIgMuziek();return}
   if(e.target.closest("#igAlleenLeeg")){igAlleenLeeg=!igAlleenLeeg;e.target.setAttribute("aria-pressed",igAlleenLeeg);igLabelAantal=20;renderIgMuziek();return}
