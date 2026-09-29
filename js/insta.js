@@ -529,7 +529,8 @@ function instaTegel(){
     <div class="tgroot">${nf0.format(IG.acc.volgers||0)}</div>
     <p class="s">${plus(c.follows-c.unfollows)} netto laatste 7 dagen</p>
     <div class="trijen">
-      ${tegelRij("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")+liveStatus("ig","09b_insta_extra.sql"))}
+      ${tegelRij("Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),(c.nu.reach==null?"nog geen meting van vandaag":"tot nu, Meta-dag (begint rond 09:00 bij ons)")+liveStatus("ig","09b_insta_extra.sql")
+        +`<br>gemiddeld ${c.bereikDag==null?"—":nf0.format(c.bereikDag)} per dag, laatste 7 dagen${igVs(c.bereikDag,c.bereikDagV)}`)}
       ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie")}
       ${igTrendRij(c)}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
