@@ -26,6 +26,7 @@ function streamRij(k,v,tot,s){return `<div class="trij"><span class="k">${k}</sp
 function tegelRij(k,v,s){return `<div class="trij"><span class="k">${k}</span><span class="v">${v}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
 
 function renderOvahzicht(){
+  if($("ovAlarm")){$("ovAlarm").innerHTML=igAlarmHTML();igBadge()}   // Insta-koppeling stuk? meteen zichtbaar
   const poen=SC.reduce((a,r)=>a+r.usd,0)*state.rate+LABEL.periods.reduce((a,p)=>a+p.net,0);
   const sc=dagGroei(SCL.snaps,"track_id","plays"), yt=dagGroei(YT.snaps,"video_id","views");
   $("ovTegels").innerHTML=`

@@ -319,3 +319,16 @@ nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding
 .vslijst li b{font-weight:800}
 .vslijst li span{color:var(--ink-2)}
 .ytstat .v.up,.ytstat .v.down{font-weight:400}
+/* waarschuwing: Insta-koppeling stuk / cijfers te oud */
+#ovAlarm:empty,#igAlarm:empty{display:none}
+.alarm{border-radius:18px;padding:16px 18px;display:grid;gap:8px;border:2px solid var(--yt);background:var(--yt-soft);color:var(--ink)}
+.alarm.oud{border-color:var(--hy);background:var(--warn-soft)}
+.alarm p{margin:0;line-height:1.45}
+.alarmkop{display:flex;align-items:center;gap:10px}
+.alarmkop h2{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(18px,2.6vw,22px)}
+.alarmicoon{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--yt);color:#fff;font-weight:900;font-family:var(--body)}
+.alarm.oud .alarmicoon{background:var(--hy);color:var(--hy-ink)}
+.alarm details summary{cursor:pointer;font-weight:800}
+.alarm ol{margin:8px 0 4px;padding-left:22px;display:grid;gap:4px;line-height:1.45}
+.alarm a{color:inherit}
+.alarm code{font-size:.92em}

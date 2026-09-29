@@ -24,8 +24,55 @@ async function loadIG(){
       sb.from("ig_story").select("media_id,soort,gepost_om,permalink,cijfers,fout").gte("gepost_om",since).order("gepost_om",{ascending:false}).range(0,499)]);
     for(const r of [a,p,d,s])if(r.error)throw r.error;
     IG={acc:a.data[0]||null,profiel:p.data,dag:d.data.map(x=>({dag:String(x.dag).slice(0,10),c:x.cijfers||{}})),posts:m,stories:s.data,err:null};
-    igBadge();
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
+  IG.status=await igStatusLaden();
+  igBadge();
+}
+// laatste ververs-poging (ig_ververst) en de sleutel (ig_token); los opgehaald, zodat een ontbrekende tabel niks kapot maakt
+async function igStatusLaden(){
+  const [v,t]=await Promise.all([
+    sb.from("ig_ververst").select("om,fout").limit(1).then(r=>r,()=>({})),
+    sb.from("ig_token").select("verloopt_op,fout,gecontroleerd_om").limit(1).then(r=>r,()=>({}))]);
+  return {ververst:(v.data&&v.data[0])||null,token:(t.data&&t.data[0])||null};
+}
+
+/* ---------- Waarschuwing: werkt de koppeling met Meta nog? ----------
+   Een fout telt alleen als hij nieuwer is dan de laatste keer dat het wél lukte (ig_account.bijgewerkt_om),
+   zodat een oude fout na het maken van een nieuwe sleutel vanzelf verdwijnt. */
+const IG_SLEUTELFOUT=/access token|not authori[sz]ed|OAuthException|session has expired|Error validating|\(#190\)|code 190/i;
+function igTijd(ts){return new Date(ts).toLocaleString("nl-NL",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Amsterdam"})}
+function igKoppeling(){
+  const st=IG.status||{},acc=IG.acc;
+  const gelukt=acc&&acc.bijgewerkt_om?Date.parse(acc.bijgewerkt_om):0;
+  const fouten=[];
+  const zet=(tekst,ts)=>{if(tekst&&IG_SLEUTELFOUT.test(tekst)&&(!ts||Date.parse(ts)>gelukt))fouten.push(tekst)};
+  if(LIVE.ig&&LIVE.ig.fout)zet(LIVE.ig.fout,LIVE.ig.om||new Date().toISOString());
+  if(st.ververst)zet(st.ververst.fout,st.ververst.om);
+  if(st.token)zet(st.token.fout,st.token.gecontroleerd_om);
+  const sinds=gelukt?igTijd(gelukt):"onbekend";
+  if(fouten.length)return {nivo:"kapot",kop:"Insta-koppeling is stuk",
+    tekst:`Meta weigert de sleutel. De laatste keer dat het lukte: <b>${sinds}</b>. Tot je een nieuwe sleutel maakt, komen er geen nieuwe Insta-cijfers binnen.`,
+    detail:fouten[0].replace(/^[a-z ]+\d*[-\d]*:\s*/i,"")};
+  if(gelukt&&Date.now()-gelukt>30*36e5)return {nivo:"oud",kop:"Geen verse Insta-cijfâhs",
+    tekst:`De laatste keer dat het ophalen lukte: <b>${sinds}</b> (meer dan een dag geleden). Klik op de Insta-pagina op "Nâh ververse" om het opnieuw te proberen; blijft dit staan, maak dan een nieuwe sleutel.`};
+  const vo=st.token&&st.token.verloopt_op?Date.parse(st.token.verloopt_op):0;
+  if(vo&&vo-Date.now()<7*864e5)return {nivo:"oud",kop:"Insta-sleutel verloopt bijna",
+    tekst:`De sleutel verloopt op <b>${igTijd(vo)}</b> en het automatisch verlengen is niet gelukt. Maak op tijd een nieuwe sleutel.`,detail:st.token.fout||""};
+  return null;
+}
+function igAlarmHTML(){
+  const k=igKoppeling();if(!k)return "";
+  return `<div class="alarm ${k.nivo}" role="alert">
+    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">!</span><h2>${k.kop}</h2></div>
+    <p>${k.tekst}</p>
+    <details><summary>Zo los je het op (5 minuten)</summary><ol>
+      <li>Ga naar <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener">developers.facebook.com</a> → <b>My Apps</b> → <b>haagse-dashboard</b> → <b>Use cases</b> → <b>Customize</b> → <b>API setup with Instagram login</b>.</li>
+      <li>Klap <b>2. Generate access tokens</b> open en klik bij the_hague_beachlife op <b>Generate token</b> (niet op het prullenbakje).</li>
+      <li>Zet alleen <b>Profiel</b> en <b>Statistieken</b> aan, klik <b>Toestaan</b> en kopieer de sleutel.</li>
+      <li>Supabase → <b>Integrations</b> → <b>Vault</b> → <code>instagram_access_token</code> → <b>Edit</b> → plakken → <b>Save</b>.</li>
+      <li>Klik hier op de Insta-pagina op <b>Nâh ververse</b>. Is het gelukt, dan verdwijnt deze melding vanzelf.</li>
+    </ol>${k.detail?`<p class="sub">Melding van Meta: ${esc(k.detail)}</p>`:""}</details>
+  </div>`;
 }
 
 /* ---------- hulpjes ---------- */
@@ -226,6 +273,7 @@ function igVs1(a,b){if(a==null||b==null||!b)return "";const d=a/b-1;   // als ig
 
 function renderInsta(){
   if(!$("igStats"))return;
+  $("igAlarm").innerHTML=igAlarmHTML();igBadge();   // waarschuwing als de koppeling met Meta stuk is
   const leeg=IG.err||!IG.acc;
   $("igBlok").hidden=!!leeg;$("igNog").hidden=!leeg;
   if(leeg){$("igNogTekst").innerHTML=IG.err?(/ig_post_stats|relation|schema cache/i.test(IG.err)
@@ -333,9 +381,10 @@ function renderIgSneek(){
 const IG_WACHT_VANAF="2026-09-22";
 function igWachtend(){return IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=IG_WACHT_VANAF&&!labelsVan(p,"muziek").length)}
 function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="insta"]');if(!b)return;
-  const n=igWachtend().length;let s=b.querySelector(".badge");
-  if(!n){if(s)s.remove();return}
+  const k=igKoppeling(),n=igWachtend().length;let s=b.querySelector(".badge");
+  if(!n&&!(k&&k.nivo==="kapot")){if(s)s.remove();return}
   if(!s){s=document.createElement("span");s.className="badge";b.appendChild(s)}
+  if(k&&k.nivo==="kapot"){s.textContent="!";s.title="Insta-koppeling is stuk: maak een nieuwe sleutel";return}   // gaat voor de wachtkamer
   s.textContent=n;s.title=n+" nieuwe post"+(n>1?"s wachten":" wacht")+" op muziek";}
 function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
