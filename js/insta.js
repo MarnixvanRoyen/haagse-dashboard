@@ -231,7 +231,7 @@ function renderInsta(){
   // 4. toppers laatste 90 dagen
   const t90=IG.posts.filter(p=>p.bereik!=null&&Date.parse(p.gepost_om)>Date.now()-90*864e5).sort((a,b)=>b.bereik-a.bereik).slice(0,10);
   $("igTop").innerHTML=t90.length?`<thead><tr><th class="n">#</th><th>Post</th><th class="n">Bereik</th><th class="n">Kwaliteit</th><th class="n">Volgâhs erbè</th><th class="n">Profielbezoek</th></tr></thead><tbody>`+
-    t90.map((p,i)=>`<tr><td class="n">${i+1}</td><td><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om))} · ${soortNaam(p)}</a> <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,70))}</span></td>
+    t90.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om))} · ${soortNaam(p)}</a> <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,70))}</span></div></div></td>
       <td class="n">${nf0.format(p.bereik)}</td><td class="n">${p.kwaliteit==null?"—":nf0.format(p.kwaliteit)}</td><td class="n">${p.nieuwe_volgers==null?"—":nf0.format(p.nieuwe_volgers)}</td><td class="n">${p.profielbezoeken==null?"—":nf0.format(p.profielbezoeken)}</td></tr>`).join("")+"</tbody>"
     :'<tbody><tr><td class="sub">Nog geen posts met cijfâhs in de laatste 90 dagen.</td></tr></tbody>';
 
