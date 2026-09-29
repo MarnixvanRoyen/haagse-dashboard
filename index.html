@@ -259,13 +259,25 @@
       </div>
       <div class="card">
         <div class="cardhead"><div><h2>Je toppâhs</h2><p class="sub" id="igTopSub">Beste posts van de laatste 90 dagen, op bereik. Klik om de post te openen.</p></div>
+          <div class="igtopknoppen">
+          <div class="seg" id="igTopOp" role="group" aria-label="Sorteer op">
+            <button type="button" data-v="bereik" aria-pressed="true">Bereik</button>
+            <button type="button" data-v="kwaliteit" aria-pressed="false">Kwaliteit</button>
+          </div>
           <div class="seg" id="igTopKies" role="group" aria-label="Periode">
             <button type="button" data-v="90" aria-pressed="true">Laatste 90 dagen</button>
             <button type="button" data-v="alles" aria-pressed="false">Allâh tijde</button>
-          </div></div>
+          </div></div></div>
         <div class="tablewrap"><table id="igTop"></table></div>
       </div>
-      <div class="card"><h2>Stories</h2><p class="sub">Laatste 7 dagen, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken.</p><div id="igStories"></div></div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Stories</h2><p class="sub" id="igStorySub">Laatste 7 dagen, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken.</p></div>
+          <div class="seg" id="igStoryKies" role="group" aria-label="Periode stories">
+            <button type="button" data-v="7" aria-pressed="true">7 dagen</button>
+            <button type="button" data-v="30" aria-pressed="false">30 dagen</button>
+            <button type="button" data-v="alles" aria-pressed="false">Allâh</button>
+          </div></div>
+        <div id="igStories"></div></div>
       <div class="card">
         <div class="cardhead"><div><h2>Van Insta naâh Sneek</h2><p class="sub">Uit GoatCounter. De Insta-app opent links in z'n eigen browser, dus een deel komt binnen als "Direct": zie dit als ondergrens.</p></div></div>
         <div class="ytstats" id="igSnStats"></div>

@@ -7,6 +7,8 @@ let igLabelAantal=20;          // hoeveel posts in de muziek-lijst
 let igAlleenLeeg=false;        // alleen posts zonder muziek-label tonen
 let igSorteer="nieuw";         // muziek-lijst: "nieuw" of "bereik"
 let igTopPeriode="90";         // toppâhs: "90" (laatste 90 dagen) of "alles" (allâh tijde)
+let igTopOp="bereik";          // toppâhs: sorteren op "bereik" of "kwaliteit"
+let igStoryPeriode="7";        // stories: "7", "30" of "alles"
 
 async function igAlles(maak){   // haalt alles op, 1000 per keer (Supabase geeft max 1000 regels per vraag)
   let out=[],from=0;
@@ -21,12 +23,20 @@ async function loadIG(){
       sb.from("ig_profiel_dag").select("dag,volgers,volgend,posts").gte("dag",since).order("dag"),
       sb.from("ig_account_dag").select("dag,cijfers").gte("dag",since).order("dag"),
       igAlles(()=>sb.from("ig_post_stats").select("media_id,soort,product,gepost_om,permalink,plaatje,bijschrift,bereik,weergaven,likes,reacties,bewaard,gedeeld,nieuwe_volgers,profielbezoeken,kijktijd_sec,kwaliteit,volgers_toen,weekdag,uur,labels").order("gepost_om",{ascending:false})),
-      sb.from("ig_story").select("media_id,soort,gepost_om,permalink,cijfers,fout").gte("gepost_om",since).order("gepost_om",{ascending:false}).range(0,499)]);
+      sb.from("ig_story").select("media_id,soort,gepost_om,permalink,cijfers,fout").order("gepost_om",{ascending:false}).range(0,1999)]);   // alle stories: ze blijven bewaard, ook na 24 uur
     for(const r of [a,p,d,s])if(r.error)throw r.error;
     IG={acc:a.data[0]||null,profiel:p.data,dag:d.data.map(x=>({dag:String(x.dag).slice(0,10),c:x.cijfers||{}})),posts:m,stories:s.data,err:null};
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
   IG.status=await igStatusLaden();
+  await igStoryLabels();
   igBadge();
+}
+// muziek-keuzes van stories (posts krijgen hun labels al mee via ig_post_stats)
+async function igStoryLabels(){
+  if(!IG.stories.length)return;
+  let rijen=[];try{rijen=await igAlles(()=>sb.from("ig_media_label").select("media_id,soort,label,bron").eq("soort","muziek").eq("weg",false))}catch(e){}
+  const per=new Map();rijen.forEach(r=>{if(!per.has(r.media_id))per.set(r.media_id,[]);per.get(r.media_id).push(r)});
+  IG.stories.forEach(s=>s.labels=per.get(s.media_id)||[]);
 }
 // laatste ververs-poging (ig_ververst) en de sleutel (ig_token); los opgehaald, zodat een ontbrekende tabel niks kapot maakt
 async function igStatusLaden(){
@@ -324,43 +334,67 @@ function renderInsta(){
 /* ---------- toppâhs: top 10 op bereik, laatste 90 dagen of allâh tijde ---------- */
 function renderIgTop(){
   if(!$("igTop"))return;
-  const alles=igTopPeriode==="alles";
+  const alles=igTopPeriode==="alles",opKw=igTopOp==="kwaliteit";
   const metCijfers=IG.posts.filter(p=>p.bereik!=null);
-  const lijst=(alles?metCijfers:metCijfers.filter(p=>Date.parse(p.gepost_om)>Date.now()-90*864e5))
-    .sort((a,b)=>b.bereik-a.bereik||(a.gepost_om<b.gepost_om?-1:1)).slice(0,10);   // gelijk bereik: oudste eerst
+  const periode=alles?metCijfers:metCijfers.filter(p=>Date.parse(p.gepost_om)>Date.now()-90*864e5);
+  // op kwaliteit: posts met heel weinig bereik tellen niet mee (1x bewaard bij 40 bereik = al 25, dat zegt niks)
+  const drempel=opKw?Math.max(100,Math.round((med(periode.map(p=>p.bereik))||0)/2)):0;
+  const lijst=(opKw?periode.filter(p=>p.kwaliteit!=null&&p.bereik>=drempel).sort((a,b)=>b.kwaliteit-a.kwaliteit||b.bereik-a.bereik)
+                   :[...periode].sort((a,b)=>b.bereik-a.bereik||(a.gepost_om<b.gepost_om?-1:1))).slice(0,10);   // gelijk bereik: oudste eerst
   document.querySelectorAll("#igTopKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igTopPeriode));
+  document.querySelectorAll("#igTopOp button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igTopOp));
   if($("igTopSub")){
     const oudste=metCijfers.reduce((m,p)=>!m||p.gepost_om<m?p.gepost_om:m,null);
     const zonder=IG.posts.length-metCijfers.length;
+    const op=opKw?`op kwaliteit (gedeeld + bewaard per 1.000 bereik). Alleen posts met minstens ${nf0.format(drempel)} bereik tellen mee, anders kan een post die bijna niemand zag bovenaan komen`:"op bereik";
     $("igTopSub").innerHTML=alles
-      ?`Je 10 beste posts ooit, op bereik. Gekeken naâh ${nf0.format(metCijfers.length)} posts met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
+      ?`Je 10 beste posts ooit, ${op}. Gekeken naâh ${nf0.format(metCijfers.length)} posts met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
         +(zonder?(zonder===1?" 1 post heb (nog) geen cijfâhs en telt nie mee.":` ${nf0.format(zonder)} posts hebbe (nog) geen cijfâhs en telle nie mee.`):"")
         +" Het archief vult zich elke nacht verder aan, dus oude toppâhs kunne d'r nog bij komme."
-      :"Beste posts van de laatste 90 dagen, op bereik. Klik om de post te openen.";
+      :`Beste posts van de laatste 90 dagen, ${op}. Klik om de post te openen.`;
   }
-  $("igTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th><th class="n">Bereik</th><th class="n">Kwaliteit</th><th class="n">Volgâhs erbè</th><th class="n">Profielbezoek</th></tr></thead><tbody>`+
+  const kop=(t,k)=>`<th class="n${igTopOp===k?" gesorteerd":""}">${t}${igTopOp===k?" ↓":""}</th>`;
+  $("igTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th>${kop("Bereik","bereik")}${kop("Kwaliteit","kwaliteit")}<th class="n">Volgâhs erbè</th><th class="n">Profielbezoek</th></tr></thead><tbody>`+
     lijst.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap">${esc((p.bijschrift||"").replace(/^Oh oh #thehague,?\s*/i,"").slice(0,70))}</span></div></div></td>
-      <td class="n">${nf0.format(p.bereik)}</td><td class="n">${p.kwaliteit==null?"—":nf0.format(p.kwaliteit)}</td><td class="n">${p.nieuwe_volgers==null?"—":nf0.format(p.nieuwe_volgers)}</td><td class="n">${p.profielbezoeken==null?"—":nf0.format(p.profielbezoeken)}</td></tr>`).join("")+"</tbody>"
+      <td class="n">${nf0.format(p.bereik)}</td><td class="n">${p.kwaliteit==null?"—":igNf1.format(p.kwaliteit)}</td><td class="n">${p.nieuwe_volgers==null?"—":nf0.format(p.nieuwe_volgers)}</td><td class="n">${p.profielbezoeken==null?"—":nf0.format(p.profielbezoeken)}</td></tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${alles?"Nog geen posts met cijfâhs.":"Nog geen posts met cijfâhs in de laatste 90 dagen."}</td></tr></tbody>`;
 }
 
 function renderIgStories(){
-  const st=IG.stories.filter(s=>Date.parse(s.gepost_om)>Date.now()-7*864e5);
-  if(!st.length){$("igStories").innerHTML='<p class="sub">Nog geen stories gemeten in de laatste 7 dagen. Stories worden elk uur opgehaald zolang ze online staan (24 uur).</p>';return}
+  document.querySelectorAll("#igStoryKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igStoryPeriode));
+  const dagen=igStoryPeriode==="alles"?null:+igStoryPeriode;
+  const st=IG.stories.filter(s=>!dagen||Date.parse(s.gepost_om)>Date.now()-dagen*864e5);
+  const eerste=IG.stories.reduce((m,s)=>!m||s.gepost_om<m?s.gepost_om:m,null);
+  if($("igStorySub"))$("igStorySub").innerHTML=`${dagen?`Laatste ${dagen} dagen`:"Allâh stories"}, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken. `
+    +`Stories blijven hier bewaard, ook als ze na 24 uur van Insta verdwijnen (cijfers = laatste meting, hooguit een uur voor het einde)${eerste?`; de eerste is van ${dLabel(dagNL(eerste),1)}`:""}.`;
+  if(!st.length){$("igStories").innerHTML=`<p class="sub">Nog geen stories gemeten${dagen?` in de laatste ${dagen} dagen`:""}. Stories worden elk uur opgehaald zolang ze online staan (24 uur).</p>`;return}
+  const titels=igTrackTitels(),opties=igMuziekOpties(titels);
   // per dag in volgorde van posten: zo zie je waar mensen afhaken
   const perDag=new Map();[...st].reverse().forEach(s=>{const d=dagNL(s.gepost_om);if(!perDag.has(d))perDag.set(d,[]);perDag.get(d).push(s)});
-  let h=`<div class="tablewrap"><table><thead><tr><th>Story</th><th class="n">Bereik</th><th class="n">Weergaven</th><th class="n">Tikte weg</th><th class="n">Reacties</th><th class="n">Sneek-bezoek</th></tr></thead><tbody>`;
-  const links=new Map((GC.bronnen||[]).filter(r=>/^story-/i.test(r.bron)).map(r=>[String(r.bron).toLowerCase(),0]));
-  (GC.bronnen||[]).forEach(r=>{const k=String(r.bron).toLowerCase();if(links.has(k))links.set(k,links.get(k)+(+r.aantal||0))});
+  let h=`<div class="tablewrap"><table class="igstorytab"><thead><tr><th>Story</th><th class="n">Bereik</th><th class="n">Weergaven</th><th class="n">Tikte weg</th><th class="n">Reacties</th><th>Muziek</th></tr></thead><tbody>`;
   [...perDag].reverse().forEach(([d,rij])=>{
-    const eerste=rij[0].cijfers&&rij[0].cijfers.reach;
-    const ddmm=d.slice(8,10)+d.slice(5,7);const sneek=[...links].filter(([k])=>k.startsWith("story-"+ddmm)).reduce((a,[,n])=>a+n,0);
-    rij.forEach((s,i)=>{const x=s.cijfers||{};const weg=x.nav_weg!=null&&(x.views||x.reach)?x.nav_weg/(x.views||x.reach):null;
-      const vast=eerste&&x.reach!=null&&i?` <span class="sub">(${pct(x.reach/eerste)} van de 1e)</span>`:"";
-      h+=`<tr><td><a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a> · ${i+1}/${rij.length}</td>
+    const eersteBereik=rij[0].cijfers&&rij[0].cijfers.reach;
+    rij.forEach((s,i)=>{const x=s.cijfers||{};const weg=igStoryWeg(s);
+      const vast=eersteBereik&&x.reach!=null&&i?` <span class="sub">(${pct(x.reach/eersteBereik)} van de 1e)</span>`:"";
+      const verlopen=Date.parse(s.gepost_om)<Date.now()-864e5;
+      h+=`<tr data-id="${esc(s.media_id)}"><td>${verlopen?`${dLabel(d)} ${tijdAms(s.gepost_om)}`:`<a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a>`} · ${i+1}/${rij.length}</td>
       <td class="n">${x.reach==null?(s.fout?'<span class="sub" title="'+esc(s.fout)+'">nog geen</span>':"—"):nf0.format(x.reach)+vast}</td><td class="n">${x.views==null?"—":nf0.format(x.views)}</td>
-      <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td><td class="n">${i===0&&sneek?nf0.format(sneek)+" (hele dag)":""}</td></tr>`})});
-  $("igStories").innerHTML=h+'</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Sneek-bezoek</b> telt alleen met een eigen link (<code>?ref=story-…</code>).</p>';
+      <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td>
+      <td>${igMuziekSelect(labelsVan(s,"muziek")[0]||"",opties,titels,"Muziek onder deze story")}</td></tr>`})});
+  const leeg=st.filter(s=>!labelsVan(s,"muziek").length).length;
+  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" telt ook mee.</p>`+igStoryMuziekHTML();
+}
+function igStoryWeg(s){const x=s.cijfers||{};return x.nav_weg!=null&&(x.views||x.reach)?x.nav_weg/(x.views||x.reach):null}
+// eigen muziek onder stories: houdt het mensen vast? (alle bewaarde stories met cijfers en een keuze)
+function igStoryMuziekHTML(){
+  const g=IG.stories.filter(s=>s.cijfers&&s.cijfers.reach!=null&&labelsVan(s,"muziek").length);
+  const met=g.filter(s=>labelsVan(s,"muziek")[0]!=="(geen)"),zonder=g.filter(s=>labelsVan(s,"muziek")[0]==="(geen)");
+  const blok=(naam,a)=>{const w=med(a.map(igStoryWeg).filter(v=>v!=null));
+    return `<b>${naam}</b>: ${a.length} ${a.length===1?"story":"stories"}, middelste bereik ${nf0.format(med(a.map(s=>s.cijfers.reach))||0)}${w==null?"":`, tikte weg ${pct(w)}`}`};
+  if(met.length<3||zonder.length<3)return `<p class="sub" style="margin:6px 0 0">♪ Vanaf 3 stories mét en 3 zonder eigen muziek zie je hier of je eigen muziek mensen langer vasthoudt (nu ${met.length} mét, ${zonder.length} zonder).</p>`;
+  const nummers=new Map();met.forEach(s=>{const t=labelsVan(s,"muziek")[0];nummers.set(t,(nummers.get(t)||0)+1)});
+  const top=[...nummers].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([t,n])=>`${esc(t)} (${n}x)`).join(", ");
+  return `<p class="sub igstorymz" style="margin:6px 0 0">♪ ${blok("Mét eigen muziek",met)} · ${blok("Zonder",zonder)}${top?`. Meest gebruikt: ${top}`:""}. ${zeker(Math.min(met.length,zonder.length))}</p>`;
 }
 
 function renderIgSneek(){
@@ -392,6 +426,8 @@ function igMuziekOpties(titels){
     (recent.length?`<optgroup label="Laatst gekozen">${recent.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`:"")+
     `<optgroup label="Alle nummâhs (SoundCloud, Spotify, DJ·World, YouTube)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
 }
+function igMuziekSelect(m,opties,titels,aria){
+  return `<select class="igsel" aria-label="${aria}">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&m!=="(geen)"&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>`}
 function igPostRij(p,opties,titels){
   const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
   const eff=m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null;
@@ -428,7 +464,7 @@ function renderIgMuziek(){
 }
 
 async function igZetMuziek(id,nieuw){
-  const p=IG.posts.find(x=>x.media_id===id);if(!p)return;
+  const p=IG.posts.find(x=>x.media_id===id)||IG.stories.find(x=>x.media_id===id);if(!p)return;
   const oud=labelsVan(p,"muziek")[0]||"";
   const {data,error}=nieuw?await sb.rpc("ig_label_zet",{p_media_id:id,p_soort:"muziek",p_label:nieuw,p_aan:true})
                            :await sb.rpc("ig_label_zet",{p_media_id:id,p_soort:"muziek",p_label:oud,p_aan:false});
@@ -439,10 +475,12 @@ async function igZetMuziek(id,nieuw){
 }
 
 /* ---------- knoppen ---------- */
-document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)igZetMuziek(s.closest(".igpost").dataset.id,s.value)});
+document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)igZetMuziek(s.closest("[data-id]").dataset.id,s.value)});
 document.addEventListener("click",async e=>{
   const k=e.target.closest("#igKies button");if(k){igKies=k.dataset.v;renderInsta();return}
   const tp=e.target.closest("#igTopKies button");if(tp){igTopPeriode=tp.dataset.v;renderIgTop();return}
+  const to=e.target.closest("#igTopOp button");if(to){igTopOp=to.dataset.v;renderIgTop();return}
+  const sp=e.target.closest("#igStoryKies button");if(sp){igStoryPeriode=sp.dataset.v;renderIgStories();return}
   const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}
   if(e.target.closest("#igMeer")){igLabelAantal+=20;renderIgMuziek();return}
   if(e.target.closest("#igAlleenLeeg")){igAlleenLeeg=!igAlleenLeeg;e.target.setAttribute("aria-pressed",igAlleenLeeg);igLabelAantal=20;renderIgMuziek();return}

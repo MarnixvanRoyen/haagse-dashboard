@@ -332,3 +332,7 @@ nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding
 .alarm ol{margin:8px 0 4px;padding-left:22px;display:grid;gap:4px;line-height:1.45}
 .alarm a{color:inherit}
 .alarm code{font-size:.92em}
+/* toppâhs: twee keuzeknoppen naast elkaar; stories: muziek-keuze in de tabel */
+.igtopknoppen{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+th.gesorteerd{color:var(--ink)}
+.igstorytab .igsel{min-width:170px;max-width:240px;min-height:32px;padding:4px 8px;font-size:13px}
