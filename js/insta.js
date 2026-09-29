@@ -202,7 +202,7 @@ function igKolommen(el,data,aria){   // gestapelde kolommen: data=[{d,parts:[{v,
     const vis=d.parts.filter(p=>p.v>0);
     vis.forEach((p,j)=>{const h=p.v/top*ih;const yt=y(acc+p.v);
       s+=j===vis.length-1?`<path d="${roundTop(x,yt,bw*.7,h,3)}" fill="var(--${p.c})"/>`:`<rect x="${x}" y="${yt}" width="${bw*.7}" height="${h}" fill="var(--${p.c})"/>`;acc+=p.v});
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"><title>${d.tip}</title></rect>`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(acc),nf0.format(acc))}><title>${d.tip}</title></rect>`;
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }

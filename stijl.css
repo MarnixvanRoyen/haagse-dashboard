@@ -120,7 +120,10 @@ nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{colo
 .chart .grid{stroke:var(--line-2);stroke-width:1;stroke-dasharray:2 4}
 .chart .base{stroke:var(--line);stroke-width:1}
 .chart .hit{fill:transparent;cursor:crosshair}
-.chart .hit:hover{fill:color-mix(in srgb,var(--hg) 7%,transparent)}
+.chart .hit:hover,.chart .hit.aan{fill:color-mix(in srgb,var(--hy) 9%,transparent)}
+/* getal boven een staaf: verschijnt bij aanwijzen (muis) of aantikken (vinger), zie staafGetal() in basis.js */
+.chart .bv{fill:var(--ink);font-family:var(--body);font-size:12.5px;font-weight:800;opacity:0;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;transition:opacity .12s}
+.chart .bv.zien{opacity:1}
 #tip{position:fixed;pointer-events:none;z-index:10;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--hy);border-radius:10px;padding:8px 11px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.16);min-width:180px}
 #tip .t{font-weight:700;margin-bottom:4px}
 #tip .r{display:flex;justify-content:space-between;gap:14px;align-items:center}

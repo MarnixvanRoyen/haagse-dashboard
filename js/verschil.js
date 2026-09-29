@@ -2,7 +2,7 @@
 // De momentopnames staan in Supabase-tabel muziek_imports (zie supabase/11_import_historie.sql).
 
 let IMP={lijst:[],data:{},err:null};
-const VS={sc:{nieuw:null,oud:null},label:{nieuw:null,oud:null},dim:"nummer",alles:false};
+const VS={sc:{nieuw:null,oud:null},label:{nieuw:null,oud:null},dim:"nummer",alles:false,gelijk:null};
 
 async function loadImports(){
   try{
@@ -137,7 +137,8 @@ async function renderVerschil(){
 async function scBlok(sc){
   const kop=`<div class="cardhead"><div><h2><i class="dot sc"></i> SoundCloud-afrekening</h2><p class="sub">Wat er veranderd is tussen twee uploads van je lifetime earnings report. Bedragen in euro (koers hierboven).</p></div>${sc.length>1?vsKiezer("sc",sc):""}</div>`;
   if(!sc.length)return `<div class="card">${kop}<p class="sub">Nog geen upload bewaard. Upload je SoundCloud-CSV; de volgende upload wordt daarmee vergeleken.</p></div>`;
-  if(sc.length<2)return `<div class="card">${kop}<p class="note">Nulmeting staat klaar: <b>${esc(vsNaam(sc[0]))}</b> (${vsEur(+sc[0].samenvatting.usd||0)}, t/m ${sc[0].samenvatting.laatste_maand?mLabel(sc[0].samenvatting.laatste_maand,1):"—"}). Upload nu je nieuwe CSV met de knop <b>SoundCloud-CSV</b> bovenaan; dan zie je hier meteen wat er veranderd is.</p></div>`;
+  const gelijk=VS.gelijk?`<p class="note" style="margin-bottom:10px">Je upload <b>${esc(VS.gelijk.bestand)}</b> was precies hetzelfde als de vorige (laatste afrekening ${VS.gelijk.laatsteAfr?mLabel(VS.gelijk.laatsteAfr,1):"onbekend"}), dus er is niks te vergelijken. Probeer het opnieuw zodra SoundCloud een nieuwe maand heeft afgerekend.</p>`:"";
+  if(sc.length<2)return `<div class="card">${kop}${gelijk}<p class="note">Nulmeting staat klaar: <b>${esc(vsNaam(sc[0]))}</b> (${vsEur(+sc[0].samenvatting.usd||0)}, t/m ${sc[0].samenvatting.laatste_maand?mLabel(sc[0].samenvatting.laatste_maand,1):"—"}). Upload nu je nieuwe CSV met de knop <b>SoundCloud-CSV</b> bovenaan; dan zie je hier meteen wat er veranderd is.</p></div>`;
   const iN=sc.find(i=>i.id===VS.sc.nieuw),iO=sc.find(i=>i.id===VS.sc.oud);
   const [dN,dO]=await Promise.all([impData(iN.id),impData(iO.id)]);
   const v=scVergelijk(dO,dN),dUsd=v.nu.usd-v.was.usd,dU=v.nu.u-v.was.u;
@@ -166,7 +167,7 @@ async function scBlok(sc){
       <td class="n">${vsEur(r.wasUsd)}</td><td class="n">${vsEur(r.nuUsd)}</td><td class="n ${vsKlasse(r.dUsd)}">${vsPlusEur(r.dUsd)}</td></tr>`).join("")
       :`<tr><td colspan="7" class="sub">Niks veranderd in deze indeling.</td></tr>`)+
     `</tbody><tfoot><tr><td>Totaal</td><td class="n">${nf0.format(v.was.u)}</td><td class="n">${nf0.format(v.nu.u)}</td><td class="n">${vsPlusN(dU)}</td><td class="n">${vsEur(v.was.usd)}</td><td class="n">${vsEur(v.nu.usd)}</td><td class="n">${vsPlusEur(dUsd)}</td></tr></tfoot>`;
-  return `<div class="card">${kop}<div class="ytstats">${tegels}</div></div>
+  return `<div class="card">${kop}${gelijk}<div class="ytstats">${tegels}</div></div>
   <div class="grid2">
     <div class="card"><h2>Wat valt op?</h2><p class="sub">Automatisch uitgerekend uit de twee uploads</p><ul class="vslijst">${ins}</ul></div>
     <div class="card"><div class="cardhead"><div><h2>Per maand</h2><p class="sub">Luistermaanden, laatste 12. Geel = erbè gekomen in de nieuwe upload.</p></div>

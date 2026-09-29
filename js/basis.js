@@ -26,9 +26,43 @@ function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v
 
 function roundTop(x,yTop,w,h,r){r=Math.min(r,h,w/2);const yb=yTop+h;
   return `M${x},${yb}V${yTop+r}Q${x},${yTop} ${x+r},${yTop}H${x+w-r}Q${x+w},${yTop} ${x+w},${yTop+r}V${yb}Z`}
-function showTip(e,html){const t=$("tip");t.innerHTML=html;t.hidden=false;const r=t.getBoundingClientRect();
-  let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;t.style.left=x+"px";t.style.top=y+"px"}
+function showTip(e,html){
+  const inGrafiek=e.target&&e.target.closest&&e.target.closest(".chart");
+  if(inGrafiek&&matchMedia("(hover:none)").matches)return;   // telefoon: het getal boven de staaf is genoeg, geen groot vak over de grafiek
+  const t=$("tip");t.innerHTML=html;t.hidden=false;const r=t.getBoundingClientRect();
+  const dx=inGrafiek?36:14;                                    // in een grafiek: opzij van het getal boven de staaf
+  let x=e.clientX+dx,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-dx;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;t.style.left=x+"px";t.style.top=y+"px"}
 function hideTip(){$("tip").hidden=true}
+
+/* ---------- getal boven een staaf ----------
+   Elke staaf heeft een onzichtbaar aanwijs-vlak (rect.hit). staafGetal() geeft dat vlak het getal mee;
+   muis erop = getal verschijnt, tikken/klikken = getal blijft staan tot je ergens anders tikt.
+   Het getal wordt als laatste in de grafiek gezet, zodat geen andere staaf eroverheen valt. */
+function staafGetal(xMid,yTop,tekst){return ` data-bv="${esc(tekst)}" data-bx="${xMid.toFixed(1)}" data-by="${(yTop-7).toFixed(1)}"`}
+function toonGetal(hit){
+  const svg=hit.ownerSVGElement;if(!svg||hit.dataset.bv==null)return;
+  let t=svg.querySelector("text.bv");
+  if(!t){t=document.createElementNS("http://www.w3.org/2000/svg","text");t.setAttribute("class","bv");t.setAttribute("text-anchor","middle")}
+  svg.appendChild(t);                                            // altijd bovenop
+  const W=svg.viewBox.baseVal.width||9999;
+  t.textContent=hit.dataset.bv;t.setAttribute("x",Math.min(Math.max(+hit.dataset.bx,24),W-24));t.setAttribute("y",hit.dataset.by);
+  t.classList.add("zien");
+}
+function verbergGetal(svg){const t=svg&&svg.querySelector("text.bv");if(t)t.classList.remove("zien")}
+document.addEventListener("mouseover",e=>{const h=e.target.closest&&e.target.closest(".chart .hit");if(h)toonGetal(h)});
+document.addEventListener("mouseout",e=>{
+  const h=e.target.closest&&e.target.closest(".chart .hit");if(!h)return;
+  const naar=e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(".chart .hit");
+  if(naar&&naar.ownerSVGElement===h.ownerSVGElement)return;   // door naar de volgende staaf: die toont zichzelf
+  const vast=h.ownerSVGElement&&h.ownerSVGElement.querySelector(".hit.aan");
+  vast?toonGetal(vast):verbergGetal(h.ownerSVGElement);        // vastgetikte staaf blijft staan
+});
+document.addEventListener("click",e=>{
+  const hit=e.target.closest&&e.target.closest(".chart .hit");
+  document.querySelectorAll(".chart .hit.aan").forEach(h=>{if(h!==hit){h.classList.remove("aan");verbergGetal(h.ownerSVGElement)}});
+  if(hit){if(hit.classList.toggle("aan"))toonGetal(hit);else{verbergGetal(hit.ownerSVGElement);hideTip()}}
+  else hideTip();
+});
 
 let msgT;function showMsg(t,good,sticky){clearTimeout(msgT);const n=$("notes");n.innerHTML=esc(t);n.hidden=false;n.style.background=good?"var(--good-soft)":"var(--warn-soft)";if(!sticky)msgT=setTimeout(()=>{n.style.background="";renderNotes()},good?6000:12000)}
 

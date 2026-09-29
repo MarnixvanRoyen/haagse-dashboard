@@ -119,7 +119,7 @@ function renderChart(d){
     if(hs>0)s+=`<path fill="var(--sc)" d="${roundTop(x,y(o.sc),bar,hs,hl>0?0:Math.min(4,hs))}"/>`;
     if(hl>0)s+=`<path fill="var(--lb)" d="${roundTop(x,y(tot)-0,bar,Math.max(0.5,hl-gap),Math.min(4,hl))}"/>`;
     if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${mLabel(o.m)}</text>`;
-    s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`;
+    s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,y(tot),eur(tot))}/>`;
   });
   s+="</svg>";
   $("monthChart").innerHTML=s;
@@ -296,11 +296,18 @@ $("fFile").addEventListener("change",async e=>{
     revenue_share:num(g(r,"Revenue Share (%)")),split_share:num(g(r,"Split Pay Share (%)"))}));
   if(!payload.length){showMsg("Geen regels gevonden in dit bestand.");return}
   showMsg(`Bezig met opslaan van ${nf0.format(payload.length)} regels in Supabase…`,true,true);
+  const scVoor=IMP.lijst.filter(i=>i.bron==="sc").length;
   const {data,error}=await sb.rpc("import_soundcloud",{rows:payload,file_name:file.name});
   if(error){showMsg("Opslaan lukte niet: "+error.message);return}
   await loadData();
-  if(!IMP.err&&IMP.lijst.filter(i=>i.bron==="sc").length>1)setTab("nieuw");   // meteen laten zien wat er veranderd is
-  showMsg(`${file.name} opgeslagen: ${nf0.format(data.inserted)} regels erin, ${nf0.format(data.deleted)} oude regels van dezelfde afrekenperiodes vervangen.${!IMP.err&&IMP.lijst.filter(i=>i.bron==="sc").length>1?" Kèk bij 'Wat is d'r nieuw?' wat er veranderd is.":""}`,true);
+  const scNa=IMP.lijst.filter(i=>i.bron==="sc").length;
+  const laatsteAfr=payload.reduce((a,r)=>r.accounting_period>a?r.accounting_period:a,"").slice(0,7);
+  if(!IMP.err&&scNa===scVoor&&scVoor>0){      // momentopname niet bewaard = zelfde inhoud als de vorige upload
+    VS.gelijk={bestand:file.name,laatsteAfr};setTab("nieuw");
+    showMsg(`${file.name} is precies hetzelfde als je vorige upload: niks nieuws. De laatste afrekening erin is ${laatsteAfr?mLabel(laatsteAfr,1):"onbekend"}. SoundCloud zet meestal één keer per maand een nieuwe maand in het rapport.`,false,true);return}
+  VS.gelijk=null;
+  if(!IMP.err&&scNa>1)setTab("nieuw");   // meteen laten zien wat er veranderd is
+  showMsg(`${file.name} opgeslagen: ${nf0.format(data.inserted)} regels erin, ${nf0.format(data.deleted)} oude regels van dezelfde afrekenperiodes vervangen.${!IMP.err&&scNa>1?" Kèk bij 'Wat is d'r nieuw?' wat er veranderd is.":""}`,true);
 });
 
 /* init */
@@ -454,7 +461,7 @@ function renderYouTube(){
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--yt)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
       if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
-      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
+      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add))}/>`});
     $("ytChart").innerHTML=s+"</svg>";
     $("ytChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
       showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot yt"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
@@ -613,7 +620,7 @@ function renderSCLive(){
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--sc)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
       if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
-      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"/>`});
+      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add))}/>`});
     $("sclChart").innerHTML=s+"</svg>";
     $("sclChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
       showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot sc"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
