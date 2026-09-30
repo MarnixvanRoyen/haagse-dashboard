@@ -387,3 +387,9 @@ td.igszelf .igsvs{white-space:normal}
 .vscheck.let{border-left-color:var(--hy);background:var(--warn-soft)}
 .vscheck .sub{font-size:12.5px}
 
+
+/* Insta-tab, toppâhs: 6 sorteerknoppen (mogen naar een tweede regel) en klikbare kolomkoppen */
+.seg.igtopop{flex-wrap:wrap}
+.igtopkop{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;white-space:nowrap}
+.igtopkop:hover{color:var(--ink)}
+td.gesorteerd{font-weight:700;color:var(--ink)}
