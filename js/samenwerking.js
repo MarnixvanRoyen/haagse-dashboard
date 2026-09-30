@@ -17,27 +17,36 @@
 //     Ridge (λ=1): effect van een partner krimpt naar 0 bij weinig posts (3 posts ± 75%, 10 posts ± 90%).
 //     Partners met precies dezelfde posts = niet te scheiden → effect van het duo. "Leunt op 1 post" = zonder de
 //     beste post van die partner valt het effect weg. Staat naast het oordeel; het oordeel zelf is (nog) niet veranderd.
+//   - Partnergegevens (30-09, 12c): kolom "Partnâh zelf" (volgers, posts/week, groei, reel-weergaven, reacties, likes) uit
+//     ig_partner_info + ig_partner_info_dag. Eigen effect met "verwacht bij z'n grootte" zodra ≥ IGS_GR_MIN partners een
+//     bekende grootte hebben: effect = α + γ·ln(volgers) + δ; δ = doet meer/minder dan z'n grootte (alleen als ± 95% zeker).
 
-let IGS={partners:[],posts:[],info:[],laat:[],fb:null,err:null};
+let IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:null};
 let igsPeriode="365";     // "365" (laatste jaar) of "alles"
-let igsSorteer="extra";   // "extra" (extra volgâhs), "eigen" (eigen effect) of "vaak" (vaakst samen)
+let igsSorteer="extra";   // "extra" (extra volgâhs), "eigen" (eigen effect), "grootte" (t.o.v. z'n grootte) of "vaak" (vaakst samen)
 let igsAlles=false;       // alle partners tonen of de eerste 12
 const IGS_MIN=3;          // vanaf zoveel posts een oordeel
 const IGS_WACHT=3;        // posts jonger dan zoveel dagen tellen nog niet mee (cijfers groeien nog)
 const IGS_LAAT=3*864e5;   // aangenomen meer dan 3 dagen na de post = laat (we checken elke 3 uur, dus ± 2½–3 dagen echt)
 const IGS_LAMBDA=1;       // voorzichtigheid eigen effect: telt als "1 post zonder effect" extra per partner
+const IGS_GR_MIN=8;       // vanaf zoveel partners met bekende grootte (en ≥ IGS_MIN posts) rekent het eigen effect met "verwacht bij z'n grootte"
 
 async function igSamenLaden(){
+  // lukt de uitgebreide vraag niet (12c nog niet gedraaid: kolom bestaat niet), dan de oude
+  const ofAnders=(a,b)=>a.then(r=>r&&r.error?b():r);
   try{
-    const [p,pp,i,f,l]=await Promise.all([
+    const [p,pp,i,h,f,l]=await Promise.all([
       igAlles(()=>sb.from("ig_partner").select("media_id,partner,status,aangenomen_om,weg,weg_om").order("media_id").order("partner")),
       igAlles(()=>sb.from("ig_partner_post").select("media_id,gepost_om,aangenomen,uitgenodigd").order("media_id")),
-      sb.from("ig_partner_info").select("partner,volgers,fout").range(0,4999),
-      sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om").eq("naam","facebook_access_token").limit(1),
+      ofAnders(sb.from("ig_partner_info").select("partner,naam,volgers,volgend,posts,reacties_med,likes_med,likes_verborgen,reel_views_med,n_gemeten,n_reels,per_week,laatste_post,gelukt_om,bijgewerkt_om,fout").range(0,4999),
+               ()=>sb.from("ig_partner_info").select("partner,volgers,fout").range(0,4999)),
+      igAlles(()=>sb.from("ig_partner_info_dag").select("partner,dag,volgers").order("partner").order("dag")).catch(()=>[]),
+      ofAnders(sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om,grootte_gelukt_om,grootte_fout,grootte_fout_om").eq("naam","facebook_access_token").limit(1),
+               ()=>sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om").eq("naam","facebook_access_token").limit(1)),
       sb.from("ig_partner_laat_effect").select("media_id,partner,gepost_om,aangenomen_om,basis_om,basis,na_om,na,voor_om,voor").range(0,1999).then(r=>r,()=>({data:[]}))]);
     for(const r of [i,f])if(r.error)throw r.error;
-    IGS={partners:p,posts:pp,info:i.data||[],laat:(l&&!l.error&&l.data)||[],fb:(f.data&&f.data[0])||null,err:null};
-  }catch(e){IGS={partners:[],posts:[],info:[],laat:[],fb:null,err:e.message||String(e)}}
+    IGS={partners:p,posts:pp,info:i.data||[],hist:h||[],laat:(l&&!l.error&&l.data)||[],fb:(f.data&&f.data[0])||null,err:null};
+  }catch(e){IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:e.message||String(e)}}
 }
 
 /* ---------- rekenen ---------- */
@@ -77,39 +86,76 @@ function igsFit(rijen,p,pen){
   const Q=igsInv(A);if(!Q)return null;
   const mul=b=>Q.map(r=>r.reduce((s,q,j)=>s+q*b[j],0));
   const B=mul(bB),V=mul(bV),dot=(x,w)=>x.reduce((s,[i,v])=>s+v*w[i],0);
+  // ruis: hoe ver zitten de posts gemiddeld naast de voorspelling (voor "hoe zeker is een afwijking")
+  const df=Math.max(1,rijen.length-p);
+  const sB=Math.sqrt(rijen.reduce((t,r)=>t+(r.yB-dot(r.x,B))**2,0)/df),sV=Math.sqrt(rijen.reduce((t,r)=>t+(r.yV-dot(r.x,V))**2,0)/df);
   const zonder=ri=>{const r=rijen[ri],u=new Array(p).fill(0);
     for(let k=0;k<p;k++){let s=0;for(const [j,v] of r.x)s+=Q[k][j]*v;u[k]=s}
     const h=dot(r.x,u);if(!(1-h>1e-9))return null;
     const fB=(r.yB-dot(r.x,B))/(1-h),fV=(r.yV-dot(r.x,V))/(1-h);
     return {B:B.map((b,k)=>b-u[k]*fB),V:V.map((v,k)=>v-u[k]*fV)}};
-  return {B,V,zonder};
+  return {B,V,zonder,Q,sB,sV};
 }
 // posts: [{id,b,v,soort,wie:[partners]}] → Map partner → eigen effect
-function igsEigen(posts){
-  const uit=new Map();if(posts.length<4)return {per:uit,solo:0};
+// gr(partner, post) = volgers van de partner rond de datum van de post (of null). Als genoeg partners een bekende grootte
+// hebben (IGS_GR_MIN met ≥ IGS_MIN posts), rekent het model met "verwacht bij deze grootte":
+//   effect partner = α (gewone partner) + γ·(ln volgers − gemiddelde) + δ (eigen afwijking).
+//   De voorzichtigheid (ridge) trekt nu δ naar 0, dus een partner met weinig posts naar "wat je bij zijn grootte verwacht".
+//   δ = doet meer/minder dan zijn grootte. Zonder genoeg grootte-gegevens: precies zoals v3 (effect naar 0).
+function igsEigen(posts,gr){
+  const uit=new Map();if(posts.length<4)return {per:uit,solo:0,groot:null};
+  gr=gr||(()=>null);
   // kolommen: 0 = basis, dan soort post (vanaf 3 posts, meest voorkomende = referentie), dan partners.
   // Bewust géén tijd-kolom: wanneer je met wie samenwerkte hangt sterk samen met de tijd, dan pikt "tijd" het partner-effect in.
   const soortTel=new Map();posts.forEach(x=>soortTel.set(x.soort,(soortTel.get(x.soort)||0)+1));
   const soorten=[...soortTel].sort((a,b)=>b[1]-a[1]).slice(1).filter(([,n])=>n>=3).map(([s])=>s);
   const kol=new Map();let p=1;soorten.forEach(s=>kol.set("s:"+s,p++));
-  const namen=[...new Set(posts.flatMap(x=>x.wie))];namen.forEach(n=>kol.set(n,p++));
-  const pen=new Array(p).fill(1e-6);namen.forEach(n=>pen[kol.get(n)]=IGS_LAMBDA);
-  const rijen=posts.map(x=>({x:[[0,1],...(kol.has("s:"+x.soort)?[[kol.get("s:"+x.soort),1]]:[]),...x.wie.map(n=>[kol.get(n),1])],
-    yB:Math.log(x.b),yV:Math.log(1+Math.max(0,x.v))}));
-  const fit=igsFit(rijen,p,pen);if(!fit)return {per:uit,solo:0};
-  const voorsp=(r,w)=>r.x.reduce((s,[i,v])=>s+v*w[i],0);
-  // wat de partner(s) toevoegden aan volgers op hun eigen posts (voorspeld met − zonder), bij de middelste van die posts
-  // (mediaan: anders telt het extra van een virale post van een medepartner toch weer mee)
-  const plusOp=(idx,somV,w)=>med(idx.map(i=>Math.exp(voorsp(rijen[i],w))*(1-Math.exp(-somV))));
+  const namen=[...new Set(posts.flatMap(x=>x.wie))];
   const postsVan=new Map(namen.map(n=>[n,[]]));posts.forEach((x,i)=>x.wie.forEach(n=>postsVan.get(n).push(i)));
+  // grootte per partner per post (ln volgers); gemiddelde over de partners met een bekende grootte
+  const lnGr=posts.map(x=>new Map(x.wie.map(n=>{const g=gr(n,x);return [n,g>0?Math.log(g):null]})));
+  const lnP=new Map(namen.map(n=>{const l=postsVan.get(n).map(i=>lnGr[i].get(n)).filter(v=>v!=null);return [n,l.length?igsGem(l):null]}));
+  const bekend=namen.filter(n=>lnP.get(n)!=null&&postsVan.get(n).length>=IGS_MIN);
+  const lnB=bekend.map(n=>lnP.get(n)),mid=lnB.length?igsGem(lnB):0;
+  const spreiding=lnB.length>1?Math.sqrt(igsGem(lnB.map(v=>(v-mid)**2))):0;
+  const metGr=bekend.length>=IGS_GR_MIN&&spreiding>0.3;
+  let cA=-1,cG=-1;if(metGr){cA=p++;cG=p++}
+  namen.forEach(n=>kol.set(n,p++));
+  const pen=new Array(p).fill(1e-6);namen.forEach(n=>pen[kol.get(n)]=IGS_LAMBDA);if(metGr){pen[cA]=0.01;pen[cG]=0.01}
+  const z=(i,n)=>{const l=lnGr[i].get(n);return l==null?0:l-mid};           // onbekende grootte = gemiddelde grootte
+  const rijen=posts.map((x,i)=>({x:[[0,1],...(kol.has("s:"+x.soort)?[[kol.get("s:"+x.soort),1]]:[]),
+      ...(metGr&&x.wie.length?[[cA,x.wie.length],[cG,x.wie.reduce((s,n)=>s+z(i,n),0)]]:[]),
+      ...x.wie.map(n=>[kol.get(n),1])],
+    yB:Math.log(x.b),yV:Math.log(1+Math.max(0,x.v))}));
+  const fit=igsFit(rijen,p,pen);if(!fit)return {per:uit,solo:0,groot:null};
+  const voorsp=(r,w)=>r.x.reduce((s,[i,v])=>s+v*w[i],0);
+  // effect van partner m in model w: verwacht (α + γ·z, gemiddeld over zijn posts) + eigen afwijking δ
+  const zGem=m=>{const l=postsVan.get(m);return l.length?igsGem(l.map(i=>z(i,m))):0};
+  const verw=(w,m)=>metGr?w[cA]+w[cG]*zGem(m):0;
+  const tot=(w,m)=>verw(w,m)+w[kol.get(m)];
+  // wat de partner(s) toevoegden aan volgers (met − zonder), bij de middelste van die posts; e = effect op log-schaal
+  // (mediaan: anders telt het extra van een virale post van een medepartner toch weer mee)
+  const plusOp=(idx,somV,e,w)=>med(idx.map(i=>Math.exp(voorsp(rijen[i],w)-somV)*(Math.exp(e)-1)));
   const sleutel=n=>postsVan.get(n).join(",");
   const groepen=new Map();namen.forEach(n=>{const k=sleutel(n);if(!groepen.has(k))groepen.set(k,[]);groepen.get(k).push(n)});
   const cat=(f,pl)=>[f>=1.25?1:f<=0.8?-1:0,pl>=1?1:pl<=-1?-1:0];
   for(const n of namen){
-    const c=kol.get(n),idx=postsVan.get(n),set=new Set(idx),groep=groepen.get(sleutel(n));
+    const idx=postsVan.get(n),set=new Set(idx),groep=groepen.get(sleutel(n));
     const leden=groep.length>1?groep:[n];
-    const somB=leden.reduce((s,m)=>s+fit.B[kol.get(m)],0),somV=leden.reduce((s,m)=>s+fit.V[kol.get(m)],0);
-    const e={n:idx.length,fB:Math.exp(somB),plus:plusOp(idx,somV,fit.V),met:leden.filter(m=>m!==n),leunt:false,moeilijk:null};
+    const som=(w,f)=>leden.reduce((s,m)=>s+f(w,m),0);
+    const somB=som(fit.B,tot),somV=som(fit.V,tot);
+    const e={n:idx.length,fB:Math.exp(somB),plus:plusOp(idx,somV,somV,fit.V),met:leden.filter(m=>m!==n),leunt:false,moeilijk:null,verw:null};
+    // verwacht bij de grootte (alleen als het model met grootte rekent én de grootte van álle leden bekend is)
+    if(metGr&&leden.every(m=>lnP.get(m)!=null)){
+      const vB=som(fit.B,verw),vV=som(fit.V,verw),plusV=plusOp(idx,somV,vV,fit.V);
+      const tB=Math.exp(somB-vB),tV=e.plus-plusV;
+      // hoe zeker is de afwijking? (afwijking gedeeld door zijn onzekerheid; ≥ 1,96 = ± 95% zeker, anders "zoals verwacht")
+      const ks=leden.map(m=>kol.get(m));let q=0;ks.forEach(j=>ks.forEach(k=>q+=fit.Q[j][k]));
+      const zB=(somB-vB)/(fit.sB*Math.sqrt(Math.max(q,1e-12))),zV=(somV-vV)/(fit.sV*Math.sqrt(Math.max(q,1e-12)));
+      const oordeel=zV>=1.96&&tV>=0.5?"meer":zV<=-1.96&&tV<=-0.5?"minder"
+        :zB>=1.96&&tB>=1.25&&zV>-1?"meer":zB<=-1.96&&tB<=0.8&&zV<1?"minder":"gelijk";
+      e.verw={fB:Math.exp(vB),plus:plusV,tB,tV,zB,zV,oordeel,volgers:Math.round(Math.exp(igsGem(leden.map(m=>lnP.get(m)))))};
+    }
     // moeilijk te scheiden: hooguit 2 posts waar de een zonder de ander staat
     if(!e.met.length){let best=null;
       for(const m of namen){if(m===n)continue;const pm=postsVan.get(m);let samen=0;pm.forEach(i=>{if(set.has(i))samen++});
@@ -119,16 +165,19 @@ function igsEigen(posts){
     if(idx.length>=IGS_MIN){
       const [cB,cV]=cat(e.fB,e.plus);
       const test=(beste,welke)=>{const f2=fit.zonder(beste);if(!f2)return false;
-        const s2=leden.reduce((s,m)=>s+f2[welke][kol.get(m)],0),s1=welke==="B"?somB:somV;
+        const s2=som(f2[welke],tot),s1=welke==="B"?somB:somV;
         const rest=idx.filter(i=>i!==beste);
-        const [k2B,k2V]=cat(Math.exp(welke==="B"?s2:somB),welke==="V"?plusOp(rest,s2,f2.V):e.plus);
+        const [k2B,k2V]=cat(Math.exp(welke==="B"?s2:somB),welke==="V"?plusOp(rest,s2,s2,f2.V):e.plus);
         return (welke==="B"?k2B!==cB:k2V!==cV)&&(Math.sign(s2)!==Math.sign(s1)||Math.abs(s2)<0.5*Math.abs(s1))};
       const topB=idx.reduce((a,i)=>posts[i].b>posts[a].b?i:a,idx[0]),topV=idx.reduce((a,i)=>posts[i].v>posts[a].v?i:a,idx[0]);
       e.leunt=(cB!==0&&test(topB,"B"))||(cV!==0&&test(topV,"V"));
     }
     uit.set(n,e);
   }
-  return {per:uit,solo:posts.filter(x=>!x.wie.length).length};
+  // hoe sterk telt grootte? (per 10× meer volgers: × kijkers en × (1+volgers))
+  const groot=metGr?{n:bekend.length,x10B:Math.exp(fit.B[cG]*Math.LN10),x10V:Math.exp(fit.V[cG]*Math.LN10)}
+    :{n:bekend.length,nodig:IGS_GR_MIN};
+  return {per:uit,solo:posts.filter(x=>!x.wie.length).length,groot};
 }
 
 const igsGem=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
@@ -136,6 +185,15 @@ function igsKort(v){return v==null?"—":v>=1e6?igNf1.format(v/1e6)+"M":v>=1e4?n
 
 function igSamen(){
   const stats=new Map(IG.posts.map(p=>[p.media_id,p]));
+  // partnergegevens (12c): laatste stand + geschiedenis (volgers per meetdag)
+  const info=new Map(IGS.info.map(x=>[x.partner,x]));
+  const hist=new Map();IGS.hist.forEach(r=>{if(r.volgers==null)return;if(!hist.has(r.partner))hist.set(r.partner,[]);hist.get(r.partner).push([Date.parse(r.dag),r.volgers])});
+  // grootte van partner n rond de post: de meting die het dichtst bij de postdatum ligt (geschiedenis begint 30-09-2026), anders de laatste stand
+  const grBij=(n,x)=>{const h=hist.get(n),t=Date.parse(x.d);
+    if(h&&h.length&&!isNaN(t)){let best=h[0];for(const m of h)if(Math.abs(m[0]-t)<Math.abs(best[0]-t))best=m;return best[1]}
+    const i=info.get(n);return i&&i.volgers!=null?i.volgers:null};
+  const groei=n=>{const h=hist.get(n);if(!h||h.length<2)return null;const a=h[0],b=h[h.length-1],dagen=(b[0]-a[0])/864e5;
+    return dagen>=7&&a[1]>0?{pct:b[1]/a[1]-1,dagen}:null};
   const grens=igsPeriode==="alles"?0:Date.now()-365*864e5, jong=Date.now()-IGS_WACHT*864e5;
   const pp=IGS.posts.filter(x=>x.gepost_om&&Date.parse(x.gepost_om)>=grens);
   const datum=new Map(pp.map(x=>[x.media_id,x.gepost_om]));
@@ -150,7 +208,7 @@ function igSamen(){
     if(!s||!(s.bereik>0)||s.nieuwe_volgers==null||Date.parse(x.gepost_om)>jong)return;
     const a=perPost.get(x.media_id)||{opTijd:0,laat:0,wie:[]};
     if(!a.opTijd&&a.laat)return;                        // alleen late partners: geen solo en geen gewone samenwerking
-    bruik.set(x.media_id,{id:x.media_id,aan:a.opTijd,b:s.bereik,v:s.nieuwe_volgers,pr:s.profielbezoeken,lk:(s.likes||0)+(s.gedeeld||0),
+    bruik.set(x.media_id,{id:x.media_id,d:x.gepost_om,aan:a.opTijd,b:s.bereik,v:s.nieuwe_volgers,pr:s.profielbezoeken,lk:(s.likes||0)+(s.gedeeld||0),
       wie:[...new Set(a.wie)],soort:soortNaam(s)})});
   const collab=[...bruik.values()].filter(x=>x.aan>0), solo=[...bruik.values()].filter(x=>x.aan===0);
   const kwal=l=>({v1k:igsGem(l.map(x=>x.v*1000/x.b)),pr1k:igsGem(l.filter(x=>x.pr!=null).map(x=>x.pr*1000/x.b)),lk:igsGem(l.map(x=>x.lk/x.b))});
@@ -164,7 +222,6 @@ function igSamen(){
       else{const b=bruik.get(r.media_id);if(b){if(!metX.has(r.partner))metX.set(r.partner,[]);metX.get(r.partner).push(b)}}}
     uit.set(r.partner,u)});
 
-  const info=new Map(IGS.info.map(x=>[x.partner,x]));
   const rijen=[...metX].map(([naam,P])=>{
     const ids=new Set(P.map(x=>x.id)),O=collab.filter(x=>!ids.has(x.id));
     // mediaan aan beide kanten: de middelste post mét X tegen de middelste post zonder X.
@@ -175,9 +232,9 @@ function igSamen(){
     const bx=gewoonB?med(P.map(x=>x.b))/gewoonB:null;
     const goed=extra!=null&&extra>=2&&vpp>=1.25*gewoonV;
     const oordeel=goed?"goed":bx!=null&&bx>=1.25?"bereik":"niks";
-    return {naam,n,vpp,gewoonV,extra,bx,q:kwal(P),qo:kwal(O),oordeel,zeker:n>=IGS_MIN,u:uit.get(naam),info:info.get(naam)};
+    return {naam,n,vpp,gewoonV,extra,bx,q:kwal(P),qo:kwal(O),oordeel,zeker:n>=IGS_MIN,u:uit.get(naam),info:info.get(naam),groei:groei(naam)};
   });
-  const eigen=igsEigen([...bruik.values()]);
+  const eigen=igsEigen([...bruik.values()],grBij);
   rijen.forEach(r=>r.eigen=eigen.per.get(r.naam)||null);
   if(igsSorteer==="vaak")rijen.sort((a,b)=>b.n-a.n||(b.extra??-1e9)-(a.extra??-1e9));
   else rijen.sort((a,b)=>b.zeker-a.zeker||(b.extra??-1e9)-(a.extra??-1e9)||b.n-a.n);
@@ -194,12 +251,17 @@ function igSamen(){
   rijen.forEach(r=>{const l=effect.get(r.naam)||[];r.laatN=l.filter(e=>e.dV!=null).length;r.extraLaat=r.laatN?extraLaat(r.naam):0;
     r.totaal=r.extra==null?null:r.extra+r.extraLaat});
   if(igsSorteer==="extra")rijen.sort((a,b)=>b.zeker-a.zeker||(b.totaal??-1e9)-(a.totaal??-1e9)||b.n-a.n);
+  if(igsSorteer==="grootte")rijen.sort((a,b)=>b.zeker-a.zeker||(b.eigen?.verw?.tV??-1e9)-(a.eigen?.verw?.tV??-1e9)||(b.eigen?.verw?.tB??0)-(a.eigen?.verw?.tB??0)||b.n-a.n);
   if(igsSorteer==="eigen")rijen.sort((a,b)=>b.zeker-a.zeker||(b.eigen?.plus??-1e9)-(a.eigen?.plus??-1e9)||(b.eigen?.fB??0)-(a.eigen?.fB??0)||b.n-a.n);
   // weggehaald in de laatste 90 dagen (alle posts, ook buiten de periode)
   const alleDatum=new Map(IGS.posts.map(x=>[x.media_id,x.gepost_om]));
   const weg=IGS.partners.filter(r=>r.weg&&r.weg_om&&Date.parse(r.weg_om)>Date.now()-90*864e5)
     .map(r=>({naam:r.partner,post:alleDatum.get(r.media_id),om:r.weg_om,was:r.status})).sort((a,b)=>a.om<b.om?1:-1);
-  return {rijen,tel,aan,alles,nooit,zelden,laat,weg,effect,eigenSolo:eigen.solo,
+  // stand van het ophalen van partnergegevens (alle partners, ook zonder cijfers)
+  const allePartners=new Set(IGS.partners.map(r=>r.partner));
+  const gegevens={totaal:allePartners.size,gemeten:IGS.info.filter(x=>x.volgers!=null&&allePartners.has(x.partner)).length,
+    nieTeZien:IGS.info.filter(x=>x.volgers==null&&x.fout&&IGS_NIETEZIEN.test(x.fout)&&allePartners.has(x.partner)).length};
+  return {rijen,tel,aan,alles,nooit,zelden,laat,weg,effect,eigenSolo:eigen.solo,groot:eigen.groot,gegevens,
     collab:{n:collab.length,medB:med(collab.map(x=>x.b)),medV:med(collab.map(x=>x.v)),...kwal(collab)},
     solo:{n:solo.length,medB:med(solo.map(x=>x.b)),medV:med(solo.map(x=>x.v)),...kwal(solo)},
     zonderCijfers:pp.filter(x=>(perPost.get(x.media_id)||{}).opTijd>0&&!bruik.has(x.media_id)).length,
@@ -215,21 +277,38 @@ function igsVs(a,b,fmt){if(a==null)return "—";const s=fmt(a);if(b==null)return
   const d=b?a/b-1:0,pijl=d>0.1?' <span class="up">↑</span>':d<-0.1?' <span class="down">↓</span>':"";
   return `${s}${pijl}<span class="igsvs">andere ${fmt(b)}</span>`}
 const igsNf2=new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2});
-// cel "Eigen effect": × kijkers en + volgers per post, met hoe zeker
+// cel "Eigen effect": × kijkers en + volgers per post, met hoe zeker (+ verwacht bij z'n grootte)
+const igsF=f=>f>=10?nf0.format(f):igNf1.format(f);
+const igsPl=pl=>Math.abs(pl)<0.05?"±0":(pl>0?"+":"−")+(Math.abs(pl)>=10?nf0.format(Math.abs(pl)):igNf1.format(Math.abs(pl)));
+const IGS_GR={meer:["good","doet meer dan z'n grootte"],minder:["niks","doet minder dan z'n grootte"],gelijk:["mute","zoals verwacht bij z'n grootte"]};
 function igsEigenCel(r){
   const e=r.eigen;if(!e)return "—";
   const f=e.fB,pl=e.plus,kl=(x,op,neer)=>x>=op?"up":x<=neer?"down":"";
-  const fx=f>=10?nf0.format(f):igNf1.format(f);
-  const pv=Math.abs(pl)<0.05?"±0":(pl>0?"+":"−")+(Math.abs(pl)>=10?nf0.format(Math.abs(pl)):igNf1.format(Math.abs(pl)));
   const noot=[];
   if(e.met.length)noot.push(`nie te scheiden: altijd samen`);
   if(e.n<IGS_MIN)noot.push(`te vroeg: ${e.n} post${e.n===1?"":"s"}`);
   else{if(e.leunt)noot.push("leunt op 1 post");
     if(e.moeilijk)noot.push(`moeilijk te scheiden van @${esc(e.moeilijk)}`);
     noot.push(e.n<6?`nog onzeker: ${e.n} posts`:`${e.n} posts`)}
+  const v=e.verw;
+  const gr=v?`<span class="igsvs">verwacht bij z'n grootte: ×${igsF(v.fB)} · ${igsPl(v.plus)}</span>`
+    +`<span class="chip ${e.n<IGS_MIN?"mute":IGS_GR[v.oordeel][0]} igsgr">${e.n<IGS_MIN?"lijkt: ":""}${IGS_GR[v.oordeel][1]}</span>`:"";
   return `${e.met.length?`<span class="igsvs">samen met ${e.met.map(m=>"@"+esc(m)).join(" + ")}:</span>`:""}`
-    +`<b class="${kl(f,1.25,0.8)}">×${fx}</b> kijkâhs<br><b class="${kl(pl,1,-1)}">${pv}</b> volgâhs/post`
-    +noot.map(t=>`<span class="igsvs">${t}</span>`).join("");
+    +`<b class="${kl(f,1.25,0.8)}">×${igsF(f)}</b> kijkâhs<br><b class="${kl(pl,1,-1)}">${igsPl(pl)}</b> volgâhs/post`
+    +gr+noot.map(t=>`<span class="igsvs">${t}</span>`).join("");
+}
+// cel "Partnâh zelf": hun eigen account (Business Discovery, 12c)
+// Meta kan persoonlijke/privé-accounts niet laten zien ("Invalid user id"); andere fouten = ophalen lukte (nog) nie
+const IGS_NIETEZIEN=/Invalid user id|cannot be found|geen gegevens|\(#110\)/i;
+function igsZelfCel(r){
+  const i=r.info;if(!i)return `—<span class="igsvs">nog nie gemeten</span>`;
+  if(i.volgers==null)return i.fout?`—<span class="igsvs" title="${esc(i.fout)}">${IGS_NIETEZIEN.test(i.fout)?"nie te zien: geen zakelijk account":"ophalen lukte nie"}</span>`:"—";
+  const l=[];
+  if(i.per_week!=null)l.push(`± ${igNf1.format(+i.per_week)} posts/week`);
+  if(r.groei)l.push(`groei ${r.groei.pct>=0?"+":"−"}${igNf1.format(Math.abs(r.groei.pct)*100)}% (${nf0.format(r.groei.dagen)} d)`);
+  if(i.reel_views_med!=null&&i.volgers>0)l.push(`reels ± ${igsKort(+i.reel_views_med)} weergaven (${pct(i.reel_views_med/i.volgers)})`);
+  if(i.reacties_med!=null)l.push(`${igsKort(+i.reacties_med)} reacties/post`+(i.likes_med!=null?` · ${igsKort(+i.likes_med)} likes`:i.likes_verborgen?" · likes verborgen":""));
+  return `<b>${igsKort(i.volgers)}</b> volgâhs`+l.map(t=>`<span class="igsvs">${t}</span>`).join("");
 }
 
 function renderIgSamen(){
@@ -242,7 +321,12 @@ function renderIgSamen(){
     :"Samenwerkingen ophalen lukte niet: "+esc(IGS.err));
   if(!IGS.posts.length)return leeg("Nog geen partners opgehaald. Dat gebeurt elke nacht vanzelf (07:05), of draai <code>select public.ig_partners_refresh(45);</code> in Supabase.");
 
-  const s=igSamen(),c=s.collab,o=s.solo;
+  let s=igSamen();
+  const grKnop=document.querySelector('#igsSorteer [data-v="grootte"]'),metVerw=!!(s.groot&&s.groot.x10B);
+  if(grKnop)grKnop.hidden=!metVerw;
+  if(!metVerw&&igsSorteer==="grootte"){igsSorteer="eigen";
+    document.querySelectorAll("#igsSorteer button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igsSorteer));s=igSamen()}
+  const c=s.collab,o=s.solo;
   $("igsSub").innerHTML=`Welke partners helpen je groeien? Per partner: de posts waarop die partner je uitnodiging <b>aannam</b>, vergeleken met al je andere samenwerkingen${igsPeriode==="365"?" van het laatste jaar":""}. Een partner die niet aannam telt niet mee: dan staat de post niet op hun profiel.`;
   $("igsStats").innerHTML=[
     igStat("Goed voor je",nf0.format(s.tel.goed),"partners: meer nieuwe volgâhs per post"),
@@ -252,9 +336,10 @@ function renderIgSamen(){
   ].join("");
 
   const toon=igsAlles?s.rijen:s.rijen.slice(0,12);
-  $("igSamen").innerHTML=s.rijen.length?`<thead><tr><th>Partnâh</th><th class="n">Posts samen</th><th class="n igseigen" title="Wat deze partner zelf toevoegt, los van de andere partners op dezelfde post">Eigen effect</th><th class="n">Neemt aan</th><th class="n">Kijkâhs</th><th class="n">Volgâhs per post</th><th class="n">Extra volgâhs</th><th class="n">Volgâhs per 1.000</th><th class="n">Profielbezoek per 1.000</th><th class="n">Likes + delen per kijkâh</th>${s.metGrootte?'<th class="n">Grootte</th>':""}<th class="igsoordeel">Oordeel</th></tr></thead><tbody>`+
-    toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a>${r.u.laatst?`<span class="igsvs">laatst ${dLabel(dagNL(r.u.laatst),1)}</span>`:""}<div class="igsmob">${igsOordeel(r)}<div class="igsmobeigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}"><span class="igsvs">Eigen effect:</span>${igsEigenCel(r)}</div></div></td>
+  $("igSamen").innerHTML=s.rijen.length?`<thead><tr><th>Partnâh</th><th class="n">Posts samen</th>${s.metGrootte?'<th class="igszelf" title="Hun eigen account: volgers, hoe vaak ze posten, hoe actief hun publiek is">Partnâh zelf</th>':""}<th class="n igseigen" title="Wat deze partner zelf toevoegt, los van de andere partners op dezelfde post">Eigen effect</th><th class="n">Neemt aan</th><th class="n">Kijkâhs</th><th class="n">Volgâhs per post</th><th class="n">Extra volgâhs</th><th class="n">Volgâhs per 1.000</th><th class="n">Profielbezoek per 1.000</th><th class="n">Likes + delen per kijkâh</th><th class="igsoordeel">Oordeel</th></tr></thead><tbody>`+
+    toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a>${r.u.laatst?`<span class="igsvs">laatst ${dLabel(dagNL(r.u.laatst),1)}</span>`:""}<div class="igsmob">${r.info&&r.info.volgers!=null?`<span class="igsvs">${igsKort(r.info.volgers)} volgâhs${r.info.per_week!=null?` · ${igNf1.format(+r.info.per_week)} posts/wk`:""}</span>`:""}${igsOordeel(r)}<div class="igsmobeigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}"><span class="igsvs">Eigen effect:</span>${igsEigenCel(r)}</div></div></td>
       <td class="n">${nf0.format(r.n)}</td>
+      ${s.metGrootte?`<td class="igszelf">${igsZelfCel(r)}</td>`:""}
       <td class="n igseigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}">${igsEigenCel(r)}</td>
       <td class="n">${nf0.format(r.u.aan)} van ${nf0.format(r.u.alles)}${r.u.alles>=5&&r.u.aan/r.u.alles<0.3?'<span class="igsvs">neemt zelden aan</span>':""}${r.u.laat?`<span class="igsvs">${r.u.laat}× te laat</span>`:""}</td>
       <td class="n">${r.bx==null?"—":igNf1.format(r.bx)+"×"}<span class="igsvs">t.o.v. andere</span></td>
@@ -263,7 +348,6 @@ function renderIgSamen(){
       <td class="n">${igsVs(r.q.v1k,r.qo.v1k,v=>igsNf2.format(v))}</td>
       <td class="n">${igsVs(r.q.pr1k,r.qo.pr1k,v=>igNf1.format(v))}</td>
       <td class="n">${igsVs(r.q.lk,r.qo.lk,v=>pct(v))}</td>
-      ${s.metGrootte?`<td class="n">${r.info&&r.info.volgers!=null?igsKort(r.info.volgers):"—"}</td>`:""}
       <td class="igsoordeel">${igsOordeel(r)}</td></tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">Nog geen samenwerkingen met cijfers in deze periode.</td></tr></tbody>`;
   $("igsMeer").hidden=s.rijen.length<=12;$("igsMeer").textContent=igsAlles?"Minder tonen":`Alle ${nf0.format(s.rijen.length)} partners tonen`;
@@ -289,9 +373,22 @@ function renderIgSamen(){
     +`<b>Nie te scheiden</b> = altijd samen op dezelfde posts: dan zie je het effect van het duo. <b>Leunt op 1 post</b> = zonder de beste post van deze partner blijft er weinig van over. `
     +`Let op: samenhang is geen bewijs. Geef je je mooiste foto's steeds aan dezelfde partner, dan krijgt die de eer van de foto.`
     +(s.eigenSolo<5?` Je hebt weinig posts zonder partner (${nf0.format(s.eigenSolo)}), dus het effect is vooral t.o.v. je andere samenwerkingen.`:"")+`</p>`);
+  if(metVerw)delen.push(`<p class="sub"><b>Verwacht bij z'n grootte</b> = wat een partner van dat formaat bij jou gemiddeld oplevert, geleerd uit al je partners samen (${nf0.format(s.groot.n)} met bekende grootte en ${IGS_MIN}+ posts). `
+    +`Nu: 10× meer volgers bij de partner ≈ ×${igNf1.format(s.groot.x10B)} kijkers en ×${igNf1.format(s.groot.x10V)} nieuwe volgers. `
+    +`<b>Doet meer dan z'n grootte</b> = duidelijk meer nieuwe volgers per post dan verwacht (of evenveel volgers maar minstens 25% meer kijkers), en zo vaak dat het geen toeval lijkt; <b>doet minder</b> = andersom. Anders: zoals verwacht. `
+    +`Bij weinig posts trekt het eigen effect nu naar wat je bij die grootte verwacht, niet naar nul. `
+    +`Let op: grootte zegt niet of hun publiek bij jou past (Hagenaars of toeristen uit het buitenland). De grootte van vóór 30-09-2026 is onbekend: daar telt de eerste meting.</p>`);
+  else if(s.groot)delen.push(`<p class="sub"><b>Verwacht bij z'n grootte</b> komt erbij zodra ${nf0.format(s.groot.nodig)} partners met ${IGS_MIN}+ posts een bekende grootte hebben (nu ${nf0.format(s.groot.n)}).</p>`);
   delen.push(`<p class="sub">Hoe het werkt: <b>Volgâhs per post</b> en <b>Kijkâhs</b> = de middelste post met deze partner, tegen de middelste van je andere samenwerkingen ("andere"). Zo telt één virale post niet te zwaar, ook niet als een andere partner die viraal maakte. <b>Extra volgâhs</b> = ongeveer hoeveel volgers de posts met deze partner meer (of minder) opleverden dan evenveel gewone samenwerkingsposts. <b>Per 1.000</b> = kwaliteit: hoeveel van de kijkers volger worden of je profiel bekijken. Een post met meer partners telt bij elke partner mee (de cijfers zijn gedeeld), en posts jonger dan ${IGS_WACHT} dagen tellen nog niet mee. Nam een partner pas later aan, dan telt die post niet voor die partner. Van samenwerkingen van vóór 1 oktober weten we niet wanneer ze aannamen; die tellen gewoon mee.`
     +(s.zonderCijfers?` ${nf0.format(s.zonderCijfers)} samenwerkingen hebben nog geen cijfers; het archief vult zich elke nacht aan.`:"")
-    +(s.metGrootte?"":" Partnergrootte komt erbij zodra de Facebook-sleutel het recht <code>instagram_manage_insights</code> heeft.")+`</p>`);
+    +`</p>`);
+  const g=s.gegevens,fb=IGS.fb||{};
+  const gFout=fb.grootte_fout&&(!fb.grootte_gelukt_om||Date.parse(fb.grootte_fout_om||0)>Date.parse(fb.grootte_gelukt_om));
+  if(g.totaal)delen.push(`<p class="sub"><b>Partnâh zelf</b> = hun eigen account, via Meta: volgers, hoe vaak ze posten, en hoe actief hun publiek is op hun eigen laatste posts `
+    +`(reel-weergaven t.o.v. hun volgers, reacties per post; likes alleen als ze die niet verbergen). Bereik van hun posts en waar hun volgers wonen geeft Meta niet. `
+    +`${nf0.format(g.gemeten)} van ${nf0.format(g.totaal)} partners gemeten${g.nieTeZien?`, ${nf0.format(g.nieTeZien)} nie te zien (persoonlijk of privé-account)`:""}. `
+    +`Elk uur komen er tot 15 bij; wie aannam wordt elke week opnieuw gemeten, nieuwe partners zo snel mogelijk na de post.`
+    +(gFout?` <b>Ophalen lukte laatst nie:</b> ${esc(fb.grootte_fout)}${/\(#10\)|permission/i.test(fb.grootte_fout)?" (de Facebook-sleutel mist het recht <code>instagram_manage_insights</code>)":""}.`:"")+`</p>`);
   $("igsOnder").innerHTML=delen.join("");
 }
 
@@ -312,12 +409,13 @@ function fbAlarmHTML(){
     <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">!</span><h2>${k.kop}</h2></div>
     <p>${k.tekst}</p>
     <details><summary>Zo maak je een nieuwe sleutel (5 minuten)</summary><ol>
-      <li>Ga naar de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>. Rechts: <b>Meta App</b> = haagse-dashboard, <b>User or Page</b> = User Token, en bij Permissions <code>instagram_basic</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code>.</li>
+      <li>Ga naar de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>. Rechts: <b>Meta App</b> = haagse-dashboard, <b>User or Page</b> = User Token, en bij Permissions <code>instagram_basic</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code> en <code>instagram_manage_insights</code> (voor de partnergegevens).</li>
       <li>Klik <b>Generate Access Token</b>. Kies in het venster "<b>current Pages only</b>" (The Hague Beachlife) en "<b>current Instagram accounts only</b>" (the_hague_beachlife).</li>
       <li>Klik op het blauwe <b>i</b>-rondje links in het sleutelvak → <b>Open in Access Token Tool</b> → <b>Extend Access Token</b> → <b>Debug</b>. Bij <i>Expires</i> moet nu "in about 2 months" staan.</li>
       <li>Kopieer de sleutel uit het vak bovenaan (klik erin, Cmd+A, Cmd+C). Plak hem nergens anders dan in de Vault.</li>
       <li>Supabase → <b>Integrations</b> → <b>Vault</b> → <code>facebook_access_token</code> → <b>Edit</b> → plakken → <b>Save</b>.</li>
       <li>Wil je niet tot vannacht wachten: SQL Editor → <code>select public.fb_token_check(), public.ig_partners_refresh(45);</code> → Run. Daarna verdwijnt deze melding.</li>
+      <li>Staat bij <i>Expires</i> dezelfde datum als bij de vorige sleutel? Dat gebeurde op 30-09 bij een sleutel van dezelfde dag. Probeer het dan een dag later opnieuw.</li>
     </ol>${k.detail?`<p class="sub">Melding van Meta: ${esc(k.detail)}</p>`:""}</details>
   </div>`;
 }

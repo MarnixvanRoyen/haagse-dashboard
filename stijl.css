@@ -368,3 +368,9 @@ th.gesorteerd{color:var(--ink)}
 .igsmobeigen{margin-top:6px;font-size:13px;line-height:1.45}
 .igsmobeigen .igsvs{white-space:normal}
 .igsmobeigen.vroeg b{color:var(--muted)}
+td.igszelf{line-height:1.4;font-size:13.5px;min-width:130px;max-width:170px}
+td.igszelf .igsvs{white-space:normal}
+#igSamen th.igszelf{vertical-align:bottom;min-width:130px}
+.igsgr{margin-top:4px;font-size:11px}
+.igsmob > .igsvs{margin-bottom:4px}
+.seg button[hidden]{display:none}
