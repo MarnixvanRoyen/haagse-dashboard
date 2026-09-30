@@ -369,6 +369,37 @@ function igKolommen(el,data,aria,onder){   // gestapelde kolommen: data=[{d,part
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }
+/* ---------- tegel Posts: trend, verdeling per soort en grafiekje per dag (laatste 30 dagen) ----------
+   Trend = aantal laatste 7 dagen vs de 7 dagen daarvoor, in aantallen (bij 2 of 3 posts zegt een % niks); pijltje vanaf 1 verschil.
+   Alleen je eigen posts en reels (geen stories: die staan in hun eigen kaart). Dagen = Haagse dagen. */
+const IG_SOORT_KLEUR={Carrousel:"hy",Reel:"sc",Foto:"lb"};
+const IG_SOORT_MEERV={Carrousel:"carrousels",Reel:"reels",Foto:"foto's"};
+function igPostsStat(c){
+  const nu=Date.now(),ps=IG.posts.filter(p=>p.gepost_om);
+  const tel=(van,tot)=>ps.filter(p=>{const t=Date.parse(p.gepost_om);return t>nu-van*864e5&&t<=nu-tot*864e5}).length;
+  const w=tel(7,0),vw=tel(14,7),d=w-vw;
+  const vs=` · vorige week ${nf0.format(vw)}${d>=1?` <span class="up">↑ ${nf0.format(d)} meer</span>`:d<=-1?` <span class="down">↓ ${nf0.format(-d)} minder</span>`:""}`;
+  // per dag, per soort
+  const vandaag=vandaagAms(),dagen=[];for(let i=29;i>=0;i--)dagen.push(dagMin(vandaag,i));
+  const per=new Map(dagen.map(x=>[x,{}])),soorten={};
+  ps.forEach(p=>{const x=per.get(dagNL(p.gepost_om));if(!x)return;const sn=soortNaam(p);x[sn]=(x[sn]||0)+1;soorten[sn]=(soorten[sn]||0)+1});
+  const volg=Object.keys(soorten).sort((a,b)=>soorten[b]-soorten[a]);
+  const kleur=sn=>`var(--${IG_SOORT_KLEUR[sn]||"muted"})`;
+  const verdeling=volg.length?volg.map(sn=>`<span class="igsrt"><i style="background:${kleur(sn)}"></i>${soorten[sn]} ${soorten[sn]===1?sn.toLowerCase():IG_SOORT_MEERV[sn]||sn.toLowerCase()}</span>`).join(" "):"geen posts";
+  // grafiekje: één staafje per dag, gestapeld per soort; dag zonder post = streepje
+  const max=Math.max(1,...dagen.map(x=>Object.values(per.get(x)).reduce((a,b)=>a+b,0)));
+  const W=300,H=46,bw=W/dagen.length;
+  let g=`<svg class="igpostgraf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Posts per dag, laatste 30 dagen">`;
+  dagen.forEach((x,i)=>{const v=per.get(x),tot=Object.values(v).reduce((a,b)=>a+b,0);let y=H;
+    if(!tot)g+=`<rect x="${(i*bw+bw*.2).toFixed(1)}" y="${H-1.5}" width="${(bw*.6).toFixed(1)}" height="1.5" fill="var(--line)"/>`;
+    volg.forEach(sn=>{if(!v[sn])return;const h=v[sn]/max*(H-2);y-=h;g+=`<rect x="${(i*bw+bw*.15).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${h.toFixed(1)}" fill="${kleur(sn)}"/>`});
+    const tip=`${igWd(x)} ${dLabel(x)}: `+(tot?volg.filter(sn=>v[sn]).map(sn=>`${v[sn]} ${v[sn]===1?sn.toLowerCase():IG_SOORT_MEERV[sn]}`).join(" + "):"geen post");
+    g+=`<rect x="${(i*bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}" fill="transparent"><title>${esc(tip)}</title></rect>`});
+  g+=`</svg><span class="igpostas"><span>${dLabel(dagen[0])}</span><span>vandaag</span></span>`;
+  return `<div class="ytstat breed"><span class="k">Posts</span><span class="v">${nf0.format(w)}</span><span class="s">laatste 7 dagen${vs}`
+    +(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:"")
+    +`<br>laatste 30 dagen: ${verdeling}${g}</span></div>`;
+}
 function igStat(k,v,s){return `<div class="ytstat"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`}
 function igVs(a,b,pctMode){if(a==null||b==null||!b)return "";const d=a/b-1;
   return ` · vorige week ${pctMode?nf0.format(b):nf0.format(b)}${d>0.05?' <span class="up">↑ '+pct(d)+"</span>":d<-0.05?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
@@ -401,14 +432,12 @@ function renderInsta(){
   $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min) of bovenaan op Ververse tikt (hooguit 1x per 5 min). Dagen zijn Meta-dagen (Amerikaanse tijd).`;
   if($("igStatus"))$("igStatus").innerHTML=igStatusHTML();
   $("igStats").innerHTML=[
-    igStat("Volgâhs",nf0.format(IG.acc.volgers||0),`${plus(c.follows-c.unfollows)} netto laatste 7 dagen (+${nf0.format(c.follows)} erbè, −${nf0.format(c.unfollows)} eraf)${igVsNetto(c.follows-c.unfollows,c.nettoV)}`),
-    igStat("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")),
-    igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)+(c.volg1kNieuw!=null?` · ${igNf1.format(c.volg1kNieuw)} per 1.000 nieuwe mensen`:"")),
-    igStat("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV)+(c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:"")),
-    igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · delen/bewaren weegt zwaar bij Insta`),
-    (l=>igStat("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes()),
-    (k=>igStat("Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)))(igKwal()),
-    igStat("Posts",nf0.format(c.posts7),"laatste 7 dagen"+(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:""))
+    igStat("Volgâhs",nf0.format(IG.acc.volgers||0),igNieuwWeg(c)),
+    ...igVasteRijen(c).map(([k,v,u,extra])=>igStat(k,v,u+(extra||""))),
+    // alleen op de Insta-tab
+    igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)),
+    igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · hele account (ook stories), per week`),
+igPostsStat(c)
   ].join("");
 
   // 2. bereik per dag, volgers vs nieuw
@@ -660,7 +689,7 @@ function igMetaStart(dag){
   return g-h*36e5;
 }
 // regel "Bereik vandaag": getal van vandaag, of uitleg waarom het er (nog) niet is, plus gistâh ter vergelijking
-function igBereikRij(c){
+function igBereikRij(c){   // geeft [kop, getal, uitleg]
   const start=igMetaStart(c.vandaag),sinds=tijdAms(start),uren=(Date.now()-start)/36e5;
   const stapFout=igLiveStand().fouten.some(f=>igStapVan(f)==="vandaag");
   const gd=dagMin(c.vandaag,1),g=igSom(gd,gd),gv=igSom(dagMin(c.vandaag,8),dagMin(c.vandaag,8));
@@ -670,15 +699,15 @@ function igBereikRij(c){
   else if(uren<3)s=`Meta-dag begon om ${sinds}, cijfâhs volgen`;
   else s="nog geen meting van vandaag";
   if(g.reach!=null)s+=`<br>gistâh (${igWd(gd)}): ${nf0.format(g.reach)}`+(gv.reach!=null?` · ${igWd(gd)} daarvoor ${nf0.format(gv.reach)}`+igPijl(g.reach,gv.reach):"");
-  return tegelRij("Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),s);
+  return ["Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),s];
 }
 
 /* ---------- tegel op het Ovâhzicht ---------- */
 // Nieuwe volgers per 1.000 niet-volgers die je zagen: vooral of het stijgt of daalt t.o.v. de week ervoor
 function igTrendRij(c){
   const nu=c.volg1kNieuw,k="Volgâhs uit nieuw bereik";
-  if(nu==null)return tegelRij(k,"—","nieuwe volgâhs per 1.000 niet-volgers die je zagen · komt zodra er 3 dagen met opsplitsing zijn");
-  return tegelRij(k,igNf1.format(nu),"nieuwe volgâhs per 1.000 niet-volgers die je zagen, laatste 7 dagen"+igVs1(nu,c.volg1kNieuwV));
+  if(nu==null)return [k,"—","nieuwe volgâhs per 1.000 niet-volgers die je zagen · komt zodra er 3 dagen met opsplitsing zijn"];
+  return [k,igNf1.format(nu),"nieuwe volgâhs per 1.000 niet-volgers die je zagen, laatste 7 dagen"+igVs1(nu,c.volg1kNieuwV)];
 }
 // volgâhs erbè én eraf (laatste 7 dagen), daaronder netto t.o.v. vorige week.
 // Geeft Meta (nog) geen unfollows voor die dagen, dan alleen netto zoals vroeger (anders lijkt het alsof niemand wegging).
@@ -686,6 +715,19 @@ function igNieuwWeg(c){
   const netto=`netto ${plus(c.follows-c.unfollows)}${igVsNetto(c.follows-c.unfollows,c.nettoV)}`;
   if(!c.w.nk.follows||!c.w.nk.unfollows)return `${plus(c.follows-c.unfollows)} netto laatste 7 dagen${igVsNetto(c.follows-c.unfollows,c.nettoV)}`;
   return `<b>+${nf0.format(c.follows)}</b> nieuw · <b>−${nf0.format(c.unfollows)}</b> weg, laatste 7 dagen<br>${netto}`;
+}
+// De vaste rij cijfâhs, in dezelfde volgorde op de Ovâhzicht-tegel én bovenaan de Insta-tab (één lijst, dus altijd gelijk).
+// Elk item: [kop, getal, uitleg, extra alleen op de Insta-tab]. Volgâhs staat apart (groot getal op de tegel).
+function igVasteRijen(c){
+  const l=igLikes(),k=igKwal();
+  return [
+    igBereikRij(c),
+    ["Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)],
+    ["Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV),
+      c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:""],
+    ["Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)],
+    ["Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)],
+    igTrendRij(c)];
 }
 function instaTegel(){
   if(IG.err||!IG.acc)return `<article class="tegel binnenkort">
@@ -699,12 +741,7 @@ function instaTegel(){
     <div class="tgroot">${nf0.format(IG.acc.volgers||0)}</div>
     <p class="s">${igNieuwWeg(c)}</p>
     <div class="trijen">
-      ${igBereikRij(c)}
-      ${tegelRij("Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV))}
-      ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV))}
-      ${(l=>tegelRij("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes())}
-      ${(k=>tegelRij("Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)))(igKwal())}
-      ${igTrendRij(c)}
+      ${igVasteRijen(c).map(([k,v,u])=>tegelRij(k,v,u)).join("")}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
       ${igStatusHTML()}
     </div>
