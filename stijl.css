@@ -393,3 +393,6 @@ td.igszelf .igsvs{white-space:normal}
 .igtopkop{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;white-space:nowrap}
 .igtopkop:hover{color:var(--ink)}
 td.gesorteerd{font-weight:700;color:var(--ink)}
+
+/* Insta-tab, stories: samenvatting boven de tabel */
+.igstorysamen{margin-bottom:14px}
