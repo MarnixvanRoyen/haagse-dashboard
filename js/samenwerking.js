@@ -8,27 +8,48 @@
 //   - Alleen bereik = niet meer volgers, wel meer kijkers (mediaan ≥ 1,25× je andere samenwerkingen).
 //   - Levert niks op = geen van beide.  Oordeel pas vanaf 3 posts, daarvoor "te vroeg" (grijs).
 //   - Per 1.000 kijkers: eerst per post uitrekenen, dan gemiddelde (elke post telt even zwaar, één virale post overheerst niet).
+//   - Laat aangenomen (> 3 dagen na de post, 12b) telt niet mee voor die partner: de post had zijn kijkers toen al.
+//     Posts waarop álle aangenomen partners laat waren, tellen nergens mee. Weggehaalde partners (weg) tellen niet mee.
+//   - Laat aangenomen mét nulmeting (12b, view ig_partner_laat_effect): erbij na aannemen min de eigen groei van de post
+//     (tempo vlak vóór het aannemen, doorgetrokken) = effect van de partner. Telt mee in Extra volgâhs, niet in het oordeel.
 
-let IGS={partners:[],posts:[],info:[],fb:null,err:null};
+let IGS={partners:[],posts:[],info:[],laat:[],fb:null,err:null};
 let igsPeriode="365";     // "365" (laatste jaar) of "alles"
 let igsSorteer="extra";   // "extra" (extra volgâhs) of "vaak" (vaakst samen)
 let igsAlles=false;       // alle partners tonen of de eerste 12
 const IGS_MIN=3;          // vanaf zoveel posts een oordeel
 const IGS_WACHT=3;        // posts jonger dan zoveel dagen tellen nog niet mee (cijfers groeien nog)
+const IGS_LAAT=3*864e5;   // aangenomen meer dan 3 dagen na de post = laat (we checken elke 3 uur, dus ± 2½–3 dagen echt)
 
 async function igSamenLaden(){
   try{
-    const [p,pp,i,f]=await Promise.all([
-      igAlles(()=>sb.from("ig_partner").select("media_id,partner,status").order("media_id").order("partner")),
+    const [p,pp,i,f,l]=await Promise.all([
+      igAlles(()=>sb.from("ig_partner").select("media_id,partner,status,aangenomen_om,weg,weg_om").order("media_id").order("partner")),
       igAlles(()=>sb.from("ig_partner_post").select("media_id,gepost_om,aangenomen,uitgenodigd").order("media_id")),
       sb.from("ig_partner_info").select("partner,volgers,fout").range(0,4999),
-      sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om").eq("naam","facebook_access_token").limit(1)]);
+      sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om").eq("naam","facebook_access_token").limit(1),
+      sb.from("ig_partner_laat_effect").select("media_id,partner,gepost_om,aangenomen_om,basis_om,basis,na_om,na,voor_om,voor").range(0,1999).then(r=>r,()=>({data:[]}))]);
     for(const r of [i,f])if(r.error)throw r.error;
-    IGS={partners:p,posts:pp,info:i.data||[],fb:(f.data&&f.data[0])||null,err:null};
-  }catch(e){IGS={partners:[],posts:[],info:[],fb:null,err:e.message||String(e)}}
+    IGS={partners:p,posts:pp,info:i.data||[],laat:(l&&!l.error&&l.data)||[],fb:(f.data&&f.data[0])||null,err:null};
+  }catch(e){IGS={partners:[],posts:[],info:[],laat:[],fb:null,err:e.message||String(e)}}
 }
 
 /* ---------- rekenen ---------- */
+// Effect van een laat aangenomen partner: wat kwam erbij na het aannemen, min wat de post in zijn eigen tempo nog zou doen.
+function igsLaatEffect(r){
+  const g=(o,k)=>o&&o[k]!=null&&!isNaN(+o[k])?+o[k]:null;
+  const uit={partner:r.partner,media_id:r.media_id,post:r.gepost_om,meet:true,dagen:0};
+  if(!r.na||g(r.na,"reach")==null||g(r.basis,"reach")==null)return uit;               // nog geen meting na het aannemen
+  const dagen=(Date.parse(r.na_om)-Date.parse(r.basis_om))/864e5;if(dagen<0.5)return uit;
+  let tb=0,tv=0,trend=false;                                                          // eigen tempo per dag vlak ervóór
+  if(r.voor&&r.voor_om){const d=(Date.parse(r.basis_om)-Date.parse(r.voor_om))/864e5;
+    if(d>0.25&&g(r.voor,"reach")!=null){tb=Math.max(0,(g(r.basis,"reach")-g(r.voor,"reach"))/d);
+      tv=g(r.voor,"follows")!=null&&g(r.basis,"follows")!=null?Math.max(0,(g(r.basis,"follows")-g(r.voor,"follows"))/d):0;trend=true}}
+  const dB=g(r.na,"reach")-g(r.basis,"reach");
+  const dV=g(r.na,"follows")!=null&&g(r.basis,"follows")!=null?g(r.na,"follows")-g(r.basis,"follows"):null;
+  return {...uit,meet:dagen<13.5,dagen,trend,dB,dV,extraB:dB-tb*dagen,extraV:dV==null?null:dV-tv*dagen};
+}
+
 const igsGem=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 function igsKort(v){return v==null?"—":v>=1e6?igNf1.format(v/1e6)+"M":v>=1e4?nf0.format(v/1e3)+"k":v>=1e3?igNf1.format(v/1e3)+"k":nf0.format(v)}
 
@@ -37,21 +58,28 @@ function igSamen(){
   const grens=igsPeriode==="alles"?0:Date.now()-365*864e5, jong=Date.now()-IGS_WACHT*864e5;
   const pp=IGS.posts.filter(x=>x.gepost_om&&Date.parse(x.gepost_om)>=grens);
   const datum=new Map(pp.map(x=>[x.media_id,x.gepost_om]));
+  const actief=IGS.partners.filter(r=>!r.weg&&datum.has(r.media_id));
+  const isLaat=r=>r.status==="Accepted"&&!!r.aangenomen_om&&Date.parse(r.aangenomen_om)-Date.parse(datum.get(r.media_id))>IGS_LAAT;
+  const perPost=new Map();   // media_id -> {opTijd, laat}: aangenomen partners per post
+  actief.forEach(r=>{if(r.status!=="Accepted")return;const x=perPost.get(r.media_id)||{opTijd:0,laat:0};if(isLaat(r))x.laat++;else x.opTijd++;perPost.set(r.media_id,x)});
 
   // posts met bruikbare cijfers (bereik + nieuwe volgers bekend, minstens 3 dagen oud)
   const bruik=new Map();
   pp.forEach(x=>{const s=stats.get(x.media_id);
     if(!s||!(s.bereik>0)||s.nieuwe_volgers==null||Date.parse(x.gepost_om)>jong)return;
-    bruik.set(x.media_id,{id:x.media_id,aan:x.aangenomen,b:s.bereik,v:s.nieuwe_volgers,pr:s.profielbezoeken,lk:(s.likes||0)+(s.gedeeld||0)})});
+    const a=perPost.get(x.media_id)||{opTijd:0,laat:0};
+    if(!a.opTijd&&a.laat)return;                        // alleen late partners: geen solo en geen gewone samenwerking
+    bruik.set(x.media_id,{id:x.media_id,aan:a.opTijd,b:s.bereik,v:s.nieuwe_volgers,pr:s.profielbezoeken,lk:(s.likes||0)+(s.gedeeld||0)})});
   const collab=[...bruik.values()].filter(x=>x.aan>0), solo=[...bruik.values()].filter(x=>x.aan===0);
   const kwal=l=>({v1k:igsGem(l.map(x=>x.v*1000/x.b)),pr1k:igsGem(l.filter(x=>x.pr!=null).map(x=>x.pr*1000/x.b)),lk:igsGem(l.map(x=>x.lk/x.b))});
 
   // uitnodigingen per partner (alle posts in de periode, ook zonder cijfers) + posts met cijfers waar hij aannam
   const uit=new Map(),metX=new Map();
-  IGS.partners.forEach(r=>{if(!datum.has(r.media_id))return;
-    const u=uit.get(r.partner)||{aan:0,alles:0,laatst:null};u.alles++;
+  actief.forEach(r=>{
+    const u=uit.get(r.partner)||{aan:0,alles:0,laat:0,laatst:null};u.alles++;
     if(r.status==="Accepted"){u.aan++;const d=datum.get(r.media_id);if(!u.laatst||d>u.laatst)u.laatst=d;
-      const b=bruik.get(r.media_id);if(b){if(!metX.has(r.partner))metX.set(r.partner,[]);metX.get(r.partner).push(b)}}
+      if(isLaat(r))u.laat++;
+      else{const b=bruik.get(r.media_id);if(b){if(!metX.has(r.partner))metX.set(r.partner,[]);metX.get(r.partner).push(b)}}}
     uit.set(r.partner,u)});
 
   const info=new Map(IGS.info.map(x=>[x.partner,x]));
@@ -74,10 +102,22 @@ function igSamen(){
   let aan=0,alles=0;uit.forEach(u=>{aan+=u.aan;alles+=u.alles});
   const nooit=[...uit].filter(([,u])=>u.aan===0&&u.alles>=3).sort((a,b)=>b[1].alles-a[1].alles);
   const zelden=[...uit].filter(([,u])=>u.aan>0&&u.alles>=5&&u.aan/u.alles<0.3).sort((a,b)=>b[1].alles-a[1].alles);
-  return {rijen,tel,aan,alles,nooit,zelden,
+  const laat=[...uit].filter(([,u])=>u.laat>0).sort((a,b)=>b[1].laat-a[1].laat);
+  // gemeten effect van laat aannemen, per partner
+  const effect=new Map();
+  IGS.laat.map(igsLaatEffect).forEach(e=>{if(!effect.has(e.partner))effect.set(e.partner,[]);effect.get(e.partner).push(e)});
+  const extraLaat=n=>(effect.get(n)||[]).reduce((a,e)=>a+(e.extraV??0),0);
+  rijen.forEach(r=>{const l=effect.get(r.naam)||[];r.laatN=l.filter(e=>e.dV!=null).length;r.extraLaat=r.laatN?extraLaat(r.naam):0;
+    r.totaal=r.extra==null?null:r.extra+r.extraLaat});
+  if(igsSorteer!=="vaak")rijen.sort((a,b)=>b.zeker-a.zeker||(b.totaal??-1e9)-(a.totaal??-1e9)||b.n-a.n);
+  // weggehaald in de laatste 90 dagen (alle posts, ook buiten de periode)
+  const alleDatum=new Map(IGS.posts.map(x=>[x.media_id,x.gepost_om]));
+  const weg=IGS.partners.filter(r=>r.weg&&r.weg_om&&Date.parse(r.weg_om)>Date.now()-90*864e5)
+    .map(r=>({naam:r.partner,post:alleDatum.get(r.media_id),om:r.weg_om,was:r.status})).sort((a,b)=>a.om<b.om?1:-1);
+  return {rijen,tel,aan,alles,nooit,zelden,laat,weg,effect,
     collab:{n:collab.length,medB:med(collab.map(x=>x.b)),medV:med(collab.map(x=>x.v)),...kwal(collab)},
     solo:{n:solo.length,medB:med(solo.map(x=>x.b)),medV:med(solo.map(x=>x.v)),...kwal(solo)},
-    zonderCijfers:pp.filter(x=>x.aangenomen>0&&!bruik.has(x.media_id)).length,
+    zonderCijfers:pp.filter(x=>(perPost.get(x.media_id)||{}).opTijd>0&&!bruik.has(x.media_id)).length,
     gecheckt:IGS.posts.length,metGrootte:rijen.some(r=>r.info&&r.info.volgers!=null)};
 }
 
@@ -114,10 +154,10 @@ function renderIgSamen(){
   $("igSamen").innerHTML=s.rijen.length?`<thead><tr><th>Partnâh</th><th class="n">Posts samen</th><th class="n">Neemt aan</th><th class="n">Kijkâhs</th><th class="n">Volgâhs per post</th><th class="n">Extra volgâhs</th><th class="n">Volgâhs per 1.000</th><th class="n">Profielbezoek per 1.000</th><th class="n">Likes + delen per kijkâh</th>${s.metGrootte?'<th class="n">Grootte</th>':""}<th class="igsoordeel">Oordeel</th></tr></thead><tbody>`+
     toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a>${r.u.laatst?`<span class="igsvs">laatst ${dLabel(dagNL(r.u.laatst),1)}</span>`:""}<div class="igsmob">${igsOordeel(r)}</div></td>
       <td class="n">${nf0.format(r.n)}</td>
-      <td class="n">${nf0.format(r.u.aan)} van ${nf0.format(r.u.alles)}${r.u.alles>=5&&r.u.aan/r.u.alles<0.3?'<span class="igsvs">neemt zelden aan</span>':""}</td>
+      <td class="n">${nf0.format(r.u.aan)} van ${nf0.format(r.u.alles)}${r.u.alles>=5&&r.u.aan/r.u.alles<0.3?'<span class="igsvs">neemt zelden aan</span>':""}${r.u.laat?`<span class="igsvs">${r.u.laat}× te laat</span>`:""}</td>
       <td class="n">${r.bx==null?"—":igNf1.format(r.bx)+"×"}<span class="igsvs">t.o.v. andere</span></td>
       <td class="n">${igsVs(r.vpp,r.gewoonV,v=>igNf1.format(v))}</td>
-      <td class="n">${r.extra==null?"—":`<b class="${r.extra>=2?"up":r.extra<=-2?"down":""}">${plus(Math.round(r.extra))}</b>`}</td>
+      <td class="n">${r.totaal==null?"—":`<b class="${r.totaal>=2?"up":r.totaal<=-2?"down":""}">${plus(Math.round(r.totaal))}</b>`}${r.laatN?`<span class="igsvs">waarvan ${plus(Math.round(r.extraLaat))} na laat aannemen</span>`:""}</td>
       <td class="n">${igsVs(r.q.v1k,r.qo.v1k,v=>igsNf2.format(v))}</td>
       <td class="n">${igsVs(r.q.pr1k,r.qo.pr1k,v=>igNf1.format(v))}</td>
       <td class="n">${igsVs(r.q.lk,r.qo.lk,v=>pct(v))}</td>
@@ -132,7 +172,15 @@ function renderIgSamen(){
     +`Per post ${o.medV==null?"—":igNf1.format(o.medV)} nieuwe volgers, bij een samenwerking ${c.medV==null?"—":igNf1.format(c.medV)}. Dit is je controlegroep: zo zie je wat een partner extra doet.</p>`);
   if(s.nooit.length)delen.push(`<p><b>Neme nooit aan</b> (3 of meer uitnodigingen): ${s.nooit.slice(0,15).map(([n,u])=>`<a class="chip mute" href="https://www.instagram.com/${encodeURIComponent(n)}/" target="_blank" rel="noopener">@${esc(n)} · 0 van ${u.alles}</a>`).join(" ")}${s.nooit.length>15?` en nog ${s.nooit.length-15}`:""}. Uitnodigen mag, maar reken er niet op.</p>`);
   if(s.zelden.length)delen.push(`<p><b>Neme zelden aan</b>: ${s.zelden.slice(0,10).map(([n,u])=>`@${esc(n)} (${u.aan} van ${u.alles})`).join(", ")}. Als ze wél aannemen kan het veel opleveren: kijk hierboven bij hun rij.</p>`);
-  delen.push(`<p class="sub">Hoe het werkt: <b>Volgâhs per post</b> en <b>Kijkâhs</b> = de middelste post met deze partner, tegen de middelste van je andere samenwerkingen ("andere"). Zo telt één virale post niet te zwaar, ook niet als een andere partner die viraal maakte. <b>Extra volgâhs</b> = ongeveer hoeveel volgers de posts met deze partner meer (of minder) opleverden dan evenveel gewone samenwerkingsposts. <b>Per 1.000</b> = kwaliteit: hoeveel van de kijkers volger worden of je profiel bekijken. Een post met meer partners telt bij elke partner mee (de cijfers zijn gedeeld), en posts jonger dan ${IGS_WACHT} dagen tellen nog niet mee.`
+  if(s.laat.length){
+    const eff=n=>{const l=(s.effect.get(n)||[]);if(!l.length)return "";
+      const klaar=l.filter(e=>e.dV!=null||e.dB!=null);
+      if(!klaar.length)return " · meet nog";
+      const b=klaar.reduce((a,e)=>a+(e.extraB||0),0),v=klaar.reduce((a,e)=>a+(e.extraV||0),0),bezig=l.some(e=>e.meet);
+      return ` · na aannemen ${plus(Math.round(b))} kijkers, ${plus(Math.round(v))} volgers${bezig?` (meet nog, dag ${nf0.format(Math.max(...l.map(e=>e.dagen||0)))} van 14)`:""}`};
+    delen.push(`<p><b>Laat aangenomen</b> (meer dan ± 3 dagen na je post): ${s.laat.slice(0,12).map(([n,u])=>`@${esc(n)} (${u.laat}×${eff(n)})`).join(", ")}${s.laat.length>12?` en nog ${s.laat.length-12}`:""}. Zulke posts tellen niet mee in het oordeel, want de post had zijn kijkers toen al. Wat de partner daarna nog opleverde, meten we apart: alles wat erbij kwam na het aannemen, min wat de post in zijn eigen tempo nog zou doen. Dat telt mee in <b>Extra volgâhs</b>.</p>`)}
+  if(s.weg.length)delen.push(`<p><b>Weggehaald</b> (laatste 90 dagen): ${s.weg.slice(0,12).map(w=>`@${esc(w.naam)}${w.post?` bij post van ${dLabel(dagNL(w.post))}`:""}${w.was==="Accepted"?" (had aangenomen)":""}`).join(", ")}${s.weg.length>12?` en nog ${s.weg.length-12}`:""}. Bewaard als geschiedenis; ze tellen niet mee.</p>`);
+  delen.push(`<p class="sub">Hoe het werkt: <b>Volgâhs per post</b> en <b>Kijkâhs</b> = de middelste post met deze partner, tegen de middelste van je andere samenwerkingen ("andere"). Zo telt één virale post niet te zwaar, ook niet als een andere partner die viraal maakte. <b>Extra volgâhs</b> = ongeveer hoeveel volgers de posts met deze partner meer (of minder) opleverden dan evenveel gewone samenwerkingsposts. <b>Per 1.000</b> = kwaliteit: hoeveel van de kijkers volger worden of je profiel bekijken. Een post met meer partners telt bij elke partner mee (de cijfers zijn gedeeld), en posts jonger dan ${IGS_WACHT} dagen tellen nog niet mee. Nam een partner pas later aan, dan telt die post niet voor die partner. Van samenwerkingen van vóór 1 oktober weten we niet wanneer ze aannamen; die tellen gewoon mee.`
     +(s.zonderCijfers?` ${nf0.format(s.zonderCijfers)} samenwerkingen hebben nog geen cijfers; het archief vult zich elke nacht aan.`:"")
     +(s.metGrootte?"":" Partnergrootte komt erbij zodra de Facebook-sleutel het recht <code>instagram_manage_insights</code> heeft.")+`</p>`);
   $("igsOnder").innerHTML=delen.join("");
