@@ -369,36 +369,34 @@ function igKolommen(el,data,aria,onder){   // gestapelde kolommen: data=[{d,part
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }
-/* ---------- tegel Posts: trend, verdeling per soort en grafiekje per dag (laatste 30 dagen) ----------
+/* ---------- Posts: tegel (aantal + trend) en losse grafiek "Posts per dag" (laatste 30 dagen) ----------
    Trend = aantal laatste 7 dagen vs de 7 dagen daarvoor, in aantallen (bij 2 of 3 posts zegt een % niks); pijltje vanaf 1 verschil.
    Alleen je eigen posts en reels (geen stories: die staan in hun eigen kaart). Dagen = Haagse dagen. */
 const IG_SOORT_KLEUR={Carrousel:"hy",Reel:"sc",Foto:"lb"};
 const IG_SOORT_MEERV={Carrousel:"carrousels",Reel:"reels",Foto:"foto's"};
-function igPostsStat(c){
+const igSoortTxt=(n,sn)=>`${n} ${n===1?sn.toLowerCase():IG_SOORT_MEERV[sn]||sn.toLowerCase()}`;
+function igPostsPerDag(){   // laatste 30 Haagse dagen: per dag per soort + totaal per soort
+  const vandaag=vandaagAms(),dagen=[];for(let i=29;i>=0;i--)dagen.push(dagMin(vandaag,i));
+  const per=new Map(dagen.map(x=>[x,{}])),soorten={};
+  IG.posts.forEach(p=>{if(!p.gepost_om)return;const x=per.get(dagNL(p.gepost_om));if(!x)return;const sn=soortNaam(p);x[sn]=(x[sn]||0)+1;soorten[sn]=(soorten[sn]||0)+1});
+  const volg=["Carrousel","Reel","Foto"].filter(sn=>soorten[sn]).concat(Object.keys(soorten).filter(sn=>!IG_SOORT_KLEUR[sn]));
+  return {dagen,per,soorten,volg};
+}
+function igPostsStat(c){   // alleen aantal + trend (details staan in de grafiek Posts per dag)
   const nu=Date.now(),ps=IG.posts.filter(p=>p.gepost_om);
   const tel=(van,tot)=>ps.filter(p=>{const t=Date.parse(p.gepost_om);return t>nu-van*864e5&&t<=nu-tot*864e5}).length;
   const w=tel(7,0),vw=tel(14,7),d=w-vw;
   const vs=` · vorige week ${nf0.format(vw)}${d>=1?` <span class="up">↑ ${nf0.format(d)} meer</span>`:d<=-1?` <span class="down">↓ ${nf0.format(-d)} minder</span>`:""}`;
-  // per dag, per soort
-  const vandaag=vandaagAms(),dagen=[];for(let i=29;i>=0;i--)dagen.push(dagMin(vandaag,i));
-  const per=new Map(dagen.map(x=>[x,{}])),soorten={};
-  ps.forEach(p=>{const x=per.get(dagNL(p.gepost_om));if(!x)return;const sn=soortNaam(p);x[sn]=(x[sn]||0)+1;soorten[sn]=(soorten[sn]||0)+1});
-  const volg=Object.keys(soorten).sort((a,b)=>soorten[b]-soorten[a]);
-  const kleur=sn=>`var(--${IG_SOORT_KLEUR[sn]||"muted"})`;
-  const verdeling=volg.length?volg.map(sn=>`<span class="igsrt"><i style="background:${kleur(sn)}"></i>${soorten[sn]} ${soorten[sn]===1?sn.toLowerCase():IG_SOORT_MEERV[sn]||sn.toLowerCase()}</span>`).join(" "):"geen posts";
-  // grafiekje: één staafje per dag, gestapeld per soort; dag zonder post = streepje
-  const max=Math.max(1,...dagen.map(x=>Object.values(per.get(x)).reduce((a,b)=>a+b,0)));
-  const W=300,H=46,bw=W/dagen.length;
-  let g=`<svg class="igpostgraf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Posts per dag, laatste 30 dagen">`;
-  dagen.forEach((x,i)=>{const v=per.get(x),tot=Object.values(v).reduce((a,b)=>a+b,0);let y=H;
-    if(!tot)g+=`<rect x="${(i*bw+bw*.2).toFixed(1)}" y="${H-1.5}" width="${(bw*.6).toFixed(1)}" height="1.5" fill="var(--line)"/>`;
-    volg.forEach(sn=>{if(!v[sn])return;const h=v[sn]/max*(H-2);y-=h;g+=`<rect x="${(i*bw+bw*.15).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${h.toFixed(1)}" fill="${kleur(sn)}"/>`});
-    const tip=`${igWd(x)} ${dLabel(x)}: `+(tot?volg.filter(sn=>v[sn]).map(sn=>`${v[sn]} ${v[sn]===1?sn.toLowerCase():IG_SOORT_MEERV[sn]}`).join(" + "):"geen post");
-    g+=`<rect x="${(i*bw).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}" fill="transparent"><title>${esc(tip)}</title></rect>`});
-  g+=`</svg><span class="igpostas"><span>${dLabel(dagen[0])}</span><span>vandaag</span></span>`;
-  return `<div class="ytstat breed"><span class="k">Posts</span><span class="v">${nf0.format(w)}</span><span class="s">laatste 7 dagen${vs}`
-    +(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:"")
-    +`<br>laatste 30 dagen: ${verdeling}${g}</span></div>`;
+  return igStat("Posts",nf0.format(w),`laatste 7 dagen${vs}`);
+}
+// losse grafiek, net als Bereik per dag: één staaf per dag, gestapeld per soort
+function renderIgPostsPerDag(){
+  if(!$("igPostChart"))return;
+  const {dagen,per,soorten,volg}=igPostsPerDag(),tot=Object.values(soorten).reduce((a,b)=>a+b,0);
+  $("igPostSub").innerHTML=`Laatste 30 dagen: <b>${nf0.format(tot)} post${tot===1?"":"s"}</b>`+(tot?" ("+volg.map(sn=>igSoortTxt(soorten[sn],sn)).join(", ")+")":"")+". Per dag hoeveel je postte, per soort. Stories tellen hier nie mee.";
+  igKolommen($("igPostChart"),dagen.map(x=>{const v=per.get(x),n=Object.values(v).reduce((a,b)=>a+b,0);
+    return {d:x,parts:volg.map(sn=>({v:v[sn]||0,c:IG_SOORT_KLEUR[sn]||"muted"})),
+      tip:`${igWd(x)} ${dLabel(x,1)}: `+(n?volg.filter(sn=>v[sn]).map(sn=>igSoortTxt(v[sn],sn)).join(" + "):"geen post")}}),"Posts per dag, laatste 30 dagen");
 }
 function igStat(k,v,s){return `<div class="ytstat"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`}
 function igVs(a,b,pctMode){if(a==null||b==null||!b)return "";const d=a/b-1;
@@ -436,7 +434,7 @@ function renderInsta(){
     ...igVasteRijen(c).map(([k,v,u,extra])=>igStat(k,v,u+(extra||""))),
     // alleen op de Insta-tab
     igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)),
-igPostsStat(c)
+    igPostsStat(c)
   ].join("");
 
   // 2. bereik per dag, volgers vs nieuw
@@ -448,6 +446,7 @@ igPostsStat(c)
 
   // 2b. likes per kijkâh of kwaliteit per post (laatste 30 posts)
   renderIgPostGrafiek();
+  renderIgPostsPerDag();   // 2c. posts per dag (laatste 30 dagen)
 
   // 3. wat werkt
   document.querySelectorAll("#igKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igKies));
