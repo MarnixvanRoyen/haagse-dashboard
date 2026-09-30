@@ -690,16 +690,25 @@ function igMetaStart(dag){
 }
 // regel "Bereik vandaag": getal van vandaag, of uitleg waarom het er (nog) niet is, plus gistâh ter vergelijking
 function igBereikRij(c){   // geeft [kop, getal, uitleg]
+  // Vandaag vs gistâh. Vandaag is nog nie klaar (Meta-dag loopt van 09:00 tot 09:00 bij ons), gistâh wel.
+  // Daarom geen ↓ zolang vandaag loopt (dat zou elke ochtend "slechter" zeggen), maar "nu al X% van gistâh".
+  // Pas als vandaag gistâh al voorbij is, een ↑: dat staat dan vast.
   const start=igMetaStart(c.vandaag),sinds=tijdAms(start),uren=(Date.now()-start)/36e5;
+  const eind=igMetaStart(dagMin(c.vandaag,-1)),nog=Math.max(0,Math.round((eind-Date.now())/36e5));
   const stapFout=igLiveStand().fouten.some(f=>igStapVan(f)==="vandaag");
-  const gd=dagMin(c.vandaag,1),g=igSom(gd,gd),gv=igSom(dagMin(c.vandaag,8),dagMin(c.vandaag,8));
+  const gd=dagMin(c.vandaag,1),g=igSom(gd,gd).reach,nu=c.nu.reach;
+  const fout=stapFout?` · <span class="igst-w">⚠ nieuwste stand ophalen lukte nie</span>`:"";
   let s;
-  if(c.nu.reach!=null)s=`tot nu · Meta-dag begon om ${sinds}`+(stapFout?` · <span class="igst-w">⚠ nieuwste stand ophalen lukte nie</span>`:"");
+  if(nu!=null&&g){
+    s=nu>=g?`gistâh ${nf0.format(g)} · <span class="up">↑ nu al ${pct(nu/g-1)} meer</span>`
+           :`gistâh ${nf0.format(g)} · vandaag nu al ${pct(nu/g)} daarvan`;
+    s+=`<br>tot nu, nog ${nog} uur te gaan (Meta-dag loopt tot ${tijdAms(eind)})`+fout;
+  }
+  else if(nu!=null)s=`tot nu · Meta-dag begon om ${sinds}`+fout;
   else if(stapFout)s=`<span class="igst-w">⚠ ophalen lukte nie</span> (Meta-dag begon om ${sinds}) · reden onderaan`;
-  else if(uren<3)s=`Meta-dag begon om ${sinds}, cijfâhs volgen`;
-  else s="nog geen meting van vandaag";
-  if(g.reach!=null)s+=`<br>gistâh (${igWd(gd)}): ${nf0.format(g.reach)}`+(gv.reach!=null?` · ${igWd(gd)} daarvoor ${nf0.format(gv.reach)}`+igPijl(g.reach,gv.reach):"");
-  return ["Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),s];
+  else if(uren<3)s=`Meta-dag begon om ${sinds}, cijfâhs volgen`+(g?` · gistâh ${nf0.format(g)}`:"");
+  else s="nog geen meting van vandaag"+(g?` · gistâh ${nf0.format(g)}`:"");
+  return ["Bereik vandaag",nu==null?"—":nf0.format(nu),s];
 }
 
 /* ---------- tegel op het Ovâhzicht ---------- */
