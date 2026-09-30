@@ -436,7 +436,6 @@ function renderInsta(){
     ...igVasteRijen(c).map(([k,v,u,extra])=>igStat(k,v,u+(extra||""))),
     // alleen op de Insta-tab
     igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)),
-    igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · hele account (ook stories), per week`),
 igPostsStat(c)
   ].join("");
 
