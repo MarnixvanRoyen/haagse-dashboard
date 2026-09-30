@@ -459,7 +459,7 @@ function muziekKort(y,days){return y.multiDay&&days<y.venster-1?` · metingen pa
 function renderYouTube(){
   if(YT.err){$("ytStats").innerHTML=`<p class="sub">YouTube-cijfers ophalen lukte niet: ${esc(YT.err)}</p>`;return}
   const y=ytCompute(MUZIEK_DAGEN);
-  if(!y.last){$("ytStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nâh ververse".</p>';$("ytChart").innerHTML="";$("ytTop").innerHTML="";$("ytGrow").innerHTML="";$("ytTable").innerHTML="";$("cmpStats").innerHTML="";$("cmpTable").innerHTML="";return}
+  if(!y.last){$("ytStats").innerHTML='<p class="sub">Nog geen metingen. Tik bovenaan op Ververse.</p>';$("ytChart").innerHTML="";$("ytTop").innerHTML="";$("ytGrow").innerHTML="";$("ytTable").innerHTML="";$("cmpStats").innerHTML="";$("cmpTable").innerHTML="";return}
   const views=y.vids.reduce((a,v)=>a+v.views,0),likes=y.vids.reduce((a,v)=>a+v.likes,0),grow=y.vids.reduce((a,v)=>a+v.grow,0);
   const days=Math.round((new Date(y.last)-new Date(y.base))/864e5);
   const tracks=y.vids.filter(v=>!v.own).length, own=y.vids.length-tracks;
@@ -557,14 +557,6 @@ function renderYtCompare(y){
       <td class="mono" style="font-size:13px;white-space:nowrap">${o.last?mLabel(o.last):"—"}</td></tr>`}).join("")+
     `</tbody><tfoot><tr><td>Totaal (${rows.length})</td><td></td><td class="n">${nf0.format(views)}</td><td class="n">${nf0.format(paid)}</td><td class="n">${nf0.format(other)}</td><td class="n">${views?pct(paid/views):""}</td><td class="n">${eur(ex(usdT))}</td><td class="n">${paid?eur(ex(usdT)/paid*1000):""}</td><td></td></tr></tfoot>`;
 }
-$("ytRefresh").addEventListener("click",async()=>{
-  const b=$("ytRefresh");b.disabled=true;b.textContent="Effe geduld…";
-  const {data,error}=await sb.rpc("yt_refresh");
-  b.disabled=false;b.textContent="Nâh ververse";
-  if(error){showMsg("Verversen lukte niet: "+error.message);return}
-  liveNetVervers("yt");await loadYT();renderYouTube();
-  showMsg(`YouTube bijgewerkt: ${data.videos} tracks en video's gemeten.${data.fouten&&data.fouten.length?" Let op: "+data.fouten.join("; "):""}`,!(data.fouten&&data.fouten.length));
-});
 
 /* ---------- SoundCloud live ---------- */
 let SCL={tracks:[],snaps:[],err:null};
@@ -617,7 +609,7 @@ function renderSCLive(){
   const clear=()=>["sclChart","sclTop","sclGrow","sclTable","sclMoneyStats","sclMoneyTable"].forEach(i=>$(i).innerHTML="");
   if(SCL.err){$("sclStats").innerHTML=`<p class="sub">SoundCloud-cijfers ophalen lukte niet: ${esc(SCL.err)}</p>`;clear();return}
   const y=sclCompute(MUZIEK_DAGEN);
-  if(!y.last){$("sclStats").innerHTML='<p class="sub">Nog geen metingen. Klik op "Nâh ververse".</p>';clear();return}
+  if(!y.last){$("sclStats").innerHTML='<p class="sub">Nog geen metingen. Tik bovenaan op Ververse.</p>';clear();return}
   const L=y.list,plays=L.reduce((a,t)=>a+(t.plays||0),0),likes=L.reduce((a,t)=>a+t.likes,0),reposts=L.reduce((a,t)=>a+t.reposts,0),
     comments=L.reduce((a,t)=>a+t.comments,0),grow=L.reduce((a,t)=>a+t.grow,0);
   const days=Math.round((new Date(y.last)-new Date(y.base))/864e5);
@@ -683,14 +675,6 @@ function renderSCLive(){
       <td class="n">${nf0.format(t.likes)}</td><td class="n">${nf0.format(t.reposts)}</td><td class="n">${nf0.format(t.comments)}</td><td class="n">${nf0.format(t.downloads)}</td></tr>`).join("")+
     `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(plays)}</td>${vd?`<td class="n">+${nf0.format(g.erbe)}</td>`:""}<td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td></td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(reposts)}</td><td class="n">${nf0.format(comments)}</td><td class="n">${nf0.format(L.reduce((a,t)=>a+t.downloads,0))}</td></tr></tfoot>`;
 }
-$("sclRefresh").addEventListener("click",async()=>{
-  const b=$("sclRefresh");b.disabled=true;b.textContent="Effe geduld…";
-  const {data,error}=await sb.rpc("sc_refresh");
-  b.disabled=false;b.textContent="Nâh ververse";
-  if(error){showMsg("Verversen lukte niet: "+error.message);return}
-  liveNetVervers("sc");await loadSCL();renderSCLive();
-  showMsg(`SoundCloud bijgewerkt: ${data.tracks} nummers gemeten.`,true);
-});
 
 /* ---------- Spotify (CSV-export uit Spotify for Artists) ---------- */
 let SP={snaps:[],err:null};

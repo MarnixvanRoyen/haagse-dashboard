@@ -65,7 +65,7 @@ function igKoppeling(){
     tekst:`Meta weigert de sleutel. De laatste keer dat het lukte: <b>${sinds}</b>. Tot je een nieuwe sleutel maakt, komen er geen nieuwe Insta-cijfers binnen.`,
     detail:fouten[0].replace(/^[a-z ]+\d*[-\d]*:\s*/i,"")};
   if(gelukt&&Date.now()-gelukt>30*36e5)return {nivo:"oud",kop:"Geen verse Insta-cijfâhs",
-    tekst:`De laatste keer dat het ophalen lukte: <b>${sinds}</b> (meer dan een dag geleden). Klik op de Insta-pagina op "Nâh ververse" om het opnieuw te proberen; blijft dit staan, maak dan een nieuwe sleutel.`};
+    tekst:`De laatste keer dat het ophalen lukte: <b>${sinds}</b> (meer dan een dag geleden). Tik bovenaan op "Ververse" om het opnieuw te proberen; blijft dit staan, maak dan een nieuwe sleutel.`};
   const vo=st.token&&st.token.verloopt_op?Date.parse(st.token.verloopt_op):0;
   if(vo&&vo-Date.now()<7*864e5)return {nivo:"oud",kop:"Insta-sleutel verloopt bijna",
     tekst:`De sleutel verloopt op <b>${igTijd(vo)}</b> en het automatisch verlengen is niet gelukt. Maak op tijd een nieuwe sleutel.`,detail:st.token.fout||""};
@@ -82,7 +82,7 @@ function igAlarmHTML(){
       <li>Klap <b>2. Generate access tokens</b> open en klik bij the_hague_beachlife op <b>Generate token</b> (niet op het prullenbakje).</li>
       <li>Zet alleen <b>Profiel</b> en <b>Statistieken</b> aan, klik <b>Toestaan</b> en kopieer de sleutel.</li>
       <li>Supabase → <b>Integrations</b> → <b>Vault</b> → <code>instagram_access_token</code> → <b>Edit</b> → plakken → <b>Save</b>.</li>
-      <li>Klik hier op de Insta-pagina op <b>Nâh ververse</b>. Is het gelukt, dan verdwijnt deze melding vanzelf.</li>
+      <li>Tik bovenaan op <b>Ververse</b>. Is het gelukt, dan verdwijnt deze melding vanzelf (lukte het ophalen net nog nie, dan kan het tot 5 minuten duren voordat hij het opnieuw probeert).</li>
     </ol>${k.detail?`<p class="sub">Melding van Meta: ${esc(k.detail)}</p>`:""}</details>
   </div>`+fb;
 }
@@ -398,7 +398,7 @@ function renderInsta(){
   const c=igCompute();
 
   // 1. tegels
-  $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min). Dagen zijn Meta-dagen (Amerikaanse tijd).`;
+  $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min) of bovenaan op Ververse tikt (hooguit 1x per 5 min). Dagen zijn Meta-dagen (Amerikaanse tijd).`;
   if($("igStatus"))$("igStatus").innerHTML=igStatusHTML();
   $("igStats").innerHTML=[
     igStat("Volgâhs",nf0.format(IG.acc.volgers||0),`${plus(c.follows-c.unfollows)} netto laatste 7 dagen (+${nf0.format(c.follows)} erbè, −${nf0.format(c.unfollows)} eraf)${igVsNetto(c.follows-c.unfollows,c.nettoV)}`),
@@ -614,12 +614,6 @@ document.addEventListener("click",async e=>{
     try{await navigator.clipboard.writeText(url);showMsg("Link gekopieerd: "+url+" — plak hem in je link-sticker.",true)}
     catch(err){$("igLinkUit").select();showMsg("Kopiëren lukte nie vanzelf: selecteer de link en kopieer hem zelf.",false)}
     return}
-  if(e.target.closest("#igRefresh")){const b=$("igRefresh");b.disabled=true;b.textContent="Effe geduld…";
-    const {data,error}=await sb.rpc("ig_live",{min_minuten:5});
-    if(error){LIVE.ig={fout:error.message||String(error)};renderInsta();showMsg("Insta verversen lukte nie: "+error.message)}
-    else{LIVE.ig=data;await Promise.all([loadIG(),loadGC()]);renderInsta();
-      showMsg(data&&data.ververst?(data.fout?"Deels bijgewerkt: "+data.fout:"Insta bijgewerkt, âhwe!"):"Net al bijgewerkt (om "+tijdAms(data&&data.om)+"), probeer het over een paar minuten nog eens.",!(data&&data.fout))}
-    b.disabled=false;b.textContent="Nâh ververse"}
 });
 let igRsz;addEventListener("resize",()=>{clearTimeout(igRsz);igRsz=setTimeout(()=>{if(sectie==="insta")renderInsta()},150)});
 
@@ -654,7 +648,7 @@ function igStatusHTML(){
   const s=igLiveStand();if(s.soort==="geen")return "";
   const kop=`<span class="igst-i" aria-hidden="true">${{ok:"✓",deels:"⚠",fout:"✕",bezig:"…"}[s.soort]}</span> ${esc(s.kort)}`;
   if(!s.fouten.length)return `<div class="igstatus ${s.soort}">${kop}</div>`;
-  const uitleg=(s.soort==="deels"?"De rest is wél bègewerkt. Meestal gaat het de volgende ronde vanzelf goed (als je het dashboard opent, hooguit 1x per 10 min, of met \"Nâh ververse\" op de Insta-pagina).":"Probeer \"Nâh ververse\" op de Insta-pagina.")
+  const uitleg=(s.soort==="deels"?"De rest is wél bègewerkt. Meestal gaat het de volgende ronde vanzelf goed (als je het dashboard opent, hooguit 1x per 10 min, of met \"Ververse\" bovenaan, hooguit 1x per 5 min).":"Probeer \"Ververse\" bovenaan.")
     +(s.fouten.some(f=>IG_SLEUTELFOUT.test(f))?" Dit lijkt op een sleutelfout: volg de rode melding bovenaan.":"");
   return `<details class="igstatus ${s.soort}"><summary>${kop}</summary>
     <ul>${s.fouten.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul><p>${uitleg}</p></details>`;

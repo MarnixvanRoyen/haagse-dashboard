@@ -153,9 +153,5 @@ function renderGC(){
   $("gcTrechter").innerHTML=stappen.map(([n,v],i)=>bar(n,[{v,c:i?"groen":"hy"}],mt,nf0.format(v)+(i&&g.b30?" · "+pct(v/g.b30):""),"",i+1)).join("")+
     '<p class="sub" style="margin:10px 0 0">Percentages t.o.v. het aantal bezoekâhs. GoatCounter telt elke bezoekâh 1 keer per 8 uur, ook als die meerdere potjes speelt.</p>';
 }
-$("gcRefresh").addEventListener("click",async e=>{const b=e.target;b.disabled=true;b.textContent="Effe geduld…";
-  const {error}=await sb.rpc("gc_refresh",{dagen:3});
-  if(error)showMsg("GoatCounter verversen lukte nie: "+error.message);else{LIVE.gc={...(LIVE.gc||{}),om:new Date().toISOString(),fout:null};await loadGC();renderSneek();showMsg("GoatCounter bijgewerkt, âhwe!",true)}
-  b.disabled=false;b.textContent="Nâh ververse"});
 
 let snRsz;addEventListener("resize",()=>{clearTimeout(snRsz);snRsz=setTimeout(()=>{if(sectie==="apps")renderSneek()},150)});

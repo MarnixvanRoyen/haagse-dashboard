@@ -4,7 +4,8 @@ const SECTIES=["ovahzicht","insta","muziek","apps","kansen"];
 let sectie="ovahzicht";                            // bij openen altijd op het Ovâhzicht beginnen
 store.del("hc_sectie");                            // oude "laatste plek" opruimen
 // na de Ververse-knop: terug naar het onderdeel waar je was (alleen voor die ene keer, niet bij gewoon openen)
-try{const v=sessionStorage.getItem("hc_ververs");sessionStorage.removeItem("hc_ververs");if(SECTIES.includes(v))sectie=v}catch(e){}
+let VERVERS_GEDRUKT=false;                         // true = net op Ververse gedrukt: live ophalen mag dan al na 5 min (live.js)
+try{const v=sessionStorage.getItem("hc_ververs");sessionStorage.removeItem("hc_ververs");if(SECTIES.includes(v)){sectie=v;VERVERS_GEDRUKT=true}}catch(e){}
 
 function setSectie(s){
   sectie=s;

@@ -52,7 +52,9 @@ async function muziekLive(){
   if(!sb||LIVE.bezig||Date.now()-LIVE.t<10*60e3)return;
   LIVE.bezig=true;LIVE.t=Date.now();hertekenLive();
   const bronnen=["yt","sc","gc","ig"];
-  const res=await Promise.all(bronnen.map(b=>(b==="gc"?sb.rpc("gc_live"):b==="ig"?sb.rpc("ig_live"):sb.rpc("muziek_live",{bron:b})).then(r=>r,e=>({error:e}))));
+  // na de Ververse-knop bovenaan mag het al na 5 min opnieuw (de oude "Nâh ververse"-knoppen per tabblad deden dat ook); gewoon openen: 10 min
+  const mm=VERVERS_GEDRUKT?5:10;VERVERS_GEDRUKT=false;
+  const res=await Promise.all(bronnen.map(b=>(b==="gc"?sb.rpc("gc_live",{min_minuten:mm}):b==="ig"?sb.rpc("ig_live",{min_minuten:mm}):sb.rpc("muziek_live",{bron:b,min_minuten:mm})).then(r=>r,e=>({error:e}))));
   const laden=[];
   res.forEach((r,i)=>{const b=bronnen[i];
     LIVE[b]=r.error?{fout:r.error.message||String(r.error)}:r.data;
@@ -74,7 +76,5 @@ function liveStatus(bron,sqlNaam){const L=LIVE[bron]||{};
   if(L.fout)return new RegExp(bron==="gc"?"gc_live|gc_uur":bron==="ig"?"ig_live":"muziek_live").test(L.fout)?` · live staat nog uit (draai ${sqlNaam})`:" · live ophalen lukte nie";
   return L.om?" · bègewerkt "+tijdAms(L.om):"";
 }
-// na "Nâh ververse" op een tabblad: tijdstip bijwerken
-function liveNetVervers(bron){LIVE[bron]={...(LIVE[bron]||{}),om:new Date().toISOString(),fout:null,vandaag:vandaagAms()}}
 // app weer in beeld (bijv. telefoon uit je zak)? dan opnieuw proberen, hooguit 1x per 10 min
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!$("app").hidden)muziekLive()});
