@@ -686,6 +686,13 @@ function igTrendRij(c){
   if(nu==null)return tegelRij(k,"—","nieuwe volgâhs per 1.000 niet-volgers die je zagen · komt zodra er 3 dagen met opsplitsing zijn");
   return tegelRij(k,igNf1.format(nu),"nieuwe volgâhs per 1.000 niet-volgers die je zagen, laatste 7 dagen"+igVs1(nu,c.volg1kNieuwV));
 }
+// volgâhs erbè én eraf (laatste 7 dagen), daaronder netto t.o.v. vorige week.
+// Geeft Meta (nog) geen unfollows voor die dagen, dan alleen netto zoals vroeger (anders lijkt het alsof niemand wegging).
+function igNieuwWeg(c){
+  const netto=`netto ${plus(c.follows-c.unfollows)}${igVsNetto(c.follows-c.unfollows,c.nettoV)}`;
+  if(!c.w.nk.follows||!c.w.nk.unfollows)return `${plus(c.follows-c.unfollows)} netto laatste 7 dagen${igVsNetto(c.follows-c.unfollows,c.nettoV)}`;
+  return `<b>+${nf0.format(c.follows)}</b> nieuw · <b>−${nf0.format(c.unfollows)}</b> weg, laatste 7 dagen<br>${netto}`;
+}
 function instaTegel(){
   if(IG.err||!IG.acc)return `<article class="tegel binnenkort">
     <div class="tkop"><h2>Insta</h2><span class="tag">@the_hague_beachlife</span></div>
@@ -696,7 +703,7 @@ function instaTegel(){
     <div class="tkop"><h2>Insta</h2><span class="tag">@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")}</span></div>
     <p class="tlbl">Volgâhs</p>
     <div class="tgroot">${nf0.format(IG.acc.volgers||0)}</div>
-    <p class="s">${plus(c.follows-c.unfollows)} netto laatste 7 dagen${igVsNetto(c.follows-c.unfollows,c.nettoV)}</p>
+    <p class="s">${igNieuwWeg(c)}</p>
     <div class="trijen">
       ${igBereikRij(c)}
       ${tegelRij("Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV))}
