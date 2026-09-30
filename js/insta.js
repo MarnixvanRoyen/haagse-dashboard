@@ -299,7 +299,8 @@ function renderInsta(){
   const c=igCompute();
 
   // 1. tegels
-  $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min)${liveStatus("ig","09b_insta_extra.sql")}. Dagen zijn Meta-dagen (Amerikaanse tijd).`;
+  $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min). Dagen zijn Meta-dagen (Amerikaanse tijd).`;
+  if($("igStatus"))$("igStatus").innerHTML=igStatusHTML();
   $("igStats").innerHTML=[
     igStat("Volgâhs",nf0.format(IG.acc.volgers||0),`${plus(c.follows-c.unfollows)} netto laatste 7 dagen (+${nf0.format(c.follows)} erbè, −${nf0.format(c.unfollows)} eraf)`),
     igStat("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")),
@@ -499,12 +500,68 @@ document.addEventListener("click",async e=>{
     return}
   if(e.target.closest("#igRefresh")){const b=$("igRefresh");b.disabled=true;b.textContent="Effe geduld…";
     const {data,error}=await sb.rpc("ig_live",{min_minuten:5});
-    if(error)showMsg("Insta verversen lukte nie: "+error.message);
+    if(error){LIVE.ig={fout:error.message||String(error)};renderInsta();showMsg("Insta verversen lukte nie: "+error.message)}
     else{LIVE.ig=data;await Promise.all([loadIG(),loadGC()]);renderInsta();
       showMsg(data&&data.ververst?(data.fout?"Deels bijgewerkt: "+data.fout:"Insta bijgewerkt, âhwe!"):"Net al bijgewerkt (om "+tijdAms(data&&data.om)+"), probeer het over een paar minuten nog eens.",!(data&&data.fout))}
     b.disabled=false;b.textContent="Nâh ververse"}
 });
 let igRsz;addEventListener("resize",()=>{clearTimeout(igRsz);igRsz=setTimeout(()=>{if(sectie==="insta")renderInsta()},150)});
+
+/* ---------- Status van de laatste ophaalronde (ig_live) ----------
+   ig_live doet zo'n 8 stappen (profiel, bereik vandaag, volgers, posts, stories, ...). Mislukt er één,
+   dan geeft hij 'fout' terug, ook al is de rest gelukt. Hier maken we onderscheid:
+   ok = alles gelukt · deels = een deel gelukt · fout = niks gelukt · bezig = loopt nog. */
+const IG_STAPNAAM={profiel:"volgâhs-stand",vandaag:"bereik van vandaag",volgers:"nieuwe volgâhs",posts:"posts",
+  post:"cijfâhs van nieuwe posts",stories:"stories",labels:"muziek-labels"};
+function igStapVan(f){return String(f).trim().split(/[: ]/)[0]}          // "stories: ..." -> "stories", "post 123: ..." -> "post"
+function igStapNamen(fouten){return [...new Set(fouten.map(f=>IG_STAPNAAM[igStapVan(f)]||"iets"))].join(" en ")}
+function igWanneer(ts){return dagNL(ts)===vandaagAms()?tijdAms(ts):igTijd(ts)}   // vandaag: alleen de tijd
+function igLiveStand(){
+  if(LIVE.bezig)return {soort:"bezig",kort:"effe bèwerke…",fouten:[]};
+  const L=LIVE.ig;
+  if(L&&!("ververst" in L)&&L.fout)   // de vraag aan Supabase ging zelf al mis
+    return {soort:"fout",kort:/ig_live/.test(L.fout)?"live staat nog uit (draai 09b_insta_extra.sql)":"ophalen lukte nie",fouten:[L.fout]};
+  if(L&&(L.ververst||L.fout)){         // deze sessie is er echt opgehaald (of het ging meteen mis)
+    const fouten=L.fouten&&L.fouten.length?L.fouten:(L.fout?[L.fout]:[]),om=L.om?igWanneer(L.om):"";
+    if(!fouten.length)return {soort:"ok",kort:"bègewerkt "+om,fouten};
+    if(!L.ververst||!(L.stappen||[]).length)return {soort:"fout",kort:"ophalen lukte nie"+(om?" ("+om+")":""),fouten};
+    return {soort:"deels",kort:`deels bègewerkt ${om} · ${igStapNamen(fouten)} lukte nie`,fouten};
+  }
+  // nog niet opgehaald deze sessie, of "net al bijgewerkt": laatste ronde uit de database (die bewaart alleen de eerste fout)
+  const v=IG.status&&IG.status.ververst;
+  if(v&&v.om)return v.fout?{soort:"deels",kort:`laatste ronde ${igWanneer(v.om)} · ${igStapNamen([v.fout])} lukte nie`,fouten:[v.fout]}
+                          :{soort:"ok",kort:"bègewerkt "+igWanneer(v.om),fouten:[]};
+  return {soort:"geen",kort:"",fouten:[]};
+}
+// statusregel onderaan de Insta-tegel en bovenaan de Insta-pagina; bij een fout uitklapbaar met de echte reden
+function igStatusHTML(){
+  const s=igLiveStand();if(s.soort==="geen")return "";
+  const kop=`<span class="igst-i" aria-hidden="true">${{ok:"✓",deels:"⚠",fout:"✕",bezig:"…"}[s.soort]}</span> ${esc(s.kort)}`;
+  if(!s.fouten.length)return `<div class="igstatus ${s.soort}">${kop}</div>`;
+  const uitleg=(s.soort==="deels"?"De rest is wél bègewerkt. Meestal gaat het de volgende ronde vanzelf goed (als je het dashboard opent, hooguit 1x per 10 min, of met \"Nâh ververse\" op de Insta-pagina).":"Probeer \"Nâh ververse\" op de Insta-pagina.")
+    +(s.fouten.some(f=>IG_SLEUTELFOUT.test(f))?" Dit lijkt op een sleutelfout: volg de rode melding bovenaan.":"");
+  return `<details class="igstatus ${s.soort}"><summary>${kop}</summary>
+    <ul>${s.fouten.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul><p>${uitleg}</p></details>`;
+}
+// Meta-dag begint om middernacht in Los Angeles; bij ons meestal 09:00, maar rond de klokwissel een week 08:00
+function igMetaStart(dag){
+  const g=Date.parse(dag+"T08:00:00Z");   // 00:00 of 01:00 in LA, afhankelijk van zomer-/wintertijd daar
+  const h=+new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"numeric",hourCycle:"h23"}).format(new Date(g));
+  return g-h*36e5;
+}
+// regel "Bereik vandaag": getal van vandaag, of uitleg waarom het er (nog) niet is, plus gistâh ter vergelijking
+function igBereikRij(c){
+  const start=igMetaStart(c.vandaag),sinds=tijdAms(start),uren=(Date.now()-start)/36e5;
+  const stapFout=igLiveStand().fouten.some(f=>igStapVan(f)==="vandaag");
+  const g=igSom(dagMin(c.vandaag,1),dagMin(c.vandaag,1));
+  let s;
+  if(c.nu.reach!=null)s=`tot nu · Meta-dag begon om ${sinds}`+(stapFout?` · <span class="igst-w">⚠ nieuwste stand ophalen lukte nie</span>`:"");
+  else if(stapFout)s=`<span class="igst-w">⚠ ophalen lukte nie</span> (Meta-dag begon om ${sinds}) · reden onderaan`;
+  else if(uren<3)s=`Meta-dag begon om ${sinds}, cijfâhs volgen`;
+  else s="nog geen meting van vandaag";
+  if(g.reach!=null)s+=`<br>gistâh: ${nf0.format(g.reach)}`;
+  return tegelRij("Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),s);
+}
 
 /* ---------- tegel op het Ovâhzicht ---------- */
 // Nieuwe volgers per 1.000 niet-volgers die je zagen: vooral of het stijgt of daalt t.o.v. de week ervoor
@@ -529,11 +586,12 @@ function instaTegel(){
     <div class="tgroot">${nf0.format(IG.acc.volgers||0)}</div>
     <p class="s">${plus(c.follows-c.unfollows)} netto laatste 7 dagen</p>
     <div class="trijen">
-      ${tegelRij("Bereik vandaag",c.nu.reach==null?"—":nf0.format(c.nu.reach),(c.nu.reach==null?"nog geen meting van vandaag":"tot nu, Meta-dag (begint rond 09:00 bij ons)")+liveStatus("ig","09b_insta_extra.sql")
-        +`<br>gemiddeld ${c.bereikDag==null?"—":nf0.format(c.bereikDag)} per dag, laatste 7 dagen${igVs(c.bereikDag,c.bereikDagV)}`)}
+      ${igBereikRij(c)}
+      ${tegelRij("Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV))}
       ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie")}
       ${igTrendRij(c)}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
+      ${igStatusHTML()}
     </div>
     <button class="btn yellow" type="button" data-ga="insta">Kèk bè Insta</button>
   </article>`;
