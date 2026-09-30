@@ -475,7 +475,6 @@ function renderInsta(){
   if(typeof renderIgSamen==="function")renderIgSamen();   // 5. samenwerkingen (samenwerking.js)
 
   renderIgStories();
-  renderIgSneek();
   renderIgMuziek();
 }
 
@@ -598,29 +597,22 @@ function igStoryMuziekHTML(){
   return `<p class="sub igstorymz" style="margin:6px 0 0">♪ ${blok("Mét eigen muziek",met)} · ${blok("Zonder",zonder)}${top?`. Meest gebruikt: ${top}`:""}. ${zeker(Math.min(met.length,zonder.length))}</p>`;
 }
 
-function renderIgSneek(){
-  const g=igSneek();
-  const linkN=g.tot.link, bio=g.links.filter(l=>l.bron==="bio").reduce((a,l)=>a+l.n,0);
-  $("igSnStats").innerHTML=[
-    igStat("Via Insta",nf0.format(g.tot.insta+g.tot.link),"Sneek-bezoekâhs, laatste 30 dagen"+(g.alle?` · ${pct((g.tot.insta+g.tot.link)/g.alle)} van alle bezoek`:"")),
-    igStat("Via Meta totaal",nf0.format(g.meta),`Insta + Facebook (je stories/posts gaan automatisch mee) · laatste 7 dagen ${nf0.format(g.d7)}`),
-    igStat("Eigen links",nf0.format(linkN),`bezoekâhs met <code>?ref=</code>, 30 dagen${bio?` · waarvan bio ${nf0.format(bio)}`:""}`)
-  ].join("");
-  igKolommen($("igSnChart"),g.dagen.map(d=>({...d,tip:`${dLabel(d.d,1)}: Insta ${nf0.format(d.parts[0].v)} · Facebook ${nf0.format(d.parts[1].v)}`})),"Sneek-bezoekers via Insta per dag");
-  $("igSnLinks").innerHTML=g.links.length?`<thead><tr><th>Link</th><th>Eerste bezoek</th><th class="n">Bezoekâhs</th></tr></thead><tbody>`+
-    g.links.slice(0,12).map(l=>`<tr><td><code>?ref=${esc(l.bron)}</code></td><td>${dLabel(l.eerst,1)}</td><td class="n">${nf0.format(l.n)}</td></tr>`).join("")+"</tbody>"
-    :'<tbody><tr><td class="sub">Nog geen bezoek via een eigen link. Maak er hierboven een en zet hem in je story of bio.</td></tr></tbody>';
-}
 
 // Wachtkamâh: nieuwe posts (vanaf IG_WACHT_VANAF) zonder muziek-keuze. Ze gaan eruit zodra je iets kiest (ook "Geen eigen muziek").
 const IG_WACHT_VANAF="2026-09-22";
 function igWachtend(){return IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=IG_WACHT_VANAF&&!labelsVan(p,"muziek").length)}
+// eigen stories (nie "post van een ander") van de laatste 2 dagen zonder muziek-keuze: zo kun je ook op de telefoon kiezen
+// (de Stories-kaart zelf staat nie op de telefoon). Ouder dan 2 dagen: alleen nog via de Stories-kaart op de Mac.
+const IG_WACHT_STORY_DAGEN=2;
+function igWachtStories(){return (IG.stories||[]).filter(s=>s.gepost_om&&Date.parse(s.gepost_om)>Date.now()-IG_WACHT_STORY_DAGEN*864e5
+  &&igStoryHerkomst(s)!=="ander"&&!labelsVan(s,"muziek").length)}
+function igWachtTekst(np,ns){const d=[];if(np)d.push(`${np} post${np>1?"s":""}`);if(ns)d.push(`${ns} ${ns>1?"stories":"story"}`);return d.join(" en ")}
 function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="insta"]');if(!b)return;
-  const k=igKoppeling(),n=igWachtend().length;let s=b.querySelector(".badge");
+  const k=igKoppeling(),n=igWachtend().length+igWachtStories().length;let s=b.querySelector(".badge");
   if(!n&&!(k&&k.nivo==="kapot")){if(s)s.remove();return}
   if(!s){s=document.createElement("span");s.className="badge";b.appendChild(s)}
   if(k&&k.nivo==="kapot"){s.textContent="!";s.title="Insta-koppeling is stuk: maak een nieuwe sleutel";return}   // gaat voor de wachtkamer
-  s.textContent=n;s.title=n+" nieuwe post"+(n>1?"s wachten":" wacht")+" op muziek";}
+  s.textContent=n;s.title=igWachtTekst(igWachtend().length,igWachtStories().length)+" zonder muziek-keuze";}
 function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
   return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option>`+
@@ -641,14 +633,24 @@ function igPostRij(p,opties,titels){
       <select class="igsel" aria-label="Muziek onder deze post">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&m!=="(geen)"&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>
     </div>`;
 }
+function igStoryWachtRij(x,opties,titels){   // zelfde opmaak als een post in de wachtkamâh
+  const c=x.cijfers||{},lk=igStoryLikes(x);
+  return `<div class="igpost" data-id="${esc(x.media_id)}">
+      <a class="igthumb" href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${x.plaatje?`<img src="${esc(x.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>Story</span></a>
+      <div class="iginfo"><span><b>${dLabel(dagNL(x.gepost_om),1)} ${tijdAms(x.gepost_om)}</b> · story${c.reach==null?" · nog geen cijfâhs":" · bereik "+nf0.format(c.reach)+(lk!=null?" · ≈ "+nf0.format(lk)+" likes":"")}</span>
+        ${x.bijschrift?`<span class="igcap">${esc(x.bijschrift.slice(0,90))}</span>`:""}</div>
+      ${igMuziekSelect("",opties,titels,"Muziek onder deze story")}
+    </div>`;
+}
 function renderIgMuziek(){
   const titels=igTrackTitels(),opties=igMuziekOpties(titels);
   // 1. wachtkamâh (nieuwste eerst)
-  const wacht=igWachtend();
-  $("igWacht").hidden=!wacht.length;
-  if(wacht.length){
-    $("igWachtSub").innerHTML=`${wacht.length} nieuwe post${wacht.length>1?"s wachten":" wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat; dan telt hij mee bij de vergelijking.`;
-    $("igWachtLijst").innerHTML=wacht.map(p=>igPostRij(p,opties,titels)).join("");
+  const wacht=igWachtend(),wachtSt=igWachtStories();
+  $("igWacht").hidden=!wacht.length&&!wachtSt.length;
+  if(wacht.length||wachtSt.length){
+    $("igWachtSub").innerHTML=`${igWachtTekst(wacht.length,wachtSt.length)} ${wacht.length+wachtSt.length>1?"wachten":"wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat; dan telt hij mee bij de vergelijking.`
+      +(wachtSt.length?` Stories staan hier ${IG_WACHT_STORY_DAGEN} dagen.`:"");
+    $("igWachtLijst").innerHTML=wacht.map(p=>igPostRij(p,opties,titels)).join("")+wachtSt.map(x=>igStoryWachtRij(x,opties,titels)).join("");
   }
   igBadge();
   // 2. archief (zonder de wachtende posts)
@@ -689,10 +691,10 @@ document.addEventListener("click",async e=>{
   if(e.target.closest("#igMeer")){igLabelAantal+=20;renderIgMuziek();return}
   if(e.target.closest("#igAlleenLeeg")){igAlleenLeeg=!igAlleenLeeg;e.target.setAttribute("aria-pressed",igAlleenLeeg);igLabelAantal=20;renderIgMuziek();return}
   const l=e.target.closest("[data-iglink]");if(l){
-    const url=igNieuweLink(l.dataset.iglink);$("igLinkUit").value=url;$("igLinkUit").hidden=false;
+    const url=igNieuweLink(l.dataset.iglink),uit=$("igLinkUit");if(uit){uit.value=url;uit.hidden=false}
     const ref=url.split("ref=")[1];if(ref!=="bio"){const r=JSON.parse(store.get("hc_ig_links")||"[]");r.push(ref);store.set("hc_ig_links",JSON.stringify(r.slice(-50)))}
     try{await navigator.clipboard.writeText(url);showMsg("Link gekopieerd: "+url+" — plak hem in je link-sticker.",true)}
-    catch(err){$("igLinkUit").select();showMsg("Kopiëren lukte nie vanzelf: selecteer de link en kopieer hem zelf.",false)}
+    catch(err){if(uit)uit.select();showMsg("Kopiëren lukte nie vanzelf. Je link: "+url,false)}
     return}
 });
 let igRsz;addEventListener("resize",()=>{clearTimeout(igRsz);igRsz=setTimeout(()=>{if(sectie==="insta")renderInsta()},150)});
@@ -802,7 +804,7 @@ function instaTegel(){
     <p class="s">${igNieuwWeg(c)}</p>
     <div class="trijen">
       ${igVasteRijen(c).map(([k,v,u])=>tegelRij(k,v,u)).join("")}
-      ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
+      ${((np,ns)=>np+ns?tegelRij("Wachtkamâh",nf0.format(np+ns),`${igWachtTekst(np,ns)} zonder muziek-keuze`):"")(igWachtend().length,igWachtStories().length)}
       ${igStatusHTML()}
     </div>
     <button class="btn yellow" type="button" data-ga="insta">Kèk bè Insta</button>

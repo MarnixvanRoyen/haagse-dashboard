@@ -207,7 +207,7 @@ function kansenSneek(){
   if(s.tot.insta>0&&(!laatsteStory||Date.parse(laatsteStory)<Date.now()-14*864e5))out.push({id:"sneek-story-links",bron:"sneek",impact:40,n:10,
     big:nf0.format(s.tot.insta),h:"Sneek-bezoekâhs uit Insta in 30 dagen, maar van geen enkele story weet je wat ie opleverde",
     p:laatsteStory?`Je laatste story met eigen link was op ${dLabel(laatsteStory,1)}.`:"Je hebt nog geen story met een eigen link gebruikt.",
-    a:'<b>Doe:</b> maak bij je volgende Sneek-story een link met de knop "Link voor story" in de tab Insta en plak die in je link-sticker. <button class="btn" type="button" data-ga="insta">Naâh Insta</button>',
+    a:`<b>Doe:</b> zet bij je volgende Sneek-story deze link in je link-sticker: <code>${esc(igNieuweLink("story"))}</code> <button class="btn" type="button" data-iglink="story">Kopieer link</button>`,
     meet:{naam:"bezoekâhs via eigen links (30 d)",waarde:s.tot.link,beter:"hoger"}});
   // 3. beste story tot nu
   if(storyLinks.length>=2){const b=[...storyLinks].sort((a,c)=>c.n-a.n)[0],m=kMed(storyLinks.map(l=>l.n));
