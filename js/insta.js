@@ -29,6 +29,7 @@ async function loadIG(){
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
   IG.status=await igStatusLaden();
   await igStoryLabels();
+  if(typeof igSamenLaden==="function")await igSamenLaden();   // samenwerkingen + Facebook-sleutel (samenwerking.js)
   igBadge();
 }
 // muziek-keuzes van stories (posts krijgen hun labels al mee via ig_post_stats)
@@ -71,7 +72,8 @@ function igKoppeling(){
   return null;
 }
 function igAlarmHTML(){
-  const k=igKoppeling();if(!k)return "";
+  const fb=typeof fbAlarmHTML==="function"?fbAlarmHTML():"";   // Facebook-sleutel (samenwerkingen) apart, zie samenwerking.js
+  const k=igKoppeling();if(!k)return fb;
   return `<div class="alarm ${k.nivo}" role="alert">
     <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">!</span><h2>${k.kop}</h2></div>
     <p>${k.tekst}</p>
@@ -82,7 +84,7 @@ function igAlarmHTML(){
       <li>Supabase → <b>Integrations</b> → <b>Vault</b> → <code>instagram_access_token</code> → <b>Edit</b> → plakken → <b>Save</b>.</li>
       <li>Klik hier op de Insta-pagina op <b>Nâh ververse</b>. Is het gelukt, dan verdwijnt deze melding vanzelf.</li>
     </ol>${k.detail?`<p class="sub">Melding van Meta: ${esc(k.detail)}</p>`:""}</details>
-  </div>`;
+  </div>`+fb;
 }
 
 /* ---------- hulpjes ---------- */
@@ -333,6 +335,7 @@ function renderInsta(){
 
   // 4. toppâhs (laatste 90 dagen of allâh tijde)
   renderIgTop();
+  if(typeof renderIgSamen==="function")renderIgSamen();   // 5. samenwerkingen (samenwerking.js)
 
   renderIgStories();
   renderIgSneek();

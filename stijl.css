@@ -351,3 +351,15 @@ th.gesorteerd{color:var(--ink)}
 .igstatus ul{margin:6px 0 4px;padding-left:18px;display:grid;gap:3px}
 .igstatus code{font-size:11.5px;overflow-wrap:anywhere;color:var(--ink-2)}
 .igstatus p{margin:0;line-height:1.4}
+
+/* Samenwerkinge (samenwerking.js) */
+.chip.niks{background:var(--yt-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--yt) 45%,transparent)}
+.igsvs{display:block;font-size:11px;color:var(--muted);font-family:var(--body);font-weight:600;white-space:nowrap}
+.igsvlg{font-size:12px;color:var(--muted);white-space:nowrap}
+#igSamen td{vertical-align:top}
+#igSamen th.n{white-space:normal;min-width:64px;vertical-align:bottom}
+.igsonder{display:grid;gap:8px;margin-top:14px}
+.igsonder p{margin:0;line-height:1.5}
+.igsonder .chip{text-decoration:none;margin:2px 0}
+.igsmob{display:none;margin-top:5px}
+@media (max-width:620px){.igsmob{display:block}#igSamen .igsoordeel{display:none}}
