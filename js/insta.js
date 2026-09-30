@@ -144,20 +144,54 @@ function igVsLikes(a,b){if(a==null||b==null)return "";const d=(a-b)*100,t=igNf1.
   return ` · 10 posts daarvoor ${igPct1(b)}${d>=0.5?` <span class="up">↑ ${t}</span>`:d<=-0.5?` <span class="down">↓ ${t}</span>`:""}`}
 function igLikesUitleg(l){return l.nu==null?"komt zodra er 3 posts van minstens 2 dagen oud met cijfâhs zijn":
   `van wie je post zag, gaf een like · middelste van je laatste ${l.n} posts`+igVsLikes(l.nu,l.voor)}
-// grafiek: per post een staaf (likes ÷ bereik), met een trendlijn = middelste van de laatste 5 posts
-function igLikeGrafiek(el,posts){   // posts: oud → nieuw
+/* ---------- kwaliteit per post: (gedeeld + bewaard) per 1.000 kijkâhs ----------
+   Zelfde rekensom als "Kwaliteit" bij Wat werkt en Toppâhs, maar dan als trend: middelste van je laatste 10 posts vs de 10 daarvoor.
+   Delen en bewaren wegen bij Insta zwaarder dan likes: delen brengt je post bij nieuwe mensen, bewaren = "wil ik terugzien".
+   Posts pas vanaf 2 dagen oud (er wordt nog gedeeld) en met minstens 100 bereik (1x gedeeld bij 40 bereik = al 25, dat zegt niks).
+   Pijltje pas vanaf 15% verschil: het zijn kleine getallen, dan zegt een klein verschil nog niks. */
+const IG_KWAL_MIN_BEREIK=100, IG_KWAL_PIJL=0.15;
+const igKwalF=v=>v<10?igNf1.format(v):nf0.format(v);
+function igKwal(){
+  const grens=Date.now()-IG_LIKE_DAGEN*864e5;
+  const ps=IG.posts.filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>=IG_KWAL_MIN_BEREIK&&(p.gedeeld!=null||p.bewaard!=null))
+    .map(p=>({...p,kw:((+p.gedeeld||0)+(+p.bewaard||0))*1000/(+p.bereik)})).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));   // nieuwste eerst
+  const nu=ps.slice(0,IG_LIKE_N),voor=ps.slice(IG_LIKE_N,2*IG_LIKE_N);
+  return {ps,n:nu.length,nu:nu.length>=3?med(nu.map(p=>p.kw)):null,
+    voor:voor.length>=IG_LIKE_N?med(voor.map(p=>p.kw)):null};
+}
+function igVsKwal(a,b){if(a==null||b==null)return "";
+  if(!b)return ` · 10 posts daarvoor 0${a>0?' <span class="up">↑</span>':""}`;
+  const d=a/b-1;
+  return ` · 10 posts daarvoor ${igKwalF(b)}${d>=IG_KWAL_PIJL?' <span class="up">↑ '+pct(d)+"</span>":d<=-IG_KWAL_PIJL?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
+function igKwalUitleg(k){return k.nu==null?"komt zodra er 3 posts van minstens 2 dagen oud (en 100+ bereik) met cijfâhs zijn":
+  `gedeeld + bewaard per 1.000 kijkâhs · middelste van je laatste ${k.n} posts`+igVsKwal(k.nu,k.voor)}
+
+// de twee maten voor de grafiek per post (knop Likes / Kwaliteit op de Insta-tab)
+let igPostMaat="likes";
+const IG_MATEN={
+  likes:{kop:"Likes per kijkâh",aria:"Likes per kijkâh per post",v:p=>p.likePct*100,as:t=>nf0.format(t)+"%",lbl:p=>igPct1(p.likePct),
+    tip:p=>`${nf0.format(+p.likes)} likes ÷ ${nf0.format(+p.bereik)} bereik = ${igPct1(p.likePct)}`,
+    sub:n=>`Je laatste ${n} posts van minstens 2 dagen oud. <b>Likes ÷ bereik</b>: welk deel van de mensen die de post zagen, gaf een like.`},
+  kwal:{kop:"Kwaliteit per post",aria:"Kwaliteit per post: gedeeld + bewaard per 1.000 kijkâhs",v:p=>p.kw,as:t=>nf0.format(t),lbl:p=>igKwalF(p.kw),
+    tip:p=>`${nf0.format(+p.gedeeld||0)} gedeeld + ${nf0.format(+p.bewaard||0)} bewaard per ${nf0.format(+p.bereik)} bereik = ${igKwalF(p.kw)} per 1.000`,
+    sub:n=>`Je laatste ${n} posts van minstens 2 dagen oud en met 100+ bereik. <b>Gedeeld + bewaard per 1.000 kijkâhs</b>: hoeveel mensen je post zo goed vonden dat ze hem doorstuurden of bewaarden. Dit weegt bij Insta zwaarder dan likes.`}};
+// grafiek: per post een staaf, met een trendlijn = middelste van de laatste 5 posts.
+// Eén uitschietâh (virale post) zou de rest plat drukken: dan loopt de schaal tot 3x de middelste post en krijgt die staaf een pijltje ▲ (echte waarde in het getal).
+function igPostGrafiek(el,posts,m){   // posts: oud → nieuw; m = IG_MATEN.likes of .kwal
   if(!posts.length){el.innerHTML='<p class="sub">Nog geen posts van minstens 2 dagen oud met cijfâhs.</p>';return}
   const W=Math.max(300,Math.round(el.clientWidth||1000)),ml=40,mr=6,mt=16,mb=26,iw=W-ml-mr,ih=(W<600?170:210)-mt-mb,H=mt+ih+mb;
-  const sch=schaal(Math.max(...posts.map(p=>p.likePct*100)),3),top=sch.top,bw=iw/posts.length;
-  const y=v=>mt+ih-v/top*ih;
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Likes per kijkâh per post">`;
-  sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}%</text>`});
+  const vs=posts.map(m.v),mx=Math.max(...vs),md=med(vs)||0,kap=md>0&&mx>3*md?3*md:mx;
+  const sch=schaal(kap,3),top=sch.top,bw=iw/posts.length;
+  const y=v=>mt+ih-Math.min(v,top)/top*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${m.aria}">`;
+  sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${m.as(t)}</text>`});
   const trend=[];
-  posts.forEach((p,i)=>{const v=p.likePct*100,x=ml+i*bw+bw*.15,h=v/top*ih;
+  posts.forEach((p,i)=>{const v=vs[i],x=ml+i*bw+bw*.15,h=Math.min(v,top)/top*ih;
     s+=`<path d="${roundTop(x,y(v),bw*.7,h,3)}" fill="var(--hy)" opacity=".8"/>`;
-    const venster=posts.slice(Math.max(0,i-4),i+1);if(venster.length>=3)trend.push([ml+i*bw+bw/2,y(med(venster.map(q=>q.likePct*100)))]);
-    const tip=`${dLabel(dagNL(p.gepost_om),1)} · ${soortNaam(p)}: ${nf0.format(+p.likes)} likes ÷ ${nf0.format(+p.bereik)} bereik = ${igPct1(p.likePct)}`;
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(v),igPct1(p.likePct))}><title>${esc(tip)}</title></rect>`;
+    if(v>top)s+=`<text x="${ml+i*bw+bw/2}" y="${mt-3}" text-anchor="middle" class="strookgetal">▲</text>`;
+    const venster=vs.slice(Math.max(0,i-4),i+1);if(venster.length>=3)trend.push([ml+i*bw+bw/2,y(med(venster))]);
+    const tip=`${dLabel(dagNL(p.gepost_om),1)} · ${soortNaam(p)}: ${m.tip(p)}`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(v),m.lbl(p))}><title>${esc(tip)}</title></rect>`;
     if((posts.length-1-i)%6===0){const xm=ml+i*bw+bw/2,rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen
       s+=`<text x="${rand?W-mr:xm}" y="${H-8}" text-anchor="${rand?"end":"middle"}">${dLabel(dagNL(p.gepost_om))}</text>`}});
   if(trend.length>1)s+=`<path d="M${trend.map(([a,b])=>a.toFixed(1)+","+b.toFixed(1)).join("L")}" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>`;
@@ -373,6 +407,7 @@ function renderInsta(){
     igStat("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV)+(c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:"")),
     igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · delen/bewaren weegt zwaar bij Insta`),
     (l=>igStat("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes()),
+    (k=>igStat("Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)))(igKwal()),
     igStat("Posts",nf0.format(c.posts7),"laatste 7 dagen"+(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:""))
   ].join("");
 
@@ -383,10 +418,8 @@ function renderInsta(){
     const parts=split?[{v:x.reach_volgers||0,c:"groen"},{v:x.reach_nieuw||0,c:"hy"}]:[{v:x.reach||0,c:"muted"}];
     return {d,parts,o:x.follows!=null?x.follows:null,tip:`${dLabel(d,1)}${d===c.vandaag?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(x.follows!=null?` · +${x.follows} / −${x.unfollows||0} volgâhs`+(x.reach?` (${igNf1.format(x.follows*1000/x.reach)} per 1.000 bereik)`:""):"")}}),"Bereik per dag",{naam:"Nieuwe volgâhs per dag",c:"good"});
 
-  // 2b. likes per kijkâh per post (laatste 30 posts)
-  if($("igLikeChart")){const l=igLikes(),laatste=l.ps.slice(0,30).reverse();
-    $("igLikeSub").innerHTML=`Je laatste ${laatste.length} posts van minstens 2 dagen oud. <b>Likes ÷ bereik</b>: welk deel van de mensen die de post zagen, gaf een like. De groene lijn is de middelste van steeds 5 posts, zo zie je de trend zonder dat één uitschietâh alles bepaalt. Alleen je eigen posts: waar je bijdrager bent telt nie mee.`;
-    igLikeGrafiek($("igLikeChart"),laatste)}
+  // 2b. likes per kijkâh of kwaliteit per post (laatste 30 posts)
+  renderIgPostGrafiek();
 
   // 3. wat werkt
   document.querySelectorAll("#igKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igKies));
@@ -409,6 +442,16 @@ function renderInsta(){
   renderIgStories();
   renderIgSneek();
   renderIgMuziek();
+}
+
+/* ---------- grafiek per post: likes per kijkâh of kwaliteit (knop) ---------- */
+function renderIgPostGrafiek(){
+  if(!$("igLikeChart"))return;
+  const m=IG_MATEN[igPostMaat],l=igPostMaat==="kwal"?igKwal():igLikes(),laatste=l.ps.slice(0,30).reverse();
+  document.querySelectorAll("#igPostMaat button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igPostMaat));
+  $("igLikeKop").textContent=m.kop;
+  $("igLikeSub").innerHTML=m.sub(laatste.length)+" De groene lijn is de middelste van steeds 5 posts, zo zie je de trend zonder dat één uitschietâh alles bepaalt. Alleen je eigen posts: waar je bijdrager bent telt nie mee.";
+  igPostGrafiek($("igLikeChart"),laatste,m);
 }
 
 /* ---------- toppâhs: top 10 op bereik, laatste 90 dagen of allâh tijde ---------- */
@@ -559,6 +602,7 @@ document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)i
 document.addEventListener("click",async e=>{
   const k=e.target.closest("#igKies button");if(k){igKies=k.dataset.v;renderInsta();return}
   const tp=e.target.closest("#igTopKies button");if(tp){igTopPeriode=tp.dataset.v;renderIgTop();return}
+  const pm=e.target.closest("#igPostMaat button");if(pm){igPostMaat=pm.dataset.v;renderIgPostGrafiek();return}
   const to=e.target.closest("#igTopOp button");if(to){igTopOp=to.dataset.v;renderIgTop();return}
   const sp=e.target.closest("#igStoryKies button");if(sp){igStoryPeriode=sp.dataset.v;renderIgStories();return}
   const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}
@@ -658,6 +702,7 @@ function instaTegel(){
       ${tegelRij("Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV))}
       ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV))}
       ${(l=>tegelRij("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes())}
+      ${(k=>tegelRij("Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)))(igKwal())}
       ${igTrendRij(c)}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
       ${igStatusHTML()}
