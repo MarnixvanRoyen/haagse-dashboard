@@ -173,7 +173,7 @@ async function scBlok(sc){
     <div class="card"><div class="cardhead"><div><h2>Per maand</h2><p class="sub">Luistermaanden, laatste 12. Geel = erbè gekomen in de nieuwe upload.</p></div>
       <div class="legend"><span><i class="dot sc"></i>Stond er al</span><span><i class="dot hy"></i>Erbè</span></div></div><div class="bars">${maandBars}</div></div>
   </div>
-  <div class="card"><div class="cardhead"><div><h2>Waâh zit het verschil?</h2><p class="sub">${VS.alles?"Alles":"Alleen wat veranderd is ("+veranderd.length+")"}, gesorteerd op € erbè</p></div>
+  <div class="card pc"><div class="cardhead"><div><h2>Waâh zit het verschil?</h2><p class="sub">${VS.alles?"Alles":"Alleen wat veranderd is ("+veranderd.length+")"}, gesorteerd op € erbè</p></div>
     <div class="vsknoppen"><div class="seg" id="vsDim">${Object.entries(dims).map(([k,n])=>`<button type="button" data-v="${k}" aria-pressed="${VS.dim===k}">${n}</button>`).join("")}</div>
     <button class="btn" type="button" id="vsAlles">${VS.alles?"Alleen verschillen":"Toon alles"}</button></div></div>
     <div class="tablewrap"><table>${tabel}</table></div></div>`;
@@ -203,7 +203,7 @@ async function lbBlok(lb){
     return `<tr><td><b>${esc(x.t)}</b>${x.v?" <span class='sub'>("+esc(x.v)+")</span>":""}${!n.was?' <span class="chip good">nieuw</span>':""}</td><td class="n">${nf0.format(+(n.nu||{}).streams||0)}</td>
       <td class="n ${vsKlasse(n.dS)}">${vsPlusN(n.dS)}</td><td class="n ${vsKlasse(n.dD)}">${vsPlusN(n.dD)}</td><td class="n ${vsKlasse(n.dN)}">${pm(n.dN)}</td></tr>`}).join("")+"</tbody>":`<tbody><tr><td class="sub">Geen nummers veranderd.</td></tr></tbody>`;
   return `<div class="card">${kop}<div class="ytstats">${tegels}</div></div>
-  <div class="grid2"><div class="card"><h2>Periodes</h2><p class="sub">Nieuw of veranderd (bedrag of status)</p><div class="tablewrap"><table>${perT}</table></div></div>
+  <div class="grid2 pc"><div class="card"><h2>Periodes</h2><p class="sub">Nieuw of veranderd (bedrag of status)</p><div class="tablewrap"><table>${perT}</table></div></div>
   <div class="card"><h2>Nummâhs</h2><p class="sub">Streams, downloads en netto erbè per nummer</p><div class="tablewrap"><table>${nrT}</table></div></div></div>`;
 }
 

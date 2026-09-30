@@ -32,13 +32,16 @@
   <header class="top">
     <div><h1>Haagse Content <span>Performance Dashboard</span></h1>
       <p class="by">Hoe gaat 't met je muziek, je Insta en je spellegies? · <a href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener">@the_hague_beachlife</a></p></div>
-    <button class="logout" id="logout" type="button">Uitlogge</button>
+    <div class="top-knoppen">
+      <button class="ververs" id="ververs" type="button" title="Alles opnieuw ophale (net als de app sluiten en weer openen)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>Ververse</button>
+      <button class="logout" id="logout" type="button">Uitlogge</button>
+    </div>
   </header>
 
   <nav class="hoofdmenu" aria-label="Onderdelen">
     <button type="button" data-s="ovahzicht">Ovâhzicht</button>
-    <button type="button" data-s="muziek">Muziek</button>
     <button type="button" data-s="insta">Insta</button>
+    <button type="button" data-s="muziek">Muziek</button>
     <button type="button" data-s="apps">Apps</button>
     <button type="button" data-s="kansen">Kansâh</button>
   </nav>
@@ -62,23 +65,23 @@
   </header>
 
   <section class="filters" aria-label="Filters">
-    <div class="f"><label for="fFrom">Van</label><select id="fFrom"></select></div>
-    <div class="f"><label for="fTo">Tot en met</label><select id="fTo"></select></div>
-    <div class="f"><label for="fArtist">Artiest</label><select id="fArtist"></select></div>
+    <div class="f pc"><label for="fFrom">Van</label><select id="fFrom"></select></div>
+    <div class="f pc"><label for="fTo">Tot en met</label><select id="fTo"></select></div>
+    <div class="f pc"><label for="fArtist">Artiest</label><select id="fArtist"></select></div>
     <div class="f"><span class="lbl">Bron</span>
       <div class="seg" id="fSource" role="group" aria-label="Bron">
         <button data-v="all" aria-pressed="true">Alles</button>
         <button data-v="sc" aria-pressed="false"><i class="dot sc"></i>SoundCloud</button>
         <button data-v="lb" aria-pressed="false"><i class="dot lb"></i>Label</button>
       </div></div>
-    <div class="f"><span class="lbl">Label-bedrag</span>
+    <div class="f pc"><span class="lbl">Label-bedrag</span>
       <div class="seg" id="fBasis" role="group" aria-label="Label bruto of netto">
         <button data-v="net" aria-pressed="true">Netto (jouw deel)</button>
         <button data-v="gross" aria-pressed="false">Bruto</button>
       </div></div>
-    <div class="f"><label for="fRate">1 USD = € </label><input id="fRate" type="number" step="0.01" min="0.5" max="1.5"></div>
-    <span class="spacer"></span>
-    <div class="f"><span class="lbl">Nieuw rappoâht inlade</span>
+    <div class="f pc"><label for="fRate">1 USD = € </label><input id="fRate" type="number" step="0.01" min="0.5" max="1.5"></div>
+    <span class="spacer pc"></span>
+    <div class="f pc"><span class="lbl">Nieuw rappoâht inlade</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <label class="btn yellow" for="fFile" style="display:inline-flex;align-items:center;gap:6px"><i class="dot sc"></i>SoundCloud-CSV</label>
         <input id="fFile" type="file" accept=".csv,text/csv" hidden>
@@ -94,9 +97,9 @@
   <nav class="tabs" role="tablist" aria-label="Weergave">
     <button role="tab" data-tab="overzicht" aria-selected="true">Per maand</button>
     <button role="tab" data-tab="nieuw" aria-selected="false">Wat is d'r nieuw?</button>
-    <button role="tab" data-tab="nummers" aria-selected="false">Per nummâh</button>
+    <button role="tab" data-tab="nummers" aria-selected="false" class="pc">Per nummâh</button>
     <button role="tab" data-tab="bronnen" aria-selected="false">Per bron</button>
-    <button role="tab" data-tab="landen" aria-selected="false">Per land</button>
+    <button role="tab" data-tab="landen" aria-selected="false" class="pc">Per land</button>
     <button role="tab" data-tab="youtube" aria-selected="false">YouTube</button>
     <button role="tab" data-tab="sclive" aria-selected="false">SoundCloud live</button>
     <button role="tab" data-tab="spotify" aria-selected="false">Spotify</button>
@@ -109,7 +112,7 @@
         <div class="legend"><span><i class="dot sc"></i>SoundCloud</span><span><i class="dot lb"></i>Label</span></div></div>
       <div class="chart" id="monthChart"></div>
     </div>
-    <div class="grid2">
+    <div class="grid2 pc">
       <div class="card"><h2>Top nummâhs</h2><p class="sub">Wat je per nummer ontving in de gekozen periode</p><div class="bars" id="topTracks"></div></div>
       <div class="card"><h2>Top platforms</h2><p class="sub">Waar het geld vandaan komt</p><div class="bars" id="topPartners"></div></div>
     </div>
@@ -132,7 +135,7 @@
       <div class="card"><h2>Per platform</h2><p class="sub">SoundCloud verspreidt je muziek ook naar andere diensten</p><div class="bars" id="partnerBars"></div></div>
       <div class="card"><h2>Per soort stream</h2><p class="sub">Wat één soort luisteraar oplevert, per 1.000 keer</p><div class="tablewrap"><table id="typeTable"></table></div></div>
     </div>
-    <div class="card"><h2>DJ·World afrekeningen</h2><p class="sub">Van bruto naar jouw netto, per afrekenperiode</p><div class="tablewrap"><table id="labelTable"></table></div></div>
+    <div class="card pc"><h2>DJ·World afrekeningen</h2><p class="sub">Van bruto naar jouw netto, per afrekenperiode</p><div class="tablewrap"><table id="labelTable"></table></div></div>
   </section>
 
   <section class="panel" id="p-landen" hidden>
@@ -151,17 +154,17 @@
       <div class="chart" id="ytChart"></div>
     </div>
     <div class="grid2">
-      <div class="card"><h2>Meest bekeke</h2><p class="sub">Totaal aantal weergaven, zelfde titels samengeteld</p><div class="bars" id="ytTop"></div></div>
-      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="ytGrowSub">Weergaven erbij in de laatste 7 dagen</p><div class="bars" id="ytGrow"></div></div>
+      <div class="card"><h2>Meest bekeke · allâh tijde</h2><p class="sub">Totaal aantal weergaven ooit, zelfde titels samengeteld</p><div class="bars" id="ytTop"></div></div>
+      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="ytGrowSub">Weergaven erbij in de laatste 31 dagen</p><div class="bars" id="ytGrow"></div></div>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>YouTube vs. SoundCloud-afrekening</h2><p class="sub" id="cmpSub">Weergaven op YouTube naast wat SoundCloud daarvoor afrekent</p></div></div>
       <div class="ytstats" id="cmpStats"></div>
       <div class="tablewrap" style="margin-top:14px"><table id="cmpTable"></table></div>
       <p class="sub" style="margin:12px 0 0">SoundCloud rekent YouTube-weergaven 2–3 maanden later af, dus de nieuwste weergaven ontbreken nog. Wijs met je muis een label aan voor uitleg.<br>
       <span class="chip good">Klopt</span> 70% of meer komt terug · <span class="chip warn">Loopt achter</span> minder dan 70% · <span class="chip good">Meer dan je kanaal</span> ook gebruikt in video's van anderen · <span class="chip lb">Via label</span> geld komt via DJ·World · <span class="chip warn">Niet via SoundCloud</span> weergaven, maar geen geld gevonden · <span class="chip mute">Geen video gevonden</span> geld, maar geen video op je kanaal</p>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>Alle tracks en video's</h2><p class="sub">Klik op een titel om hem op YouTube te openen</p></div></div>
       <div class="tablewrap"><table id="ytTable"></table></div>
     </div>
@@ -179,16 +182,16 @@
       <div class="chart" id="sclChart"></div>
     </div>
     <div class="grid2">
-      <div class="card"><h2>Meest beluisterd</h2><p class="sub">Totaal aantal plays op SoundCloud</p><div class="bars" id="sclTop"></div></div>
-      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="sclGrowSub">Plays erbij in de laatste 7 dagen</p><div class="bars" id="sclGrow"></div></div>
+      <div class="card"><h2>Meest beluisterd · allâh tijde</h2><p class="sub">Totaal aantal plays ooit op SoundCloud</p><div class="bars" id="sclTop"></div></div>
+      <div class="card"><h2>Groeiâhs</h2><p class="sub" id="sclGrowSub">Plays erbij in de laatste 31 dagen</p><div class="bars" id="sclGrow"></div></div>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>Van plays naâh poen</h2><p class="sub" id="sclMoneySub">Openbare plays naast wat SoundCloud zelf daarvoor afrekent</p></div></div>
       <div class="ytstats" id="sclMoneyStats"></div>
       <div class="tablewrap" style="margin-top:14px"><table id="sclMoneyTable"></table></div>
       <p class="sub" style="margin:12px 0 0">Alleen plays van betalende abonnees en plays met reclame worden betaald, en SoundCloud rekent 1–2 maanden later af. Een laag percentage is dus normaal; het verschil tussen nummers is het interessante deel.</p>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>Alle nummâhs</h2><p class="sub">Klik op een titel om hem op SoundCloud te openen</p></div></div>
       <div class="tablewrap"><table id="sclTable"></table></div>
     </div>
@@ -197,14 +200,14 @@
   <section class="panel" id="p-spotify" hidden>
     <div class="card">
       <div class="cardhead"><div><h2><i class="dot sp"></i> Spotify</h2><p class="sub" id="spSub">Uit je Spotify for Artists-export. De filters hierboven gelden hier niet.</p></div>
-        <label class="btn" for="fSp">Nieuwe export inlade</label></div>
+        <label class="btn pc" for="fSp">Nieuwe export inlade</label></div>
       <div class="ytstats" id="spStats"></div>
     </div>
     <div class="grid2">
       <div class="card"><h2>Meest gestreamd</h2><p class="sub">Totaal aantal streams sinds release</p><div class="bars" id="spTop"></div></div>
       <div class="card"><h2>Groeiâhs</h2><p class="sub" id="spGrowSub">Streams erbij sinds de vorige import</p><div class="bars" id="spGrow"></div></div>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>Van streams naâh poen</h2><p class="sub" id="spMoneySub">Spotify-streams naast wat SoundCloud en DJ·World daarvoor afrekenen</p></div></div>
       <div class="ytstats" id="spMoneyStats"></div>
       <div id="spMoneyNote"></div>
@@ -212,7 +215,7 @@
       <p class="sub" style="margin:12px 0 0">Spotify-geld komt 2–3 maanden later binnen, dus de nieuwste streams ontbreken altijd nog. Wijs met je muis een label aan voor uitleg.<br>
       <span class="chip good">Klopt</span> 70% of meer afgerekend · <span class="chip warn">Loopt achter</span> minder dan 70% · <span class="chip mute">Onder 1.000-grens</span> Spotify betaalt pas vanaf 1.000 streams per nummer in 12 maanden · <span class="chip warn">Spotify ontbreekt</span> boven de grens, maar geen Spotify-geld via SoundCloud · <span class="chip lb">Via label</span> DJ·World telt minstens zoveel streams (alle platforms samen) · <span class="chip warn">Label telt minder</span> DJ·World telt minder streams dan Spotify alleen · <span class="chip mute">Nog te vroeg</span> jonger dan 3 maanden · <span class="chip warn">Geen afrekening</span> nergens geld gevonden</p>
     </div>
-    <div class="card">
+    <div class="card pc">
       <div class="cardhead"><div><h2>Alle nummâhs</h2><p class="sub">Stand van de laatste import</p></div></div>
       <div class="tablewrap"><table id="spTable"></table></div>
     </div>
@@ -244,6 +247,11 @@
         <div class="cardhead"><div><h2>Bereik per dag</h2><p class="sub">Laatste 30 Meta-dagen. Hoeveel verschillende mensen je die dag zagen, en onderin hoeveel nieuwe volgâhs dat opleverde.</p></div>
           <div class="legend"><span><i class="dot groen"></i>Volgâhs</span><span><i class="dot hy"></i>Nieuwe mensen</span><span><i class="dot muted"></i>Nog nie opgesplitst</span><span><i class="dot good"></i>Nieuwe volgâhs (onderin)</span></div></div>
         <div class="chart" id="igChart"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Likes per kijkâh</h2><p class="sub" id="igLikeSub"></p></div>
+          <div class="legend"><span><i class="dot hy"></i>Per post</span><span><i class="dot good"></i>Trend (middelste van 5 posts)</span></div></div>
+        <div class="chart" id="igLikeChart"></div>
       </div>
       <div class="card">
         <div class="cardhead"><div><h2>Wat werkt?</h2><p class="sub" id="igWwSub"></p></div>

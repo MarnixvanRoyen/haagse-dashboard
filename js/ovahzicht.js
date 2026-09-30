@@ -30,6 +30,7 @@ function renderOvahzicht(){
   const poen=SC.reduce((a,r)=>a+r.usd,0)*state.rate+LABEL.periods.reduce((a,p)=>a+p.net,0);
   const sc=dagGroei(SCL.snaps,"track_id","plays"), yt=dagGroei(YT.snaps,"video_id","views");
   $("ovTegels").innerHTML=`
+  ${instaTegel()}
   <article class="tegel">
     <div class="tkop"><h2>Muziek</h2><span class="tag">Marreman Rojas & Beuk</span></div>
     <p class="tlbl">Poen tot nu toe</p>
@@ -42,7 +43,6 @@ function renderOvahzicht(){
     </div>
     <button class="btn yellow" type="button" data-ga="muziek">Kèk bè Muziek</button>
   </article>
-  ${instaTegel()}
   ${appsTegel()}
   ${kansTegel()}`;
 }

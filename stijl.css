@@ -197,7 +197,15 @@ footer .sig{font-family:var(--display);font-weight:400;letter-spacing:.02em;colo
 /* ---------- kop van het dashboard ---------- */
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px 16px}
 .top>div{min-width:0}
-.top .logout{flex:none;margin-top:4px}
+.top .logout{flex:none}
+/* knoppen rechtsboven: Ververse (groot, makkelijk met je duim) + Uitlogge */
+.top-knoppen{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:2px}
+.ververs{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 14px 6px 11px;border-radius:999px;border:0;background:var(--hy);color:var(--hy-ink);font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ververs svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ververs:hover{background:#ffd633}
+.ververs:active{transform:scale(.96)}
+.ververs:disabled{opacity:.75;cursor:default}
+@media (prefers-reduced-motion:no-preference){.ververs.draait svg{animation:ververs-draai .8s linear infinite}@keyframes ververs-draai{to{transform:rotate(360deg)}}}
 .top h1{font-family:var(--display);font-weight:400;font-size:clamp(22px,3.2vw,32px);line-height:1.05;margin:0;color:var(--hy)}
 .top h1 span{color:var(--ink)}
 .top .by{margin:4px 0 0;font-size:13px;color:var(--muted)}
@@ -374,3 +382,6 @@ td.igszelf .igsvs{white-space:normal}
 .igsgr{margin-top:4px;font-size:11px}
 .igsmob > .igsvs{margin-bottom:4px}
 .seg button[hidden]{display:none}
+
+/* telefoon: alleen de hoofdzaken; tabellen, uploads en details (class "pc") alleen op de computer */
+@media (max-width:700px){.pc{display:none!important}}

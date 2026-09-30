@@ -109,27 +109,79 @@ function igSom(van,tot){   // van t/m tot (JJJJ-MM-DD)
 }
 
 // nieuwe volgers per 1.000 bereikte niet-volgers over een reeks Meta-dagen (alleen dagen mét opsplitsing volgers/nieuw)
-function igPer1kNieuw(van,tot){
+function igPer1kNieuw(van,tot,minDagen){
   const r=IG.dag.filter(x=>x.dag>=van&&x.dag<=tot&&x.c.reach_nieuw!=null);
   const n=r.reduce((a,x)=>a+x.c.reach_nieuw,0);
-  return r.length>=3&&n?r.reduce((a,x)=>a+(x.c.follows||0),0)*1000/n:null;   // minstens 3 dagen, anders zegt het te weinig
+  return r.length>=(minDagen||3)&&n?r.reduce((a,x)=>a+(x.c.follows||0),0)*1000/n:null;   // minstens 3 dagen (vorige week: 5), anders zegt het te weinig
+}
+// deel van je bereik dat je (nog) nie volgt, over een reeks Meta-dagen (alleen dagen mét opsplitsing).
+// Opgeteld over de dagen, dus drukke dagen tellen zwaarder (= deel van al je bereik die week).
+function igNieuwPct(van,tot,minDagen){
+  const r=IG.dag.filter(x=>x.dag>=van&&x.dag<=tot&&x.c.reach_nieuw!=null);
+  const n=r.reduce((a,x)=>a+x.c.reach_nieuw,0),v=r.reduce((a,x)=>a+(x.c.reach_volgers||0),0);
+  return r.length>=(minDagen||1)&&n+v?n/(n+v):null;
+}
+// vergelijking met vorige week voor een percentage: verschil in procentpunten, pijltje vanaf 3 punten
+function igVsPct(a,b){if(a==null||b==null)return "";const d=Math.round((a-b)*100);
+  return ` · vorige week ${pct(b)}${d>=3?` <span class="up">↑ ${d} punten</span>`:d<=-3?` <span class="down">↓ ${-d} punten</span>`:""}`}
+/* ---------- likes per kijkâh (likes ÷ bereik), per post ----------
+   Alleen je eigen posts: posts waar een ander de maker is en jij bijdrager, komen niet binnen (me/media = alleen eigen posts).
+   Per bereik (verschillende mensen), nie per weergave: weergaven tellen herhalingen mee (reels die doorlopen, carrousels),
+   dan zakt het percentage alleen al door de soort post. Posts pas vanaf 2 dagen oud (daarvoor loopt het nog).
+   Vergelijken per 10 posts i.p.v. per week: je post ± 2x per week, dan is een week te weinig om iets te zeggen. */
+const IG_LIKE_DAGEN=2, IG_LIKE_N=10;
+const igPct1=v=>igNf1.format(v*100)+"%";
+function igLikes(){
+  const grens=Date.now()-IG_LIKE_DAGEN*864e5;
+  const ps=IG.posts.filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>0&&p.likes!=null)
+    .map(p=>({...p,likePct:(+p.likes)/(+p.bereik)})).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));   // nieuwste eerst
+  const nu=ps.slice(0,IG_LIKE_N),voor=ps.slice(IG_LIKE_N,2*IG_LIKE_N);
+  return {ps,n:nu.length,nu:nu.length>=3?med(nu.map(p=>p.likePct)):null,
+    voor:voor.length>=IG_LIKE_N?med(voor.map(p=>p.likePct)):null};   // vorige 10 alleen als het er echt 10 zijn
+}
+// vergelijking met de 10 posts daarvoor: verschil in procentpunten, pijltje vanaf een halve punt
+function igVsLikes(a,b){if(a==null||b==null)return "";const d=(a-b)*100,t=igNf1.format(Math.abs(d))+(Math.abs(d)<1.05?" punt":" punten");
+  return ` · 10 posts daarvoor ${igPct1(b)}${d>=0.5?` <span class="up">↑ ${t}</span>`:d<=-0.5?` <span class="down">↓ ${t}</span>`:""}`}
+function igLikesUitleg(l){return l.nu==null?"komt zodra er 3 posts van minstens 2 dagen oud met cijfâhs zijn":
+  `van wie je post zag, gaf een like · middelste van je laatste ${l.n} posts`+igVsLikes(l.nu,l.voor)}
+// grafiek: per post een staaf (likes ÷ bereik), met een trendlijn = middelste van de laatste 5 posts
+function igLikeGrafiek(el,posts){   // posts: oud → nieuw
+  if(!posts.length){el.innerHTML='<p class="sub">Nog geen posts van minstens 2 dagen oud met cijfâhs.</p>';return}
+  const W=Math.max(300,Math.round(el.clientWidth||1000)),ml=40,mr=6,mt=16,mb=26,iw=W-ml-mr,ih=(W<600?170:210)-mt-mb,H=mt+ih+mb;
+  const sch=schaal(Math.max(...posts.map(p=>p.likePct*100)),3),top=sch.top,bw=iw/posts.length;
+  const y=v=>mt+ih-v/top*ih;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Likes per kijkâh per post">`;
+  sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}%</text>`});
+  const trend=[];
+  posts.forEach((p,i)=>{const v=p.likePct*100,x=ml+i*bw+bw*.15,h=v/top*ih;
+    s+=`<path d="${roundTop(x,y(v),bw*.7,h,3)}" fill="var(--hy)" opacity=".8"/>`;
+    const venster=posts.slice(Math.max(0,i-4),i+1);if(venster.length>=3)trend.push([ml+i*bw+bw/2,y(med(venster.map(q=>q.likePct*100)))]);
+    const tip=`${dLabel(dagNL(p.gepost_om),1)} · ${soortNaam(p)}: ${nf0.format(+p.likes)} likes ÷ ${nf0.format(+p.bereik)} bereik = ${igPct1(p.likePct)}`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(v),igPct1(p.likePct))}><title>${esc(tip)}</title></rect>`;
+    if((posts.length-1-i)%6===0){const xm=ml+i*bw+bw/2,rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen
+      s+=`<text x="${rand?W-mr:xm}" y="${H-8}" text-anchor="${rand?"end":"middle"}">${dLabel(dagNL(p.gepost_om))}</text>`}});
+  if(trend.length>1)s+=`<path d="M${trend.map(([a,b])=>a.toFixed(1)+","+b.toFixed(1)).join("L")}" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>`;
+  el.innerHTML=s+"</svg>";
 }
 function igCompute(){
   const vandaag=vandaagLA(),gist=dagMin(vandaag,1);
   const w=igSom(dagMin(vandaag,7),gist), vw=igSom(dagMin(vandaag,14),dagMin(vandaag,8)), nu=igSom(vandaag,vandaag);
+  const vwOk=vw.dagen>=5;   // vorige week pas vergelijken als daar minstens 5 van de 7 dagen gemeten zijn (anders vergelijk je met 1 losse dag)
   const metSplit=IG.dag.filter(r=>r.dag>=dagMin(vandaag,7)&&r.dag<=gist&&r.c.reach_nieuw!=null);
   const nieuw=metSplit.reduce((a,r)=>a+r.c.reach_nieuw,0), volg=metSplit.reduce((a,r)=>a+(r.c.reach_volgers||0),0);
   const vNieuw=metSplit.reduce((a,r)=>a+(r.c.views_nieuw||0),0), vVolg=metSplit.reduce((a,r)=>a+(r.c.views_volgers||0),0);
   const posts7=IG.posts.filter(p=>p.gepost_om&&Date.parse(p.gepost_om)>Date.now()-7*864e5);
   return {vandaag,w,vw,nu,
-    bereikDag:w.dagen?(w.reach||0)/w.dagen:null, bereikDagV:vw.dagen?(vw.reach||0)/vw.dagen:null,
-    nieuwPct:nieuw+volg?nieuw/(nieuw+volg):null, viewsNieuwPct:vNieuw+vVolg?vNieuw/(vNieuw+vVolg):null,
-    kwal:w.reach?((w.shares||0)+(w.saves||0))*1000/w.reach:null, kwalV:vw.reach?((vw.shares||0)+(vw.saves||0))*1000/vw.reach:null,
+    bereikDag:w.dagen?(w.reach||0)/w.dagen:null, bereikDagV:vwOk?(vw.reach||0)/vw.dagen:null,
+    nieuwPct:nieuw+volg?nieuw/(nieuw+volg):null,
+    nieuwPctV:igNieuwPct(dagMin(vandaag,14),dagMin(vandaag,8),5),   // week ervoor, pas als daar minstens 5 van de 7 dagen gemeten zijn
+    viewsNieuwPct:vNieuw+vVolg?vNieuw/(vNieuw+vVolg):null,
+    kwal:w.reach?((w.shares||0)+(w.saves||0))*1000/w.reach:null, kwalV:vwOk&&vw.reach?((vw.shares||0)+(vw.saves||0))*1000/vw.reach:null,
     follows:w.follows||0, unfollows:w.unfollows||0, posts7:posts7.length,
     // nieuwe volgers per 1.000 bereik (bereik = opgeteld per dag, net als bij 'Bereik per dag'; zelfde rekensom voor beide weken, dus eerlijk te vergelijken)
-    volg1k:w.reach?(w.follows||0)*1000/w.reach:null, volg1kV:vw.reach?(vw.follows||0)*1000/vw.reach:null,
+    volg1k:w.reach?(w.follows||0)*1000/w.reach:null, volg1kV:vwOk&&vw.reach?(vw.follows||0)*1000/vw.reach:null,
     volg1kNieuw:nieuw?metSplit.reduce((a,r)=>a+(r.c.follows||0),0)*1000/nieuw:null,   // alleen niet-volgers kunnen volger worden
-    volg1kNieuwV:igPer1kNieuw(dagMin(vandaag,14),dagMin(vandaag,8)),   // zelfde voor de week ervoor (null als er toen nog geen opsplitsing was)
+    volg1kNieuwV:igPer1kNieuw(dagMin(vandaag,14),dagMin(vandaag,8),5),   // zelfde voor de week ervoor (null als er toen nog geen opsplitsing was)
     laatstePost:IG.posts.find(p=>p.gepost_om)};
 }
 
@@ -307,8 +359,9 @@ function renderInsta(){
     igStat("Volgâhs",nf0.format(IG.acc.volgers||0),`${plus(c.follows-c.unfollows)} netto laatste 7 dagen (+${nf0.format(c.follows)} erbè, −${nf0.format(c.unfollows)} eraf)`),
     igStat("Bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"gemiddeld, laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)+(c.nu.reach?` · vandaag tot nu ${nf0.format(c.nu.reach)}`:"")),
     igStat("Volgâhs per 1.000 bereik",c.volg1k==null?"—":igNf1.format(c.volg1k),"nieuwe volgâhs, laatste 7 dagen"+igVs1(c.volg1k,c.volg1kV)+(c.volg1kNieuw!=null?` · ${igNf1.format(c.volg1kNieuw)} per 1.000 nieuwe mensen`:"")),
-    igStat("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie"+(c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:"")),
+    igStat("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV)+(c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:"")),
     igStat("Gedeeld + bewaard",c.kwal==null?"—":nf0.format(c.kwal),`per 1.000 bereik, laatste 7 dagen${igVs(c.kwal,c.kwalV)} · delen/bewaren weegt zwaar bij Insta`),
+    (l=>igStat("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes()),
     igStat("Posts",nf0.format(c.posts7),"laatste 7 dagen"+(c.laatstePost?` · laatste ${dLabel(dagNL(c.laatstePost.gepost_om))}`:""))
   ].join("");
 
@@ -318,6 +371,11 @@ function renderInsta(){
   igKolommen($("igChart"),dagen.map(d=>{const x=per.get(d)||{};const split=x.reach_nieuw!=null;
     const parts=split?[{v:x.reach_volgers||0,c:"groen"},{v:x.reach_nieuw||0,c:"hy"}]:[{v:x.reach||0,c:"muted"}];
     return {d,parts,o:x.follows!=null?x.follows:null,tip:`${dLabel(d,1)}${d===c.vandaag?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(x.follows!=null?` · +${x.follows} / −${x.unfollows||0} volgâhs`+(x.reach?` (${igNf1.format(x.follows*1000/x.reach)} per 1.000 bereik)`:""):"")}}),"Bereik per dag",{naam:"Nieuwe volgâhs per dag",c:"good"});
+
+  // 2b. likes per kijkâh per post (laatste 30 posts)
+  if($("igLikeChart")){const l=igLikes(),laatste=l.ps.slice(0,30).reverse();
+    $("igLikeSub").innerHTML=`Je laatste ${laatste.length} posts van minstens 2 dagen oud. <b>Likes ÷ bereik</b>: welk deel van de mensen die de post zagen, gaf een like. De groene lijn is de middelste van steeds 5 posts, zo zie je de trend zonder dat één uitschietâh alles bepaalt. Alleen je eigen posts: waar je bijdrager bent telt nie mee.`;
+    igLikeGrafiek($("igLikeChart"),laatste)}
 
   // 3. wat werkt
   document.querySelectorAll("#igKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igKies));
@@ -591,7 +649,8 @@ function instaTegel(){
     <div class="trijen">
       ${igBereikRij(c)}
       ${tegelRij("Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV))}
-      ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie")}
+      ${tegelRij("Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV))}
+      ${(l=>tegelRij("Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)))(igLikes())}
       ${igTrendRij(c)}
       ${(n=>n?tegelRij("Wachtkamâh",nf0.format(n),`nieuwe post${n>1?"s":""} zonder muziek-keuze`):"")(igWachtend().length)}
       ${igStatusHTML()}
