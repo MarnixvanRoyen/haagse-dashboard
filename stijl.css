@@ -317,9 +317,6 @@ nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding
 #vsInhoud,#vsSc,#vsLb{display:grid;gap:16px;min-width:0}
 #vsLb:empty{display:none}
 .down{color:var(--yt);font-weight:700}
-.vskies{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:var(--muted)}
-.vskies label{display:inline-flex;gap:6px;align-items:center}
-.vskies select{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:5px 8px;max-width:260px;color:var(--ink)}
 .vsknoppen{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .vslijst{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .vslijst li{display:grid;gap:2px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border-left:4px solid var(--good);font-size:13.5px}
@@ -385,3 +382,7 @@ td.igszelf .igsvs{white-space:normal}
 
 /* telefoon: alleen de hoofdzaken; tabellen, uploads en details (class "pc") alleen op de computer */
 @media (max-width:700px){.pc{display:none!important}}
+/* Wat is d'r nieuw?: check of de nieuwste upload anders is dan de vorige */
+.vscheck{font-size:13.5px;border-radius:12px;padding:9px 14px;margin:0 0 12px;border-left:4px solid var(--good);background:var(--good-soft);color:var(--ink)}
+.vscheck.let{border-left-color:var(--hy);background:var(--warn-soft)}
+.vscheck .sub{font-size:12.5px}

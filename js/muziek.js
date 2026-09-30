@@ -299,17 +299,21 @@ $("fFile").addEventListener("change",async e=>{
     units:num(g(r,"Units")),revenue_usd:num(g(r,"Revenue (USD)")),
     revenue_share:num(g(r,"Revenue Share (%)")),split_share:num(g(r,"Split Pay Share (%)"))}));
   if(!payload.length){showMsg("Geen regels gevonden in dit bestand.");return}
+  const laatsteAfr=payload.reduce((a,r)=>r.accounting_period>a?r.accounting_period:a,"").slice(0,7);
+  // check vooraf: is dit bestand ouder dan wat er al staat? Dan zou het latere correcties terugdraaien.
+  const scVorige=(IMP.lijst||[]).filter(i=>i.bron==="sc").slice(-1)[0],vAfr=scVorige&&scVorige.samenvatting&&scVorige.samenvatting.laatste_afrekening;
+  if(vAfr&&laatsteAfr&&laatsteAfr<vAfr&&!confirm(`Dit bestand gaat t/m afrekening ${mLabel(laatsteAfr,1)}, je vorige upload t/m ${mLabel(vAfr,1)}. Het is dus óuder. Inladen kan latere correcties van SoundCloud terugdraaien. Toch inladen?`)){
+    showMsg("Niks ingeladen: het bestand was ouder dan je vorige upload.",true);return}
   showMsg(`Bezig met opslaan van ${nf0.format(payload.length)} regels in Supabase…`,true,true);
   const scVoor=IMP.lijst.filter(i=>i.bron==="sc").length;
   const {data,error}=await sb.rpc("import_soundcloud",{rows:payload,file_name:file.name});
   if(error){showMsg("Opslaan lukte niet: "+error.message);return}
   await loadData();
   const scNa=IMP.lijst.filter(i=>i.bron==="sc").length;
-  const laatsteAfr=payload.reduce((a,r)=>r.accounting_period>a?r.accounting_period:a,"").slice(0,7);
   if(!IMP.err&&scNa===scVoor&&scVoor>0){      // momentopname niet bewaard = zelfde inhoud als de vorige upload
-    VS.gelijk={bestand:file.name,laatsteAfr};setTab("nieuw");
+    VS.gelijk.sc={bestand:file.name,tekst:`is precies hetzelfde als je vorige upload (laatste afrekening ${laatsteAfr?mLabel(laatsteAfr,1):"onbekend"}). SoundCloud zet meestal één keer per maand een nieuwe maand in het rapport.`};setTab("nieuw");
     showMsg(`${file.name} is precies hetzelfde als je vorige upload: niks nieuws. De laatste afrekening erin is ${laatsteAfr?mLabel(laatsteAfr,1):"onbekend"}. SoundCloud zet meestal één keer per maand een nieuwe maand in het rapport.`,false,true);return}
-  VS.gelijk=null;
+  VS.gelijk.sc=null;
   if(!IMP.err&&scNa>1)setTab("nieuw");   // meteen laten zien wat er veranderd is
   showMsg(`${file.name} opgeslagen: ${nf0.format(data.inserted)} regels erin, ${nf0.format(data.deleted)} oude regels van dezelfde afrekenperiodes vervangen.${!IMP.err&&scNa>1?" Kèk bij 'Wat is d'r nieuw?' wat er veranderd is.":""}`,true);
 });
@@ -396,12 +400,24 @@ $("fPdf").addEventListener("change",async e=>{
     const r=parseDJWorld(await pdfLines(pdfjs,new Uint8Array(await file.arrayBuffer())));
     if(!r.periods.length||!r.tracks.length){showMsg("Dit lijkt geen DJ·World totaaloverzicht in het nieuwe format (met streams per nummer). "+r.warnings.join(" "));return}
     if(!r.statement_date){showMsg("De datum 'Opgemaakt op' niet gevonden in de PDF.");return}
+    // check vooraf: een óuder overzicht vervangt je periodes en nummers door die oude stand
+    const dNL=d=>String(d).slice(0,10).split("-").reverse().join("-");
+    const lbVorige=(IMP.lijst||[]).filter(i=>i.bron==="label").slice(-1)[0],vDat=lbVorige&&lbVorige.samenvatting&&lbVorige.samenvatting.overzicht_van;
+    if(vDat&&r.statement_date<String(vDat).slice(0,10)&&!confirm(`Deze PDF is opgemaakt op ${dNL(r.statement_date)}, je vorige overzicht op ${dNL(vDat)}. Dit is dus een óuder overzicht: inladen zet je label-cijfers terug naar die oude stand. Toch inladen?`)){
+      showMsg("Niks ingeladen: de PDF was ouder dan je vorige overzicht.",true);return}
+    const lbVoor=(IMP.lijst||[]).filter(i=>i.bron==="label").length;
     showMsg(`Opslaan: ${r.periods.length} periodes en ${r.tracks.length} nummers…`,true,true);
     r.bestand=file.name;                              // voor de momentopname (Wat is d'r nieuw?)
     const {data,error}=await sb.rpc("import_djworld",{doc:r});
     if(error){showMsg("Opslaan lukte niet: "+error.message);return}
     await loadData();
-    showMsg(`Label-overzicht van ${r.statement_date.split("-").reverse().join("-")} opgeslagen: ${data.periods} periodes, ${data.tracks} nummers.${r.warnings.length?" Let op: "+r.warnings.join(" "):""}`,!r.warnings.length);
+    const lbNa=IMP.lijst.filter(i=>i.bron==="label").length;
+    if(!IMP.err&&lbNa===lbVoor&&lbVoor>0){   // momentopname niet bewaard = zelfde inhoud als het vorige overzicht
+      VS.gelijk.label={bestand:file.name,tekst:`is precies hetzelfde als je vorige overzicht (opgemaakt op ${dNL(r.statement_date)}).`};setTab("nieuw");
+      showMsg(`${file.name} is precies hetzelfde als je vorige DJ·World-overzicht: niks nieuws.`,false,true);return}
+    VS.gelijk.label=null;
+    if(!IMP.err&&lbNa>1)setTab("nieuw");   // meteen laten zien wat er veranderd is
+    showMsg(`Label-overzicht van ${r.statement_date.split("-").reverse().join("-")} opgeslagen: ${data.periods} periodes, ${data.tracks} nummers.${!IMP.err&&lbNa>1?" Kèk bij 'Wat is d'r nieuw?' wat er veranderd is.":""}${r.warnings.length?" Let op: "+r.warnings.join(" "):""}`,!r.warnings.length);
   }catch(err){showMsg("PDF inladen lukte niet: "+err.message)}
 });
 

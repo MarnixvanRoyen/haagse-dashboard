@@ -2,7 +2,8 @@
 // De momentopnames staan in Supabase-tabel muziek_imports (zie supabase/11_import_historie.sql).
 
 let IMP={lijst:[],data:{},err:null};
-const VS={sc:{nieuw:null,oud:null},label:{nieuw:null,oud:null},dim:"nummer",alles:false,gelijk:null};
+// Altijd: nieuwste upload vs de upload daarvóór (geen kiezers). gelijk.sc/gelijk.label = melding na een upload die niks nieuws bracht.
+const VS={dim:"nummer",alles:false,gelijk:{sc:null,label:null}};
 
 async function loadImports(){
   try{
@@ -106,17 +107,14 @@ function lbVergelijk(oud,nieuw){
 }
 
 /* ---------- tekenen ---------- */
-function vsKiezer(bron,lijst){
-  const opt=sel=>lijst.map(i=>`<option value="${i.id}"${i.id===sel?" selected":""}>${esc(vsNaam(i))}</option>`).slice().reverse().join("");
-  return `<div class="vskies"><label>Nieuw <select data-vs="${bron}-nieuw">${opt(VS[bron].nieuw)}</select></label>
-    <label>vs <select data-vs="${bron}-oud">${opt(VS[bron].oud)}</select></label></div>`;
-}
 function vsTegel(k,v,s,kl){return `<div class="ytstat"><span class="k">${k}</span><span class="v${kl?" "+kl:""}">${v}</span><span class="s">${s}</span></div>`}
-function vsKiesStandaard(bron,lijst){
-  const ids=lijst.map(i=>i.id);
-  if(!ids.includes(VS[bron].nieuw))VS[bron].nieuw=ids[ids.length-1]??null;
-  if(!ids.includes(VS[bron].oud)||VS[bron].oud===VS[bron].nieuw)VS[bron].oud=ids.length>1?ids[ids.indexOf(VS[bron].nieuw)-1]??ids[0]:null;
-}
+// de check bovenaan elk blok: is de nieuwste upload echt anders dan de vorige?
+function vsGelijkHTML(bron){const g=VS.gelijk[bron];if(!g)return "";
+  return `<p class="vscheck let"><b>⚠ Niks nieuws in je upload van net:</b> ${esc(g.bestand)} ${g.tekst} Er is niks extra bewaard; hieronder staat nog steeds je laatste echte verschil.</p>`}
+function vsCheckHTML(iN,iO,n,wat){
+  const namen=`<span class="sub">Nieuwste: ${esc(vsNaam(iN))} · vorige: ${esc(vsNaam(iO))}</span>`;
+  return n?`<p class="vscheck ok"><b>✓ Anders dan de vorige upload</b>: ${wat}.<br>${namen}</p>`
+    :`<p class="vscheck let"><b>⚠ Wel een andere upload, maar geen verschil in bedragen of streams</b> (alleen iets kleins, zoals een schrijfwijze).<br>${namen}</p>`}
 
 let vsTeken=0;
 async function renderVerschil(){
@@ -124,7 +122,6 @@ async function renderVerschil(){
   if(IMP.err){el.innerHTML=`<div class="card"><p class="sub">${/muziek_imports|schema cache|relation/i.test(IMP.err)?
     "Dit tabblad heeft de tabel <code>muziek_imports</code> nodig. Draai eerst <code>supabase/11_import_historie.sql</code> in Supabase (vóór je een nieuwe CSV uploadt).":"Uploads ophalen lukte nie: "+esc(IMP.err)}</p></div>`;return}
   const sc=IMP.lijst.filter(i=>i.bron==="sc"),lb=IMP.lijst.filter(i=>i.bron==="label");
-  vsKiesStandaard("sc",sc);vsKiesStandaard("label",lb);
   const mijn=++vsTeken;
   el.innerHTML=`<div id="vsSc"><div class="card"><p class="sub">Effe lade…</p></div></div><div id="vsLb"></div>`;
   try{
@@ -135,11 +132,11 @@ async function renderVerschil(){
 }
 
 async function scBlok(sc){
-  const kop=`<div class="cardhead"><div><h2><i class="dot sc"></i> SoundCloud-afrekening</h2><p class="sub">Wat er veranderd is tussen twee uploads van je lifetime earnings report. Bedragen in euro (koers hierboven).</p></div>${sc.length>1?vsKiezer("sc",sc):""}</div>`;
+  const kop=`<div class="cardhead"><div><h2><i class="dot sc"></i> SoundCloud-afrekening</h2><p class="sub">Wat er veranderd is tussen je nieuwste en je vorige upload van het lifetime earnings report. Bedragen in euro (koers hierboven).</p></div></div>`;
   if(!sc.length)return `<div class="card">${kop}<p class="sub">Nog geen upload bewaard. Upload je SoundCloud-CSV; de volgende upload wordt daarmee vergeleken.</p></div>`;
-  const gelijk=VS.gelijk?`<p class="note" style="margin-bottom:10px">Je upload <b>${esc(VS.gelijk.bestand)}</b> was precies hetzelfde als de vorige (laatste afrekening ${VS.gelijk.laatsteAfr?mLabel(VS.gelijk.laatsteAfr,1):"onbekend"}), dus er is niks te vergelijken. Probeer het opnieuw zodra SoundCloud een nieuwe maand heeft afgerekend.</p>`:"";
+  const gelijk=vsGelijkHTML("sc");
   if(sc.length<2)return `<div class="card">${kop}${gelijk}<p class="note">Nulmeting staat klaar: <b>${esc(vsNaam(sc[0]))}</b> (${vsEur(+sc[0].samenvatting.usd||0)}, t/m ${sc[0].samenvatting.laatste_maand?mLabel(sc[0].samenvatting.laatste_maand,1):"—"}). Upload nu je nieuwe CSV met de knop <b>SoundCloud-CSV</b> bovenaan; dan zie je hier meteen wat er veranderd is.</p></div>`;
-  const iN=sc.find(i=>i.id===VS.sc.nieuw),iO=sc.find(i=>i.id===VS.sc.oud);
+  const iN=sc[sc.length-1],iO=sc[sc.length-2];   // lijst staat op volgorde van uploaden (oud → nieuw)
   const [dN,dO]=await Promise.all([impData(iN.id),impData(iO.id)]);
   const v=scVergelijk(dO,dN),dUsd=v.nu.usd-v.was.usd,dU=v.nu.u-v.was.u;
   const nieuwM=v.nieuweMaanden,corr=v.correcties.reduce((a,m)=>a+m.dUsd,0);
@@ -167,7 +164,9 @@ async function scBlok(sc){
       <td class="n">${vsEur(r.wasUsd)}</td><td class="n">${vsEur(r.nuUsd)}</td><td class="n ${vsKlasse(r.dUsd)}">${vsPlusEur(r.dUsd)}</td></tr>`).join("")
       :`<tr><td colspan="7" class="sub">Niks veranderd in deze indeling.</td></tr>`)+
     `</tbody><tfoot><tr><td>Totaal</td><td class="n">${nf0.format(v.was.u)}</td><td class="n">${nf0.format(v.nu.u)}</td><td class="n">${vsPlusN(dU)}</td><td class="n">${vsEur(v.was.usd)}</td><td class="n">${vsEur(v.nu.usd)}</td><td class="n">${vsPlusEur(dUsd)}</td></tr></tfoot>`;
-  return `<div class="card">${kop}${gelijk}<div class="ytstats">${tegels}</div></div>
+  const nNr=v.nummer.filter(r=>Math.abs(r.dUsd)>=0.005||r.dU!==0).length,nMd=v.maanden.filter(m=>Math.abs(m.dUsd)>=0.005||m.dU!==0).length;
+  const check=vsCheckHTML(iN,iO,nNr+nMd,`${nNr} nummâh${nNr===1?"":"s"} en ${nMd} maand${nMd===1?"":"en"} veranderd`);
+  return `<div class="card">${kop}${gelijk}${check}<div class="ytstats">${tegels}</div></div>
   <div class="grid2">
     <div class="card"><h2>Wat valt op?</h2><p class="sub">Automatisch uitgerekend uit de twee uploads</p><ul class="vslijst">${ins}</ul></div>
     <div class="card"><div class="cardhead"><div><h2>Per maand</h2><p class="sub">Luistermaanden, laatste 12. Geel = erbè gekomen in de nieuwe upload.</p></div>
@@ -180,10 +179,10 @@ async function scBlok(sc){
 }
 
 async function lbBlok(lb){
-  const kop=`<div class="cardhead"><div><h2><i class="dot lb"></i> DJ·World (label)</h2><p class="sub">Verschil tussen twee totaaloverzichten (PDF). Bedragen netto, in euro.</p></div>${lb.length>1?vsKiezer("label",lb):""}</div>`;
+  const kop=`<div class="cardhead"><div><h2><i class="dot lb"></i> DJ·World (label)</h2><p class="sub">Verschil tussen je nieuwste en je vorige totaaloverzicht (PDF). Bedragen netto, in euro.</p></div></div>`;
   if(!lb.length)return `<div class="card">${kop}<p class="sub">Nog geen overzicht bewaard.</p></div>`;
-  if(lb.length<2)return `<div class="card">${kop}<p class="sub">Nulmeting staat klaar: overzicht van ${lb[0].samenvatting.overzicht_van?dLabel(lb[0].samenvatting.overzicht_van,1):vsDatum(lb[0])} (${eur(+lb[0].samenvatting.netto||0)} netto, ${nf0.format(+lb[0].samenvatting.streams||0)} streams). Laad je volgende DJ·World-PDF in; dan zie je hier wat er veranderd is.</p></div>`;
-  const iN=lb.find(i=>i.id===VS.label.nieuw),iO=lb.find(i=>i.id===VS.label.oud);
+  if(lb.length<2)return `<div class="card">${kop}${vsGelijkHTML("label")}<p class="sub">Nulmeting staat klaar: overzicht van ${lb[0].samenvatting.overzicht_van?dLabel(lb[0].samenvatting.overzicht_van,1):vsDatum(lb[0])} (${eur(+lb[0].samenvatting.netto||0)} netto, ${nf0.format(+lb[0].samenvatting.streams||0)} streams). Laad je volgende DJ·World-PDF in; dan zie je hier wat er veranderd is.</p></div>`;
+  const iN=lb[lb.length-1],iO=lb[lb.length-2];
   const [dN,dO]=await Promise.all([impData(iN.id),impData(iO.id)]);
   const v=lbVergelijk(dO,dN),dNet=v.nu.netto-v.was.netto,dS=v.nu.streams-v.was.streams,dD=v.nu.downloads-v.was.downloads;
   const sN=+v.saldoNu.to_book||0,sO=+v.saldoWas.to_book||0,uN=+v.saldoNu.paid_out||0,uO=+v.saldoWas.paid_out||0;
@@ -202,14 +201,14 @@ async function lbBlok(lb){
   const nrT=nrs.length?`<thead><tr><th>Nummer</th><th class="n">Streams</th><th class="n">erbè</th><th class="n">Downloads erbè</th><th class="n">Netto erbè</th></tr></thead><tbody>`+nrs.map(n=>{const x=n.nu||n.was;
     return `<tr><td><b>${esc(x.t)}</b>${x.v?" <span class='sub'>("+esc(x.v)+")</span>":""}${!n.was?' <span class="chip good">nieuw</span>':""}</td><td class="n">${nf0.format(+(n.nu||{}).streams||0)}</td>
       <td class="n ${vsKlasse(n.dS)}">${vsPlusN(n.dS)}</td><td class="n ${vsKlasse(n.dD)}">${vsPlusN(n.dD)}</td><td class="n ${vsKlasse(n.dN)}">${pm(n.dN)}</td></tr>`}).join("")+"</tbody>":`<tbody><tr><td class="sub">Geen nummers veranderd.</td></tr></tbody>`;
-  return `<div class="card">${kop}<div class="ytstats">${tegels}</div></div>
+  const check=vsCheckHTML(iN,iO,per.length+nrs.length+(uN!==uO||sN!==sO?1:0),
+    `${per.length} periode${per.length===1?"":"s"} en ${nrs.length} nummâh${nrs.length===1?"":"s"} veranderd${uN!==uO||sN!==sO?", saldo ook":""}`);
+  return `<div class="card">${kop}${vsGelijkHTML("label")}${check}<div class="ytstats">${tegels}</div></div>
   <div class="grid2 pc"><div class="card"><h2>Periodes</h2><p class="sub">Nieuw of veranderd (bedrag of status)</p><div class="tablewrap"><table>${perT}</table></div></div>
   <div class="card"><h2>Nummâhs</h2><p class="sub">Streams, downloads en netto erbè per nummer</p><div class="tablewrap"><table>${nrT}</table></div></div></div>`;
 }
 
 /* ---------- knoppen ---------- */
-document.addEventListener("change",e=>{const s=e.target.closest("select[data-vs]");if(!s)return;
-  const [bron,welke]=s.dataset.vs.split("-");VS[bron][welke]=+s.value;renderVerschil()});
 document.addEventListener("click",e=>{
   const d=e.target.closest("#vsDim button");if(d){VS.dim=d.dataset.v;renderVerschil();return}
   if(e.target.closest("#vsAlles")){VS.alles=!VS.alles;renderVerschil()}
