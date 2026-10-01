@@ -127,6 +127,7 @@ nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{colo
 /* getal boven een staaf: verschijnt bij aanwijzen (muis) of aantikken (vinger), zie staafGetal() in basis.js */
 .chart .bv{fill:var(--ink);font-family:var(--body);font-size:12.5px;font-weight:800;opacity:0;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;transition:opacity .12s}
 .chart .bv.zien{opacity:1}
+.chart .bv .bvd{font-weight:600;fill:var(--ink-2)}   /* datum vóór het getal: rustiger dan het getal zelf */
 #tip{position:fixed;pointer-events:none;z-index:10;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--hy);border-radius:10px;padding:8px 11px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.16);min-width:180px}
 #tip .t{font-weight:700;margin-bottom:4px}
 #tip .r{display:flex;justify-content:space-between;gap:14px;align-items:center}
@@ -383,6 +384,18 @@ td.igszelf .igsvs{white-space:normal}
 
 /* telefoon: alleen de hoofdzaken; tabellen, uploads en details (class "pc") alleen op de computer */
 @media (max-width:700px){.pc{display:none!important}}
+@media (min-width:701px){.tel{display:none!important}}   /* .tel = alleen op de telefoon (tegenhangâh van .pc), bv. kaart Top 5 */
+/* Top 5 (telefoon): per regel plek, plaatje, datum + tekst, cijfâh rechts */
+.igt5{display:grid;gap:6px}
+#igT5Kaart .igtopknoppen{justify-content:flex-start}
+.igt5rij{display:grid;grid-template-columns:18px auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 8px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2);color:inherit;text-decoration:none}
+.igt5rij .nr{font-family:var(--display);font-size:17px;color:var(--muted);text-align:center}
+.igt5rij .wat{min-width:0;display:grid;gap:1px}
+.igt5rij .wat b{font-size:14px}
+.igt5rij .wat .igcap{max-width:none}
+.igt5rij .cijf{text-align:right;display:grid;gap:1px}
+.igt5rij .cijf b{font-family:var(--display);font-weight:400;font-size:20px;line-height:1.1}
+.igt5rij .cijf span{font-size:12px;color:var(--muted);white-space:nowrap}
 /* Wat is d'r nieuw?: check of de nieuwste upload anders is dan de vorige */
 .vscheck{font-size:13.5px;border-radius:12px;padding:9px 14px;margin:0 0 12px;border-left:4px solid var(--good);background:var(--good-soft);color:var(--ink)}
 .vscheck.let{border-left-color:var(--hy);background:var(--warn-soft)}

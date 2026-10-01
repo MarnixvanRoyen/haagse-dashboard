@@ -38,14 +38,24 @@ function hideTip(){$("tip").hidden=true}
    Elke staaf heeft een onzichtbaar aanwijs-vlak (rect.hit). staafGetal() geeft dat vlak het getal mee;
    muis erop = getal verschijnt, tikken/klikken = getal blijft staan tot je ergens anders tikt.
    Het getal wordt als laatste in de grafiek gezet, zodat geen andere staaf eroverheen valt. */
-function staafGetal(xMid,yTop,tekst){return ` data-bv="${esc(tekst)}" data-bx="${xMid.toFixed(1)}" data-by="${(yTop-7).toFixed(1)}"`}
+// datum (sinds 01-10): optioneel 4e stukje, bv. dKort("2026-09-30") → "di 30 sep". Staat vóór het getal: "di 30 sep · 2.566",
+// zodat je ook op de telefoon (geen zweef-vak) ziet over welke dag/maand/post het getal gaat.
+function staafGetal(xMid,yTop,tekst,datum){return ` data-bv="${esc(tekst)}"${datum?` data-bd="${esc(datum)}"`:""} data-bx="${xMid.toFixed(1)}" data-by="${(yTop-7).toFixed(1)}"`}
+const DAG_KORT=["zo","ma","di","wo","do","vr","za"];
+function dKort(d){return DAG_KORT[new Date(d+"T12:00:00Z").getUTCDay()]+" "+dLabel(d)}   // "di 30 sep"
 function toonGetal(hit){
   const svg=hit.ownerSVGElement;if(!svg||hit.dataset.bv==null)return;
+  const NS="http://www.w3.org/2000/svg";
   let t=svg.querySelector("text.bv");
-  if(!t){t=document.createElementNS("http://www.w3.org/2000/svg","text");t.setAttribute("class","bv");t.setAttribute("text-anchor","middle")}
+  if(!t){t=document.createElementNS(NS,"text");t.setAttribute("class","bv");t.setAttribute("text-anchor","middle")}
   svg.appendChild(t);                                            // altijd bovenop
   const W=svg.viewBox.baseVal.width||9999;
-  t.textContent=hit.dataset.bv;t.setAttribute("x",Math.min(Math.max(+hit.dataset.bx,24),W-24));t.setAttribute("y",hit.dataset.by);
+  t.textContent="";
+  if(hit.dataset.bd){const d=document.createElementNS(NS,"tspan");d.setAttribute("class","bvd");d.textContent=hit.dataset.bd+" · ";t.appendChild(d)}
+  t.appendChild(document.createTextNode(hit.dataset.bv));
+  t.setAttribute("y",hit.dataset.by);
+  let half=24;try{half=Math.max(24,t.getComputedTextLength()/2+4)}catch(e){}   // hele tekst binnen de grafiek houden (ook met datum erbij)
+  t.setAttribute("x",half*2>=W?W/2:Math.min(Math.max(+hit.dataset.bx,half),W-half));
   t.classList.add("zien");
 }
 function verbergGetal(svg){const t=svg&&svg.querySelector("text.bv");if(t)t.classList.remove("zien")}

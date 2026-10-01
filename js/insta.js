@@ -209,7 +209,7 @@ function igPostGrafiek(el,posts,m){   // posts: oud → nieuw; m = IG_MATEN.like
     if(v>top)s+=`<text x="${ml+i*bw+bw/2}" y="${mt-3}" text-anchor="middle" class="strookgetal">▲</text>`;
     const venster=vs.slice(Math.max(0,i-4),i+1);if(venster.length>=3)trend.push([ml+i*bw+bw/2,y(med(venster))]);
     const tip=`${dLabel(dagNL(p.gepost_om),1)} · ${soortNaam(p)}: ${m.tip(p)}`;
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(v),m.lbl(p))}><title>${esc(tip)}</title></rect>`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(v),m.lbl(p),dKort(dagNL(p.gepost_om)))}><title>${esc(tip)}</title></rect>`;
     if((posts.length-1-i)%6===0){const xm=ml+i*bw+bw/2,rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen
       s+=`<text x="${rand?W-mr:xm}" y="${H-8}" text-anchor="${rand?"end":"middle"}">${dLabel(dagNL(p.gepost_om))}</text>`}});
   if(trend.length>1)s+=`<path d="M${trend.map(([a,b])=>a.toFixed(1)+","+b.toFixed(1)).join("L")}" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>`;
@@ -383,8 +383,9 @@ function igKolommen(el,data,aria,onder){   // gestapelde kolommen: data=[{d,part
     if(onder&&d.o!=null){getal+=` · +${nf0.format(d.o)}`;
       if(d.o>0){const h=d.o/oTop*oa;s+=`<path d="${roundTop(x,ob-h,bw*.7,h,2)}" fill="var(--${onder.c})"/>`;
         if(met)s+=`<text x="${ml+i*bw+bw/2}" y="${ob-h-3}" text-anchor="middle" class="strookgetal">${nf0.format(d.o)}</text>`}}
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ob-mt}"${staafGetal(ml+i*bw+bw/2,y(acc),getal)}><title>${d.tip}</title></rect>`;
-    if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ob-mt}"${staafGetal(ml+i*bw+bw/2,y(acc),getal,dKort(d.d))}><title>${d.tip}</title></rect>`;
+    if((data.length-1-i)%7===0){const xm=ml+i*bw+bw/2,rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen (zoals in igPostGrafiek)
+      s+=`<text x="${rand?W-mr:xm}" y="${H-8}" text-anchor="${rand?"end":"middle"}">${dLabel(d.d)}</text>`}});
   el.innerHTML=s+"</svg>";
 }
 /* ---------- Posts: tegel (aantal + trend) en losse grafiek "Posts per dag" (laatste 30 dagen) ----------
@@ -487,6 +488,7 @@ function renderInsta(){
 
   // 4. toppâhs (laatste 90 dagen of allâh tijde)
   renderIgTop();
+  renderIgT5();   // 4b. Top 5 (alleen telefoon)
   if(typeof renderIgSamen==="function")renderIgSamen();   // 5. samenwerkingen (samenwerking.js)
 
   renderIgStories();
@@ -543,6 +545,55 @@ function renderIgTop(){
     lijst.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span></div></div></td>
       ${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${periode.length?`Nog geen posts met een cijfâh voor ${op.kop.toLowerCase()}${alles?"":" in de laatste 90 dagen"}.`:alles?"Nog geen posts met cijfâhs.":"Nog geen posts met cijfâhs in de laatste 90 dagen."}</td></tr></tbody>`;
+}
+
+/* ---------- Top 5 op de telefoon (01-10): posts óf stories, 7/30/90 dagen, op bereik, likes of kwaliteit ----------
+   Alleen < 700 px breed (class "tel"); Mac/iPad hebben Je toppâhs (top 10) en de Stories-tabel.
+   Zelfde rekenregels als daar: posts kwaliteit = (gedeeld + bewaard) per 1.000 bereik, stories = gedeeld per 1.000 bereik.
+   Op kwaliteit tellen posts/stories met heel weinig bereik nie mee (1x gedeeld bij 40 bereik = al 25, zegt niks):
+   drempel = de helft van de middelste in de lijst, minstens 100 (posts) of 50 (stories hebben minder bereik).
+   Nog nie klaar (post < 2 dagen, story < 24 uur) → "loopt nog", telt wel mee. */
+let igT5Wat="posts", igT5Per="30", igT5Op="bereik";
+const IG_T5_OP={
+  bereik:{naam:"bereik",post:p=>p.bereik,story:s=>(s.cijfers||{}).reach,f:v=>nf0.format(v)},
+  likes:{naam:"likes",post:p=>p.likes,story:s=>igStoryLikes(s),f:v=>nf0.format(v)},
+  kwaliteit:{naam:"kwaliteit",post:p=>IG_TOP_OP.kwaliteit.v(p),story:s=>igStoryKwal(s),f:v=>igKwalF(v)}};
+function igT5Lijst(){   // {lijst:[{x,v,bereik,likes}], n, zonder, drempel}
+  const op=IG_T5_OP[igT5Op]||IG_T5_OP.bereik,st=igT5Wat==="stories",grens=Date.now()-(+igT5Per)*864e5;
+  const bron=st?(IG.stories||[]):IG.posts;
+  const alle=bron.filter(x=>x.gepost_om&&Date.parse(x.gepost_om)>grens).map(x=>({x,
+    v:st?op.story(x):op.post(x),bereik:st?(x.cijfers||{}).reach:x.bereik,likes:st?igStoryLikes(x):x.likes}));
+  const metBereik=alle.filter(r=>r.bereik!=null);
+  const drempel=igT5Op==="kwaliteit"?Math.max(st?50:100,Math.round((med(metBereik.map(r=>+r.bereik))||0)/2)):0;
+  const bruikbaar=alle.filter(r=>r.v!=null&&!isNaN(+r.v)&&(+r.bereik||0)>=drempel);
+  const lijst=bruikbaar.sort((a,b)=>(+b.v)-(+a.v)||(+b.bereik||0)-(+a.bereik||0)||(a.x.gepost_om<b.x.gepost_om?-1:1)).slice(0,5);
+  return {lijst,n:alle.length,zonder:alle.filter(r=>r.v==null).length,teKlein:alle.filter(r=>r.v!=null&&(+r.bereik||0)<drempel).length,drempel,st,op};
+}
+function renderIgT5(){
+  if(!$("igT5"))return;
+  if(!IG_T5_OP[igT5Op])igT5Op="bereik";
+  [["igT5Wat",igT5Wat],["igT5Per",igT5Per],["igT5Op",igT5Op]].forEach(([id,v])=>document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v)));
+  const {lijst,n,zonder,teKlein,drempel,st,op}=igT5Lijst(),wat=st?"stories":"posts";
+  const uitleg={bereik:"op bereik (hoeveel verschillende mensen het zagen)",likes:"op likes",
+    kwaliteit:st?"op kwaliteit (gedeeld per 1.000 bereik)":"op kwaliteit (gedeeld + bewaard per 1.000 bereik)"}[igT5Op];
+  const extra=[];
+  if(teKlein)extra.push(`${nf0.format(teKlein)} met minder dan ${nf0.format(drempel)} bereik tellen nie mee`);
+  if(zonder)extra.push(`${nf0.format(zonder)} zonder dit cijfâh`);
+  $("igT5Sub").innerHTML=`Je 5 beste ${wat} van de laatste ${igT5Per} dagen, ${uitleg}. ${nf0.format(n)} ${n===1?(st?"story":"post"):wat} in deze periode`+(extra.length?` (${extra.join(", ")})`:"")+"."
+    +(st?" Tik op een story van de laatste 24 uur om hem te openen.":" Tik op een post om hem te openen.");
+  if(!lijst.length){$("igT5").innerHTML=`<p class="sub" style="margin:0">${n?`Nog geen ${wat} met een cijfâh voor ${op.naam} in de laatste ${igT5Per} dagen.`:`Geen ${wat} in de laatste ${igT5Per} dagen.`}</p>`;return}
+  $("igT5").innerHTML=lijst.map((r,i)=>{const x=r.x,d=dagNL(x.gepost_om),oud=Date.now()-Date.parse(x.gepost_om);
+    const loopt=oud<(st?1:2)*864e5?' <span class="chip mute">loopt nog</span>':"";
+    const kop=st?`${dKort(d)} ${tijdAms(x.gepost_om)}`:`${dKort(d)} · ${soortNaam(x)}`;
+    const tekst=st?String(x.bijschrift||"").trim():igEersteRegel(x.bijschrift);
+    const beeld=st?igStoryBeeld(x):x.plaatje;
+    const link=st?(oud<864e5&&x.permalink?x.permalink:""):(x.permalink||"");
+    const bij=igT5Op==="bereik"?(r.likes!=null?`${nf0.format(r.likes)} likes`:""):(r.bereik!=null?`bereik ${nf0.format(r.bereik)}`:"");
+    const binnen=`<span class="nr">${i+1}</span>
+      <span class="igthumb ${st?"story":"klein"}" aria-hidden="true">${beeld?`<img src="${esc(beeld)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
+      <span class="wat"><b>${kop}</b>${loopt?`<span>${loopt}</span>`:""}${tekst?`<span class="igcap">${esc(tekst)}</span>`:""}</span>
+      <span class="cijf"><b>${op.f(+r.v)}</b><span>${igT5Op==="kwaliteit"?"per 1.000":op.naam}${bij?" · "+bij:""}</span></span>`;
+    return link?`<a class="igt5rij" href="${esc(link)}" target="_blank" rel="noopener">${binnen}</a>`:`<div class="igt5rij">${binnen}</div>`}).join("");
 }
 
 function renderIgStories(){
@@ -699,6 +750,8 @@ document.addEventListener("click",async e=>{
   const pm=e.target.closest("#igPostMaat button");if(pm){igPostMaat=pm.dataset.v;renderIgPostGrafiek();return}
   const to=e.target.closest("#igTopOp button");if(to){igTopOp=to.dataset.v;renderIgTop();return}
   const tk=e.target.closest("[data-igtop]");if(tk){igTopOp=tk.dataset.igtop;renderIgTop();return}
+  const t5=e.target.closest("#igT5Wat button,#igT5Per button,#igT5Op button");if(t5){
+    const id=t5.parentElement.id;if(id==="igT5Wat")igT5Wat=t5.dataset.v;else if(id==="igT5Per")igT5Per=t5.dataset.v;else igT5Op=t5.dataset.v;renderIgT5();return}
   const sp=e.target.closest("#igStoryKies button");if(sp){igStoryPeriode=sp.dataset.v;renderIgStories();return}
   const sw=e.target.closest("#igStoryWie button");if(sw){igStoryWie=sw.dataset.v;renderIgStories();return}
   const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}

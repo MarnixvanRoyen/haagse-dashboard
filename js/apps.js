@@ -46,7 +46,7 @@ function kolommen(el,data,kleur,aria="Nieuwe spelers per dag",eenheid="nieuw"){
   sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
   data.forEach((d,i)=>{const h=d.v/top*ih,x=ml+i*bw+bw*.15;
     if(d.v)s+=`<path d="${roundTop(x,y(d.v),bw*.7,h,3)}" fill="var(--${kleur})"/>`;
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(d.v),nf0.format(d.v))}><title>${dLabel(d.d,1)}: ${d.v} ${eenheid}</title></rect>`;
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+i*bw+bw/2,y(d.v),nf0.format(d.v),dKort(d.d))}><title>${dLabel(d.d,1)}: ${d.v} ${eenheid}</title></rect>`;
     if((data.length-1-i)%7===0)s+=`<text x="${ml+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${dLabel(d.d)}</text>`});
   el.innerHTML=s+"</svg>";
 }

@@ -122,7 +122,7 @@ function renderChart(d){
     if(hs>0)s+=`<path fill="var(--sc)" d="${roundTop(x,y(o.sc),bar,hs,hl>0?0:Math.min(4,hs))}"/>`;
     if(hl>0)s+=`<path fill="var(--lb)" d="${roundTop(x,y(tot)-0,bar,Math.max(0.5,hl-gap),Math.min(4,hl))}"/>`;
     if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${mLabel(o.m)}</text>`;
-    s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,y(tot),eur(tot))}/>`;
+    s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,y(tot),eur(tot),mLabel(o.m,1))}/>`;
   });
   s+="</svg>";
   $("monthChart").innerHTML=s;
@@ -485,7 +485,7 @@ function renderYouTube(){
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--yt)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
       if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
-      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add))}/>`});
+      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add),dKort(o.d))}/>`});
     $("ytChart").innerHTML=s+"</svg>";
     $("ytChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
       showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot yt"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
@@ -637,7 +637,7 @@ function renderSCLive(){
     pts.forEach((o,i)=>{const x=ml+bw*i+(bw-bar)/2,h=o.add/max*ih;
       if(h>0)s+=`<path fill="var(--sc)" d="${roundTop(x,yy(o.add),bar,h,Math.min(4,h))}"/>`;
       if((i%every===0&&n-1-i>=every/2)||i===n-1)s+=`<text x="${ml+bw*i+bw/2}" y="${H-10}" text-anchor="middle">${dLabel(o.d)}</text>`;
-      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add))}/>`});
+      s+=`<rect class="hit" data-i="${i}" x="${ml+bw*i}" y="${mt}" width="${bw}" height="${ih}"${staafGetal(ml+bw*i+bw/2,yy(o.add),(o.add>0?"+":"")+nf0.format(o.add),dKort(o.d))}/>`});
     $("sclChart").innerHTML=s+"</svg>";
     $("sclChart").querySelectorAll(".hit").forEach(r=>{r.addEventListener("mousemove",e=>{const o=pts[+r.dataset.i];
       showTip(e,`<div class="t">${dLabel(o.d,1)}${o.d===vandaagAms()?" · tot nu":""}</div><div class="r"><span><i class="dot sc"></i>Erbij</span><b class="num">+${nf0.format(o.add)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(o.tot)}</b></div>`)});
