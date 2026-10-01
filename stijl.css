@@ -397,3 +397,10 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 
 /* Insta-tab, stories: samenvatting boven de tabel */
 .igstorysamen{margin-bottom:14px}
+
+/* Bereik vandaag vs gistâh op hetzelfde tijdstip (01-10) */
+.trij .ignw{white-space:nowrap}   /* op de Ovâhzicht-tegel per stukje heel laten; in de smalle Insta-tegels mag het gewoon afbreken */
+.legend .streep{width:14px;height:0;border-top:3px solid var(--ink);border-radius:2px;display:inline-block;flex:none}
+.chart .gistmark line{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.chart .gistmark line.rand{stroke:var(--bg);stroke-width:5.5}
+.chart .gistmark circle{fill:var(--ink);stroke:var(--bg);stroke-width:1.5}
