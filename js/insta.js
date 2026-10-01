@@ -364,27 +364,54 @@ function igEffectHTML(eff){
 }
 
 /* ---------- tekenen ---------- */
-function igKolommen(el,data,aria,onder){   // gestapelde kolommen: data=[{d,parts:[{v,c}],o}]; onder={naam,c} = strook eronder met één getal per dag (bijv. nieuwe volgers)
+// rechthoek met ronde hoeken onderaan (staaf die vanaf de lijn omlaag hangt; tegenhangâh van roundTop)
+function roundBottom(x,yTop,w,h,r){r=Math.min(r,h,w/2);const yb=yTop+h;
+  return `M${x},${yTop}V${yb-r}Q${x},${yb} ${x+r},${yb}H${x+w-r}Q${x+w},${yb} ${x+w},${yb-r}V${yTop}Z`}
+// gestapelde kolommen: data=[{d,parts:[{v,c}],m,o,w,ot,od,lopend,tip}]
+//   d.m = streepje (bijv. gistâh om dit tijdstip)
+//   onder={naam,c} = strook eronder met één getal per dag (d.o, bijv. nieuwe volgâhs)
+//   onder.weg={c,naam} = tweede strook, gespiegeld: staafjes hangen omlaag onder dezelfde lijn (d.w, bijv. unfollows).
+//     d.w: getal = gemeten, null = Meta gaf niks ("nie gemeten": grijs streepje, NIET als 0), undefined = geen dag-cijfâhs.
+//     Nieuw en weg hebben dezelfde schaal (1 volgâh is even hoog), anders lijkt weinig weg al snel veel.
+//   d.ot/d.od = tekst/datum als je de strook aanwijst of aantikt (eigen aanwijs-vlak, los van de staaf erboven)
+//   d.lopend = dag loopt nog (Meta-dag tot 09:00) → staafjes in de strook half gevuld met stippelrand
+function igKolommen(el,data,aria,onder){
   const W=Math.max(300,Math.round(el.clientWidth||1000)),ml=40,mr=6,mt=10,mb=26,iw=W-ml-mr,ih=(W<600?180:220)-mt-mb;
-  const og=onder?24:0,oh=onder?(W<600?40:52):0,H=mt+ih+og+oh+mb;   // og = ruimte voor het kopje van de strook, oh = hoogte strook
-  const sch=schaal(Math.max(...data.map(d=>Math.max(d.parts.reduce((a,p)=>a+p.v,0),d.m||0))),3),top=sch.top,bw=iw/data.length;   // d.m = streepje (bijv. gistâh om dit tijdstip)
+  const weg=onder&&onder.weg,bw=iw/data.length,met=bw>=20;   // met = ruimte voor getallen bij de staafjes
+  const og=onder?24:0,oh=onder?(W<600?40:52):0;   // og = ruimte voor het kopje van de strook, oh = hoogte strook
+  const oTop=onder?Math.max(1,...data.map(d=>d.o||0),...(weg?data.map(d=>d.w||0):[])):1,oa=oh-(met?13:0);   // oa = hoogte hoogste staaf
+  const wMax=weg?Math.max(0,...data.map(d=>d.w||0)):0,wa=wMax/oTop*oa;
+  const wh=weg?Math.max(14,Math.ceil(wa)+(met&&wMax?13:0)+3):0;   // rode strook: zo hoog als nodig (minstens ruimte voor het grijze streepje)
+  const ob=mt+ih+og+oh,H=ob+wh+mb;   // ob = lijn tussen nieuw (erboven) en weg (eronder)
+  const sch=schaal(Math.max(...data.map(d=>Math.max(d.parts.reduce((a,p)=>a+p.v,0),d.m||0))),3),top=sch.top;
   const y=v=>mt+ih-v/top*ih;
-  const oTop=onder?Math.max(1,...data.map(d=>d.o||0)):1,ob=mt+ih+og+oh,met=bw>=20,oa=oh-(met?13:0);   // ob = onderkant strook, oa = hoogte hoogste staaf (met = ruimte voor getallen)
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">`;
   sch.lijnen.forEach(t=>{s+=`<line class="${t?"grid":"base"}" x1="${ml}" x2="${W-mr}" y1="${y(t)}" y2="${y(t)}"/><text x="${ml-6}" y="${y(t)+4}" text-anchor="end">${nf0.format(t)}</text>`});
-  if(onder)s+=`<text x="${ml}" y="${mt+ih+og-6}" text-anchor="start" class="strook">${onder.naam}</text><line class="base" x1="${ml}" x2="${W-mr}" y1="${ob}" y2="${ob}"/>${met?"":`<text x="${ml-6}" y="${ob-oa+4}" text-anchor="end">${nf0.format(oTop)}</text>`}`;
-  data.forEach((d,i)=>{let acc=0;const x=ml+i*bw+bw*.15;
+  if(onder){
+    const ng=weg&&data.some(d=>d.w===null);   // legenda "nie gemeten" alleen als het er staat
+    const leg=(c,t,teken)=>`<tspan dx="10" fill="var(--${c})">${teken||"■"}</tspan><tspan dx="4">${t}</tspan>`;   // dx = ruimte (spaties tellen in SVG nie dubbel)
+    const kop=weg?(W<600?onder.kort||onder.naam:onder.naam)+leg(onder.c,onder.nieuw||"nieuw")+leg(weg.c,weg.naam||"weg")+(ng?leg("muted","nie gemeten","▬"):""):onder.naam;
+    s+=`<text x="${ml}" y="${mt+ih+og-6}" text-anchor="start" class="strook">${kop}</text><line class="base" x1="${ml}" x2="${W-mr}" y1="${ob}" y2="${ob}"/>`;
+    if(!met){s+=`<text x="${ml-6}" y="${ob-oa+4}" text-anchor="end">${nf0.format(oTop)}</text>`;
+      if(weg&&wMax&&wa>=12)s+=`<text x="${ml-6}" y="${ob+wa+4}" text-anchor="end">${nf0.format(wMax)}</text>`}}
+  data.forEach((d,i)=>{let acc=0;const x=ml+i*bw+bw*.15,xm=ml+i*bw+bw/2,lp=c=>d.lopend?` class="lopend" stroke="var(--${c})"`:"";   // lopende dag: stippelrand
     const vis=d.parts.filter(p=>p.v>0);
     vis.forEach((p,j)=>{const h=p.v/top*ih;const yt=y(acc+p.v);
       s+=j===vis.length-1?`<path d="${roundTop(x,yt,bw*.7,h,3)}" fill="var(--${p.c})"/>`:`<rect x="${x}" y="${yt}" width="${bw*.7}" height="${h}" fill="var(--${p.c})"/>`;acc+=p.v});
     if(d.m!=null){const ym=y(d.m).toFixed(1),x1=(ml+i*bw+bw*.04).toFixed(1),x2=(ml+i*bw+bw*.96).toFixed(1);   // streepje met stip, iets breder dan de staaf
       s+=`<g class="gistmark" pointer-events="none"><line class="rand" x1="${x1}" x2="${x2}" y1="${ym}" y2="${ym}"/><line x1="${x1}" x2="${x2}" y1="${ym}" y2="${ym}"/><circle cx="${((+x1+ +x2)/2).toFixed(1)}" cy="${ym}" r="3.2"/></g>`}
-    let getal=nf0.format(acc);
-    if(onder&&d.o!=null){getal+=` · +${nf0.format(d.o)}`;
-      if(d.o>0){const h=d.o/oTop*oa;s+=`<path d="${roundTop(x,ob-h,bw*.7,h,2)}" fill="var(--${onder.c})"/>`;
-        if(met)s+=`<text x="${ml+i*bw+bw/2}" y="${ob-h-3}" text-anchor="middle" class="strookgetal">${nf0.format(d.o)}</text>`}}
-    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ob-mt}"${staafGetal(ml+i*bw+bw/2,y(acc),getal,dKort(d.d))}><title>${d.tip}</title></rect>`;
-    if((data.length-1-i)%7===0){const xm=ml+i*bw+bw/2,rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen (zoals in igPostGrafiek)
+    let getal=nf0.format(acc),oy=ob;
+    if(onder&&d.o!=null){if(d.ot==null)getal+=` · +${nf0.format(d.o)}`;   // zonder eigen strook-tekst: zoals vroeger achter het getal
+      if(d.o>0){const h=d.o/oTop*oa;oy=ob-h;s+=`<path${lp(onder.c)} d="${roundTop(x,ob-h,bw*.7,h,2)}" fill="var(--${onder.c})"/>`;
+        if(met){s+=`<text x="${xm}" y="${ob-h-3}" text-anchor="middle" class="strookgetal">${nf0.format(d.o)}</text>`;oy-=13}}}
+    if(weg){
+      if(d.w>0){const h=d.w/oTop*oa;s+=`<path${lp(weg.c)} d="${roundBottom(x,ob,bw*.7,h,2)}" fill="var(--${weg.c})"/>`;
+        if(met)s+=`<text x="${xm}" y="${ob+h+11}" text-anchor="middle" class="strookgetal">${nf0.format(d.w)}</text>`}
+      else if(d.w===null)s+=`<line class="nietgemeten" x1="${x.toFixed(1)}" x2="${(x+bw*.7).toFixed(1)}" y1="${ob+5}" y2="${ob+5}"><title>nie gemeten</title></line>`}
+    const hb=onder&&d.ot!=null?mt+ih+4:ob;   // staaf erboven en strook elk een eigen aanwijs-vlak
+    s+=`<rect class="hit" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${hb-mt}"${staafGetal(xm,y(acc),getal,dKort(d.d))}><title>${d.tip}</title></rect>`;
+    if(onder&&d.ot!=null)s+=`<rect class="hit" x="${ml+i*bw}" y="${hb}" width="${bw}" height="${ob+wh-hb}"${staafGetal(xm,oy,d.ot,d.od||dKort(d.d))}><title>${d.tip}</title></rect>`;
+    if((data.length-1-i)%7===0){const rand=xm>W-mr-24;   // laatste datum nie over de rand laten lopen (zoals in igPostGrafiek)
       s+=`<text x="${rand?W-mr:xm}" y="${H-8}" text-anchor="${rand?"end":"middle"}">${dLabel(d.d)}</text>`}});
   el.innerHTML=s+"</svg>";
 }
@@ -435,6 +462,19 @@ function igWd(d){return IG_WD[new Date(d+"T12:00:00Z").getUTCDay()]}
 function igPijl(a,b){if(a==null||!b)return "";const d=a/b-1;   // alleen het pijltje (vanaf 5% verschil), zoals in igVs
   return d>0.05?' <span class="up">↑ '+pct(d)+"</span>":d<-0.05?' <span class="down">↓ '+pct(-d)+"</span>":""}
 
+// volgâhs van één Meta-dag voor de strook onder Bereik per dag: {o: nieuw, w: weg, ot: tekst bij aanwijzen/tikken}
+// w = null als Meta (nog) geen unfollows gaf → "nie gemeten", NIET als 0 tonen (anders lijkt het alsof niemand wegging).
+// Geen dag-cijfâhs (x = null) → niks tekenen en geen tekst. Lopende dag → "loopt nog" (staat al bij de datum).
+function igVolgDag(x){
+  if(!x)return {o:null,w:undefined,ot:null};
+  const o=x.follows!=null?+x.follows:null,w=x.unfollows!=null?+x.unfollows:null;
+  let ot;
+  if(o!=null&&w!=null)ot=`+${nf0.format(o)} · −${nf0.format(w)} · netto ${o-w?plus(o-w):"0"}`;
+  else if(o!=null)ot=`+${nf0.format(o)} · weg nie gemeten`;
+  else if(w!=null)ot=`nieuw nie gemeten · −${nf0.format(w)}`;
+  else ot="nie gemeten";
+  return {o,w,ot};
+}
 function renderInsta(){
   if(!$("igStats"))return;
   $("igAlarm").innerHTML=igAlarmHTML();igBadge();   // waarschuwing als de koppeling met Meta stuk is
@@ -463,8 +503,11 @@ function renderInsta(){
   igKolommen($("igChart"),dagen.map(d=>{const x=per.get(d)||{};const split=x.reach_nieuw!=null;
     const parts=split?[{v:x.reach_volgers||0,c:"groen"},{v:x.reach_nieuw||0,c:"hy"}]:[{v:x.reach||0,c:"muted"}];
     if(!split&&x.reach)grijs=true;
-    const m=d===c.vandaag&&vg?vg.g:null;
-    return {d,parts,m,o:x.follows!=null?x.follows:null,tip:`${dLabel(d,1)}${d===c.vandaag?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(m!=null?` · gistâh om ${vg.tijdG}: ${nf0.format(m)}`:"")+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(x.follows!=null?` · +${x.follows} / −${x.unfollows||0} volgâhs`+(x.reach?` (${igNf1.format(x.follows*1000/x.reach)} per 1.000 bereik)`:""):"")}}),"Bereik per dag",{naam:"Nieuwe volgâhs per dag",c:"good"});
+    const m=d===c.vandaag&&vg?vg.g:null,lopend=d===c.vandaag;
+    const vs=igVolgDag(per.has(d)?x:null);   // strook onderin: nieuw (groen, omhoog) en weg (rood, omlaag)
+    return {d,parts,m,o:vs.o,w:vs.w,ot:vs.ot,od:vs.ot!=null?dKort(d)+(lopend?" (loopt nog)":""):null,lopend,
+      tip:`${dLabel(d,1)}${lopend?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(m!=null?` · gistâh om ${vg.tijdG}: ${nf0.format(m)}`:"")+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(vs.ot!=null?` · volgâhs ${vs.ot}`+(x.follows!=null&&x.reach?` (${igNf1.format(x.follows*1000/x.reach)} nieuw per 1.000 bereik)`:""):"")}}),
+    "Bereik per dag",{naam:"Volgâhs per dag",kort:"Volgâhs",c:"good",weg:{c:"weg"}});
   if($("igLegGist"))$("igLegGist").hidden=!vg;     // legenda: alleen tonen wat er in de grafiek staat (telefoon: nie meer regels dan eerst)
   if($("igLegGrijs"))$("igLegGrijs").hidden=!grijs;
 

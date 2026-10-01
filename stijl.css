@@ -13,7 +13,7 @@ html{color-scheme:dark;font-synthesis:none}body{margin:0}img{max-width:100%}
   --sc:#f07a3f; --lb:#4a95ec; --yt:#ef5046; --sp:#1ed760;
   --sc-soft:color-mix(in srgb,var(--sc) 24%,var(--surface)); --lb-soft:color-mix(in srgb,var(--lb) 24%,var(--surface));
   --yt-soft:color-mix(in srgb,var(--yt) 24%,var(--surface)); --sp-soft:color-mix(in srgb,var(--sp) 20%,var(--surface));
-  --good:#5cc98c; --good-soft:color-mix(in srgb,var(--good) 18%,var(--surface)); --warn:#f5c518; --warn-soft:color-mix(in srgb,var(--hy) 16%,var(--surface));
+  --weg:#d9432f; --good:#5cc98c; --good-soft:color-mix(in srgb,var(--good) 18%,var(--surface)); --warn:#f5c518; --warn-soft:color-mix(in srgb,var(--hy) 16%,var(--surface));
   --display:"Titan One","Arial Black",system-ui,sans-serif;
   --body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"Nunito",system-ui,sans-serif; /* Nunito-cijfers zijn al even breed, dus kolommen blijven netjes */
@@ -417,3 +417,6 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 .chart .gistmark line{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
 .chart .gistmark line.rand{stroke:var(--bg);stroke-width:5.5}
 .chart .gistmark circle{fill:var(--ink);stroke:var(--bg);stroke-width:1.5}
+/* strook volgâhs onder Bereik per dag: nieuw (groen) omhoog, weg (rood #d9432f) omlaag; lopende Meta-dag half gevuld met stippelrand, nie gemeten = grijs streepje */
+.chart .lopend{fill-opacity:.35;stroke-width:1.2;stroke-dasharray:3 2}
+.chart .nietgemeten{stroke:var(--muted);stroke-width:2.5;stroke-linecap:round}
