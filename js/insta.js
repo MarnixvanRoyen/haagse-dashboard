@@ -9,7 +9,7 @@ let igSorteer="nieuw";         // muziek-lijst: "nieuw" of "bereik"
 let igTopPeriode="90";         // toppâhs: "90" (laatste 90 dagen) of "alles" (allâh tijde)
 let igTopOp="bereik";          // toppâhs: sorteren op bereik, kwaliteit, volgers, profiel, likes of weergaven (zie IG_TOP_OP)
 let igStoryPeriode="7";        // stories: "7", "30" of "alles"
-let igStoryWie="eigen";        // stories: "eigen" (zelf gemaakt, + oude die we nie kennen) of "alles" (ook gedeelde posts)
+let igStoryWie="alles";        // stories: "alles", "eigen" (zelf gemaakt) of "gedeeld" (gedeelde post, bijv. een feature van je foto)
 
 async function igAlles(maak){   // haalt alles op, 1000 per keer (Supabase geeft max 1000 regels per vraag)
   let out=[],from=0;
@@ -30,16 +30,25 @@ async function loadIG(){
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
   IG.status=await igStatusLaden();
   await igStoryLabels();
+  await igStoryMinis();
   if(typeof igSamenLaden==="function")await igSamenLaden();   // samenwerkingen + Facebook-sleutel (samenwerking.js)
   igBadge();
 }
 // stories mét bijschrift (14_story_bijschrift.sql). Is die kolom er nog nie, dan zonder (dan is alles "onbekend").
 async function igStoriesLaden(){
   const q=k=>sb.from("ig_story").select(k).order("gepost_om",{ascending:false}).range(0,1999);
-  let r=await q("media_id,soort,gepost_om,permalink,cijfers,fout,bijschrift");
-  if(r.error&&/bijschrift/i.test(r.error.message||""))r=await q("media_id,soort,gepost_om,permalink,cijfers,fout");
+  let r=await q("media_id,soort,gepost_om,permalink,plaatje,cijfers,fout,bijschrift");
+  if(r.error&&/bijschrift/i.test(r.error.message||""))r=await q("media_id,soort,gepost_om,permalink,plaatje,cijfers,fout");
   return r;
 }
+// kleine plaatjes van stories (16_story_mini.sql + Edge Function story-mini). Tabel er nog nie → gewoon zonder.
+async function igStoryMinis(){
+  if(!IG.stories.length)return;
+  let rijen=[];try{rijen=await igAlles(()=>sb.from("ig_story_mini").select("media_id,mini").not("mini","is",null))}catch(e){return}
+  const m=new Map(rijen.map(r=>[r.media_id,r.mini]));IG.stories.forEach(s=>s.mini=m.get(s.media_id)||null);
+}
+// plaatje van een story: eigen kleine kopie, anders de link van Meta zolang die nog werkt (± 5 dagen)
+function igStoryBeeld(s){return s.mini||(s.plaatje&&Date.parse(s.gepost_om)>Date.now()-5*864e5?s.plaatje:"")}
 // muziek-keuzes van stories (posts krijgen hun labels al mee via ig_post_stats)
 async function igStoryLabels(){
   if(!IG.stories.length)return;
@@ -535,54 +544,50 @@ function renderIgStories(){
   document.querySelectorAll("#igStoryWie button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igStoryWie));
   const dagen=igStoryPeriode==="alles"?null:+igStoryPeriode;
   const inPeriode=IG.stories.filter(s=>!dagen||Date.parse(s.gepost_om)>Date.now()-dagen*864e5);
-  const st=igStoryWie==="alles"?inPeriode:inPeriode.filter(s=>igStoryHerkomst(s)!=="ander");   // eigen = zelf gemaakt, eigen post gedeeld of onbekend (van vóór 1 okt)
-  const gedeeld=inPeriode.length-st.length;
+  const st=igStoryWie==="alles"?inPeriode:inPeriode.filter(s=>igStoryHerkomst(s)===igStoryWie);   // zelf gemaakt of gedeelde post (oude "onbekend" alleen bij Alles)
   const eerste=IG.stories.reduce((m,s)=>!m||s.gepost_om<m?s.gepost_om:m,null);
   if($("igStorySub"))$("igStorySub").innerHTML=`${dagen?`Laatste ${dagen} dagen`:"Allâh stories"}, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken. `
-    +(igStoryWie==="eigen"?`Alleen je eigen stories: zelf gemaakt of je eigen post gedeeld${gedeeld?` (${nf0.format(gedeeld)} gedeelde post${gedeeld===1?"":"s"} van anderen verborgen)`:""}. `:"Ook gedeelde posts van anderen. ")
-    +`Stories blijven hier bewaard, ook als ze na 24 uur van Insta verdwijnen (cijfers = laatste meting, hooguit een uur voor het einde)${eerste?`; de eerste is van ${dLabel(dagNL(eerste),1)}`:""}.`;
-  if(!st.length){$("igStories").innerHTML=`<p class="sub">Nog geen stories gemeten${dagen?` in de laatste ${dagen} dagen`:""}${gedeeld?" (wel gedeelde posts van anderen: kies \"Alles\")":""}. Stories worden elk uur opgehaald zolang ze online staan (24 uur).</p>`;return}
+    +(igStoryWie==="eigen"?"Alleen stories zonder tekst. ":igStoryWie==="gedeeld"?"Alleen stories met tekst (bijschrift). ":"")
+    +`Stories blijven hier bewaard, ook als ze na 24 uur van Insta verdwijnen (cijfers = laatste meting, vanaf 1 okt ± 10 minuten voor het einde; klein plaatje bewaard vanaf eind sep)${eerste?`; de eerste is van ${dLabel(dagNL(eerste),1)}`:""}.`;
+  if(!st.length){$("igStories").innerHTML=`<p class="sub">Nog geen stories gemeten${dagen?` in de laatste ${dagen} dagen`:""}${igStoryWie!=="alles"&&inPeriode.length?" van deze soort (kies \"Alles\")":""}. Stories worden elk uur opgehaald zolang ze online staan (24 uur).</p>`;return}
   const titels=igTrackTitels(),opties=igMuziekOpties(titels);
   // samenvatting: de middelste story (één uitschietâh telt nie te zwaar)
   const mc=st.filter(s=>s.cijfers&&s.cijfers.reach>0);
   const mLikes=med(mc.map(igStoryLikes).filter(v=>v!=null)),mLpk=med(mc.filter(s=>igStoryLikes(s)!=null).map(s=>igStoryLikes(s)/s.cijfers.reach)),mKw=med(mc.map(igStoryKwal).filter(v=>v!=null));
   const samen=mc.length?`<div class="ytstats igstorysamen">
-      ${igStat("Stories",nf0.format(st.length),igStoryWie==="eigen"?"eigen stories, in deze periode":"in deze periode")}
+      ${igStat("Stories",nf0.format(st.length),igStoryWie==="alles"?"in deze periode":IG_HERKOMST[igStoryWie]+", in deze periode")}
       ${igStat("Bereik",nf0.format(med(mc.map(s=>s.cijfers.reach))),"middelste story")}
-      ${igStat("Likes ≈",mLikes==null?"—":nf0.format(mLikes),mLpk==null?"middelste story":`middelste story · ${igPct1(mLpk)} van de kijkâhs`)}
+      ${igStat("Likes",mLikes==null?"—":nf0.format(mLikes),mLpk==null?"middelste story":`middelste story · ${igPct1(mLpk)} van de kijkâhs`)}
       ${igStat("Kwaliteit",mKw==null?"—":igKwalF(mKw),"gedeeld per 1.000 bereik, middelste story")}</div>`:"";
   // per dag in volgorde van posten: zo zie je waar mensen afhaken
   const perDag=new Map();[...st].reverse().forEach(s=>{const d=dagNL(s.gepost_om);if(!perDag.has(d))perDag.set(d,[]);perDag.get(d).push(s)});
-  let h=samen+`<div class="tablewrap"><table class="igstorytab"><thead><tr><th>Story</th><th class="n">Bereik</th><th class="n">Weergaven</th><th class="n" title="Schatting: interacties − gedeeld − reacties (Meta geeft geen likes voor stories)">Likes ≈</th><th class="n" title="Gedeeld per 1.000 bereik">Kwaliteit</th><th class="n">Tikte weg</th><th class="n">Reacties</th><th>Muziek</th></tr></thead><tbody>`;
+  let h=samen+`<div class="tablewrap"><table class="igstorytab"><thead><tr><th>Story</th><th class="n">Bereik</th><th class="n">Weergaven</th><th class="n" title="Echte likes (export Meta Business Suite) of berekend: interacties − gedeeld − reacties (gecontroleerd: klopt)">Likes</th><th class="n" title="Gedeeld per 1.000 bereik">Kwaliteit</th><th class="n">Tikte weg</th><th class="n">Reacties</th><th>Muziek</th></tr></thead><tbody>`;
   [...perDag].reverse().forEach(([d,rij])=>{
     const eersteBereik=rij[0].cijfers&&rij[0].cijfers.reach;
     rij.forEach((s,i)=>{const x=s.cijfers||{};const weg=igStoryWeg(s),lk=igStoryLikes(s),kw=igStoryKwal(s),her=igStoryHerkomst(s);
       const vast=eersteBereik&&x.reach!=null&&i?` <span class="sub">(${pct(x.reach/eersteBereik)} van de 1e)</span>`:"";
       const verlopen=Date.parse(s.gepost_om)<Date.now()-864e5;
-      const wie=her==="eigen_post"||her==="ander"?` <span class="chip mute" title="${esc(s.bijschrift||"")}">${IG_HERKOMST[her]}</span>`:"";
-      h+=`<tr data-id="${esc(s.media_id)}"><td>${verlopen?`${dLabel(d)} ${tijdAms(s.gepost_om)}`:`<a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a>`} · ${i+1}/${rij.length}${wie}</td>
+      const wie=her==="gedeeld"?` <span class="chip mute" title="${esc(s.bijschrift||"")}">met tekst</span>`:"";
+      const bl=igStoryBeeld(s);
+      h+=`<tr data-id="${esc(s.media_id)}"><td><div class="igtoprij"><span class="igthumb story" aria-hidden="true">${bl?`<img src="${esc(bl)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><div>${verlopen?`${dLabel(d)} ${tijdAms(s.gepost_om)}`:`<a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a>`} · ${i+1}/${rij.length}${wie}</div></div></td>
       <td class="n">${x.reach==null?(s.fout?'<span class="sub" title="'+esc(s.fout)+'">nog geen</span>':"—"):nf0.format(x.reach)+vast}</td><td class="n">${x.views==null?"—":nf0.format(x.views)}</td>
       <td class="n">${lk==null?"—":nf0.format(lk)}</td><td class="n">${kw==null?"—":igKwalF(kw)}</td>
       <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td>
       <td>${igMuziekSelect(labelsVan(s,"muziek")[0]||"",opties,titels,"Muziek onder deze story")}</td></tr>`})});
   const leeg=st.filter(s=>!labelsVan(s,"muziek").length).length;
-  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes ≈</b> = schatting: Meta geeft voor stories geen likes, wel "interacties"; daar gaan gedeeld en reacties af (nog te checken met de Insta-app). <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Eigen of van een ander</b> herkennen we pas vanaf 1 okt (aan het bijschrift: geen tekst = zelf gemaakt, tekst van een van je posts = eigen post gedeeld); oudere stories tellen als eigen. <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" telt ook mee.</p>`+igStoryMuziekHTML();
+  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes</b>: de koppeling geeft voor stories geen likes, dus rekenen we ze uit: interacties − gedeeld − reacties (gecontroleerd met Meta Business Suite op 1 okt: klopt precies). Bij stories uit de export (juli t/m 30 sep) staan de echte likes. <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Met of zonder tekst</b>: tot en met 30 sep uit de export, daarna via de koppeling. Stories uit de export hebben geen <b>Tikte weg</b> (staat nie in de export). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" telt ook mee.</p>`+igStoryMuziekHTML();
 }
-/* ---------- stories: van wie, likes en kwaliteit ----------
-   VOORLOPIG, nog valideren met de Insta-app (afspraak 30-09):
-   - Van wie: Meta zegt het nie. Een zelf gemaakte story heeft geen bijschrift; een gedeelde post neemt het bijschrift van die post mee.
-     bijschrift null = nie gemeten (story van vóór 1 okt), '' = geen tekst → zelf gemaakt, tekst gelijk aan een eigen post → eigen post gedeeld, anders → post van een ander.
-   - Likes: Meta geeft geen likes voor stories. Wel total_interactions; aanname: = likes + gedeeld + reacties → likes ≈ interacties − gedeeld − reacties.
+/* ---------- stories: soort, likes en kwaliteit ----------
+   Likes gevalideerd 01-10 (Meta Business Suite); herkomst = alleen tekst ja/nee:
+   - Alle stories zijn van Marnix (bevestigd 30-09). We splitsen alleen op het bijschrift dat Meta meegeeft:
+     null = nie gemeten (story van vóór 1 okt) → onbekend, '' → "zonder tekst", tekst → "met tekst".
+     (Eerst dachten we: tekst = gedeelde post van een ander; klopte nie. De tekst lijkt op de bijschriften van stories, nie van posts.)
+   - Likes: de API geeft geen likes voor stories. Wel total_interactions = likes + gedeeld + reacties (gecontroleerd 01-10 met Meta Business Suite: 4 van 4 precies goed).
+     Stories uit de export (15_story_export.sql, bron 'export'/'api+export') hebben cijfers.likes = echte likes; die gaan voor.
    - Kwaliteit story = gedeeld per 1.000 bereik (stories kun je nie bewaren). */
-const igCapNorm=t=>String(t||"").toLowerCase().replace(/\s+/g," ").trim().slice(0,50);
-function igStoryHerkomst(s){
-  if(s.bijschrift==null)return "onbekend";
-  const c=igCapNorm(s.bijschrift);if(!c)return "eigen";
-  return IG.posts.some(p=>p.bijschrift&&igCapNorm(p.bijschrift)===c)?"eigen_post":"ander";
-}
-const IG_HERKOMST={eigen:"zelf gemaakt",eigen_post:"eigen post gedeeld",ander:"post van een ander",onbekend:"van vóór 1 okt"};
-// "Alleen eigen" = alles behalve "post van een ander" (Marnix 30-09: een gedeelde eigen post is ook van hem)
-function igStoryLikes(s){const x=s.cijfers||{};return x.total_interactions==null?null:Math.max(0,x.total_interactions-(x.shares||0)-(x.replies||0))}
+function igStoryHerkomst(s){return s.bijschrift==null?"onbekend":String(s.bijschrift).trim()?"gedeeld":"eigen"}
+const IG_HERKOMST={eigen:"zonder tekst",gedeeld:"met tekst",onbekend:"van vóór 1 okt"};
+function igStoryLikes(s){const x=s.cijfers||{};if(x.likes!=null)return x.likes;return x.total_interactions==null?null:Math.max(0,x.total_interactions-(x.shares||0)-(x.replies||0))}
 function igStoryKwal(s){const x=s.cijfers||{};return x.reach>0&&x.shares!=null?x.shares*1000/x.reach:null}
 function igStoryWeg(s){const x=s.cijfers||{};return x.nav_weg!=null&&(x.views||x.reach)?x.nav_weg/(x.views||x.reach):null}
 // eigen muziek onder stories: houdt het mensen vast? (alle bewaarde stories met cijfers en een keuze)
@@ -601,11 +606,11 @@ function igStoryMuziekHTML(){
 // Wachtkamâh: nieuwe posts (vanaf IG_WACHT_VANAF) zonder muziek-keuze. Ze gaan eruit zodra je iets kiest (ook "Geen eigen muziek").
 const IG_WACHT_VANAF="2026-09-22";
 function igWachtend(){return IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=IG_WACHT_VANAF&&!labelsVan(p,"muziek").length)}
-// eigen stories (nie "post van een ander") van de laatste 2 dagen zonder muziek-keuze: zo kun je ook op de telefoon kiezen
+// stories van de laatste 2 dagen zonder muziek-keuze: zo kun je ook op de telefoon kiezen
 // (de Stories-kaart zelf staat nie op de telefoon). Ouder dan 2 dagen: alleen nog via de Stories-kaart op de Mac.
 const IG_WACHT_STORY_DAGEN=2;
 function igWachtStories(){return (IG.stories||[]).filter(s=>s.gepost_om&&Date.parse(s.gepost_om)>Date.now()-IG_WACHT_STORY_DAGEN*864e5
-  &&igStoryHerkomst(s)!=="ander"&&!labelsVan(s,"muziek").length)}
+  &&!labelsVan(s,"muziek").length)}
 function igWachtTekst(np,ns){const d=[];if(np)d.push(`${np} post${np>1?"s":""}`);if(ns)d.push(`${ns} ${ns>1?"stories":"story"}`);return d.join(" en ")}
 function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="insta"]');if(!b)return;
   const k=igKoppeling(),n=igWachtend().length+igWachtStories().length;let s=b.querySelector(".badge");
@@ -636,7 +641,7 @@ function igPostRij(p,opties,titels){
 function igStoryWachtRij(x,opties,titels){   // zelfde opmaak als een post in de wachtkamâh
   const c=x.cijfers||{},lk=igStoryLikes(x);
   return `<div class="igpost" data-id="${esc(x.media_id)}">
-      <a class="igthumb" href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${x.plaatje?`<img src="${esc(x.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>Story</span></a>
+      <a class="igthumb" href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${igStoryBeeld(x)?`<img src="${esc(igStoryBeeld(x))}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>Story</span></a>
       <div class="iginfo"><span><b>${dLabel(dagNL(x.gepost_om),1)} ${tijdAms(x.gepost_om)}</b> · story${c.reach==null?" · nog geen cijfâhs":" · bereik "+nf0.format(c.reach)+(lk!=null?" · ≈ "+nf0.format(lk)+" likes":"")}</span>
         ${x.bijschrift?`<span class="igcap">${esc(x.bijschrift.slice(0,90))}</span>`:""}</div>
       ${igMuziekSelect("",opties,titels,"Muziek onder deze story")}

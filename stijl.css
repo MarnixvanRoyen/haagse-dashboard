@@ -310,6 +310,7 @@ nav.hoofdmenu .badge{display:inline-block;min-width:20px;margin-left:6px;padding
 .igeff .ignorm{font-weight:600;color:var(--muted)}
 .igtoprij{display:flex;gap:10px;align-items:center}
 .igthumb.klein{width:48px;height:48px;flex:none}
+.igthumb.story{width:27px;height:48px;border-radius:5px;flex:none}
 
 #igStories td:first-child,#igSnLinks td:first-child{white-space:nowrap}
 
