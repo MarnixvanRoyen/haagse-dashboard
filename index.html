@@ -422,6 +422,15 @@
 </div>
 <div id="tip" hidden></div>
 
+<!-- pop-up "Wat draaide d'r vandaag?" vanaf de Ovâhzicht-tegel Muziek (live.js, vnPopOpen) -->
+<div class="vnpop" id="vnPop" hidden>
+  <div class="vnpopkaart card" role="dialog" aria-modal="true" aria-labelledby="vnPopTitel">
+    <div class="cardhead"><div><h2 id="vnPopTitel">Wat draaide d'r vandaag?</h2><p class="sub" id="vnPopSub"></p></div>
+      <button class="btn" type="button" id="vnPopDicht" aria-label="Sluite">✕</button></div>
+    <div id="vnPopInhoud"></div>
+    <button class="btn yellow vnpopnaar" type="button" id="vnPopNaar">Kèk bè SoundCloud live</button>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="js/basis.js"></script>

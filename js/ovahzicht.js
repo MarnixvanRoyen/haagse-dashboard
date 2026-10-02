@@ -1,8 +1,10 @@
 // ovahzicht.js — de tegels op de startpagina, één per onderdeel
 
+// SoundCloud/YouTube-regel: tikken opent de pop-up "Wat draaide d'r vandaag?" (live.js, vnPopOpen)
 function liveRij(label,bron,g){
   const i=liveInfo(bron,g);
-  return i.leeg?tegelRij(label,i.v,i.s):streamRij(label,i.v,g.tot,i.s);
+  const pop=` data-vnpop="${bron}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${bron==="yt"?"YouTube":"SoundCloud"}: per nummâh wat er vandaag bij kwam"`;
+  return i.leeg?tegelRij(label,i.v,i.s,pop):streamRij(label,i.v,g.tot,i.s,pop);
 }
 function spotifyRij(label){
   const snaps=SP.snaps||[];
@@ -22,8 +24,8 @@ function bezoekRij(v){
   return `<div class="trij"><span class="k">Bezoekâhs vandaag</span><span class="v">${nf0.format(v.bezoek)}</span><span class="tot">${nf0.format(v.speelden)} speelden${pctS}</span><span class="s">${v.exact?"sinds 00:00":"sinds "+tijdAms(dagUTC(Date.now())+"T00:00:00Z")}${v.gedeeld?" · "+nf0.format(v.gedeeld)+" scoâhs gedeeld":""}${liveStatus("gc","08_goatcounter_live.sql")}</span></div>`;
 }
 // rij met groot getal (erbè) en het totaal eronder
-function streamRij(k,v,tot,s){return `<div class="trij"><span class="k">${k}</span><span class="v">${v}</span><span class="tot">totaal ${nf0.format(tot)}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
-function tegelRij(k,v,s){return `<div class="trij"><span class="k">${k}</span><span class="v">${v}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
+function streamRij(k,v,tot,s,attr=""){return `<div class="trij${attr?" klik":""}"${attr}><span class="k">${k}${attr?'<span class="trijpijl" aria-hidden="true">›</span>':""}</span><span class="v">${v}</span><span class="tot">totaal ${nf0.format(tot)}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
+function tegelRij(k,v,s,attr=""){return `<div class="trij${attr?" klik":""}"${attr}><span class="k">${k}${attr?'<span class="trijpijl" aria-hidden="true">›</span>':""}</span><span class="v">${v}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
 
 function renderOvahzicht(){
   if($("ovAlarm")){$("ovAlarm").innerHTML=igAlarmHTML();igBadge()}   // Insta-koppeling stuk? meteen zichtbaar

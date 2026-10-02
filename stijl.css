@@ -435,3 +435,22 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 .btn.vnmeer{margin-top:10px}
 /* vegen over een grafiek (basis.js): zijwaarts = getal volgt je vinger, nie de browser laten scrollen of "terug" laten gaan; omhoog/omlaag scrollt gewoon */
 .chart svg{touch-action:pan-y}
+
+/* Ovâhzicht-tegel Muziek: SoundCloud/YouTube-regel is aan te tikken → pop-up "Wat draaide d'r vandaag?" (02-10) */
+.trij.klik{cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent}
+.trij.klik:hover,.trij.klik:active{background:color-mix(in srgb,var(--hy) 8%,transparent)}
+.trij .trijpijl{color:var(--hy);font-weight:800;font-size:17px;line-height:1;margin-left:2px}
+.vnpop{position:fixed;inset:0;z-index:50;background:rgba(5,15,18,.62);display:flex;align-items:center;justify-content:center;padding:16px}
+.vnpopkaart{width:100%;max-width:680px;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.vnpopkaart .cardhead{flex-wrap:nowrap;margin-bottom:10px}   /* ✕ altijd naast de titel */
+.vnpopkaart .cardhead>div:first-child{flex:1 1 auto}
+.vnpopkaart h2{font-size:20px;line-height:1.2}
+.vnpopkaart .cardhead .sub{font-size:12.5px;margin-top:4px}
+#vnPopDicht{min-width:40px;font-size:16px}
+.vnpopnaar{margin-top:14px;width:100%}
+body.popopen{overflow:hidden}
+@media (max-width:700px){
+  .vnpop{align-items:flex-end;padding:0}
+  .vnpopkaart{max-width:none;max-height:85dvh;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+}
+#tip{z-index:60}   /* zweefvak ook boven de pop-up */

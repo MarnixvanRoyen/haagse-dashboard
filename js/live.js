@@ -64,7 +64,7 @@ async function muziekLive(){
   hertekenLive();
 }
 function hertekenLive(){
-  if(sectie==="ovahzicht")renderOvahzicht();
+  if(sectie==="ovahzicht"){renderOvahzicht();vnPopTeken()}
   else if(sectie==="muziek"&&(state.tab==="youtube"||state.tab==="sclive"))render();
   else if(sectie==="apps")renderSneek();
   else if(sectie==="insta")renderInsta();
@@ -99,9 +99,9 @@ function vandaagNummers(bron){
   const rijen=[...per.values()].filter(r=>r.n>=1).sort((a,b)=>b.n-a.n||a.naam.localeCompare(b.naam,"nl"));
   return {g,rijen};
 }
-function renderVandaagNummers(bron){
-  const yt=bron==="yt",el=$(yt?"ytVandaag":"sclVandaag"),sub=$(yt?"ytVandaagSub":"sclVandaagSub");
-  if(!el)return;
+function renderVandaagNummers(bron,el,sub){      // el/sub meegeven = ergens anders tekenen (pop-up op Ovâhzicht)
+  const yt=bron==="yt";el=el||$(yt?"ytVandaag":"sclVandaag");sub=sub||$(yt?"ytVandaagSub":"sclVandaagSub");
+  if(!el||!sub)return;
   const eenheid=yt?"weergaven":"plays",kleur=yt?"yt":"sc",L=LIVE[bron]||{},vandaag=L.vandaag||vandaagAms();
   const leeg=t=>{el.innerHTML=`<p class="sub vnleeg">${t}</p>`};
   if(yt?YT.err:SCL.err){sub.textContent="Per nummâh wat er vandaag bij kwam.";leeg("Geen cijfers: ophalen lukte nie (zie hierboven).");return}
@@ -146,4 +146,36 @@ function vnGrafiek(box,rijen,kleur,eenheid,yt){
     h.addEventListener("mouseleave",hideTip)});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-vnalles]");if(!b)return;
-  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];renderVandaagNummers(bron)});
+  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];renderVandaagNummers(bron);if(VN_POP===bron)vnPopTeken()});
+
+/* ---------- Pop-up op Ovâhzicht (02-10, chat 09) ----------
+   Tegel Muziek: tik op de regel SoundCloud-plays of YouTube-weergaven → dezelfde grafiek "Wat draaide d'r vandaag?"
+   als pop-up (telefoon: van onderen, Mac: in het midden). Sluiten: ✕, naast de pop-up tikken of Esc.
+   Bewust op tikken en nie op "vinger eroverheen": anders springt hij open zodra je langs de tegel scrollt. */
+let VN_POP=null;                         // "sc" / "yt" als de pop-up open is
+function vnPopOpen(bron){
+  VN_POP=bron;$("vnPop").hidden=false;document.body.classList.add("popopen");
+  vnPopTeken();$("vnPopDicht").focus({preventScroll:true});
+}
+function vnPopDicht(){if(!VN_POP)return;const bron=VN_POP;VN_POP=null;$("vnPop").hidden=true;document.body.classList.remove("popopen");hideTip();
+  const r=document.querySelector(`[data-vnpop="${bron}"]`);if(r)r.focus({preventScroll:true})}
+function vnPopTeken(){
+  if(!VN_POP)return;const yt=VN_POP==="yt";
+  $("vnPopTitel").innerHTML=`<i class="dot ${yt?"yt":"sc"}"></i> ${yt?"YouTube":"SoundCloud"} · wat draaide d'r vandaag?`;
+  $("vnPopNaar").textContent=yt?"Kèk bè YouTube":"Kèk bè SoundCloud live";
+  $("vnPopNaar").dataset.vntab=yt?"youtube":"sclive";
+  renderVandaagNummers(VN_POP,$("vnPopInhoud"),$("vnPopSub"));
+}
+document.addEventListener("click",e=>{
+  const rij=e.target.closest&&e.target.closest("[data-vnpop]");
+  if(rij){vnPopOpen(rij.dataset.vnpop);return}
+  if(!VN_POP)return;
+  const naar=e.target.closest("#vnPopNaar");
+  if(naar){const t=naar.dataset.vntab;vnPopDicht();setSectie("muziek");setTab(t);scrollTo(0,0);return}
+  if(e.target.closest("#vnPopDicht")||e.target.id==="vnPop")vnPopDicht();   // ✕ of naast de pop-up (de donkere achtergrond)
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&VN_POP)vnPopDicht();
+  const rij=(e.key==="Enter"||e.key===" ")&&e.target.closest&&e.target.closest("[data-vnpop]");
+  if(rij){e.preventDefault();vnPopOpen(rij.dataset.vnpop)}
+});
