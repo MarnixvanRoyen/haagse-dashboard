@@ -4,7 +4,7 @@ Eén Haags dashboard voor de performance van @the_hague_beachlife: muziek (Marre
 Live: https://marnixvanroyen.github.io/haagse-dashboard/
 
 - **Voorkant** (deze map): een gewone webpagina, gehost op GitHub Pages.
-- **Data**: in Supabase (het project van Sneek). Je moet inloggen om iets te zien.
+- **Data**: in Supabase (project "Haagse Content", gedeeld met Sneek). Je moet inloggen om iets te zien.
 
 ## Wat zit waar
 
