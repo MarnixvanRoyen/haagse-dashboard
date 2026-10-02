@@ -420,3 +420,8 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 /* strook volgâhs onder Bereik per dag: nieuw (groen) omhoog, weg (rood #d9432f) omlaag; lopende Meta-dag half gevuld met stippelrand, nie gemeten = grijs streepje */
 .chart .lopend{fill-opacity:.35;stroke-width:1.2;stroke-dasharray:3 2}
 .chart .nietgemeten{stroke:var(--muted);stroke-width:2.5;stroke-linecap:round}
+
+/* netto-rij onder de strook volgâhs (Mac/iPad) */
+.chart .strookgetal.netto{font-size:11px;font-weight:800}
+.chart .strookgetal.netto.plus{fill:var(--good)}
+.chart .strookgetal.netto.min{fill:var(--weg)}
