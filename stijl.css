@@ -425,3 +425,13 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 .chart .strookgetal.netto{font-size:11px;font-weight:800}
 .chart .strookgetal.netto.plus{fill:var(--good)}
 .chart .strookgetal.netto.min{fill:var(--weg)}
+
+/* Wat draaide d'r vandaag? (YouTube + SoundCloud, 02-10): liggende staaf per nummâh */
+.chart .vnnaam{fill:var(--ink);font-size:12.5px;font-weight:700}
+.chart .vnval{fill:var(--ink-2);font-size:12px;font-weight:800}
+.vnsamen{margin:0 0 6px;font-size:14px;color:var(--ink-2)}
+.vnsamen b{color:var(--ink)}
+.vnleeg{margin:0!important}
+.btn.vnmeer{margin-top:10px}
+/* vegen over een grafiek (basis.js): zijwaarts = getal volgt je vinger, nie de browser laten scrollen of "terug" laten gaan; omhoog/omlaag scrollt gewoon */
+.chart svg{touch-action:pan-y}

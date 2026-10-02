@@ -73,6 +73,18 @@ document.addEventListener("click",e=>{
   if(hit){if(hit.classList.toggle("aan"))toonGetal(hit);else{verbergGetal(hit.ownerSVGElement);hideTip()}}
   else hideTip();
 });
+// vegen (telefoon, 02-10): vinger over de staven slepen = het getal van de staaf onder je vinger, net als met de muis.
+// Pas vanaf 12 px bewegen (anders is het gewoon tikken en regelt de click hierboven het). Laatste staaf blijft staan.
+let veeg=null;
+document.addEventListener("touchstart",e=>{const h=e.target.closest&&e.target.closest(".chart .hit");const t=e.touches[0];
+  veeg=h&&t?{svg:h.ownerSVGElement,x:t.clientX,y:t.clientY,aan:false}:null},{passive:true});
+document.addEventListener("touchmove",e=>{const t=e.touches[0];if(!veeg||!t)return;
+  if(!veeg.aan&&Math.hypot(t.clientX-veeg.x,t.clientY-veeg.y)<12)return;veeg.aan=true;
+  const el=document.elementFromPoint(t.clientX,t.clientY),h=el&&el.closest&&el.closest(".chart .hit");
+  if(!h||h.ownerSVGElement!==veeg.svg||h.classList.contains("aan"))return;
+  veeg.svg.querySelectorAll(".hit.aan").forEach(x=>x.classList.remove("aan"));h.classList.add("aan");toonGetal(h)},{passive:true});
+document.addEventListener("touchend",()=>{veeg=null},{passive:true});
+document.addEventListener("touchcancel",()=>{veeg=null},{passive:true});
 
 let msgT;function showMsg(t,good,sticky){clearTimeout(msgT);const n=$("notes");n.innerHTML=esc(t);n.hidden=false;n.style.background=good?"var(--good-soft)":"var(--warn-soft)";if(!sticky)msgT=setTimeout(()=>{n.style.background="";renderNotes()},good?6000:12000)}
 

@@ -78,3 +78,72 @@ function liveStatus(bron,sqlNaam){const L=LIVE[bron]||{};
 }
 // app weer in beeld (bijv. telefoon uit je zak)? dan opnieuw proberen, hooguit 1x per 10 min
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!$("app").hidden)muziekLive()});
+
+/* ---------- Wat draaide d'r vandaag? (02-10, chat 09) ----------
+   YouTube- en SoundCloud-tab: liggende staaf per nummâh met vandaag ≥ 1 erbè, meeste bovenaan.
+   Vandaag = laatste meting van vandaag min de laatste meting van de dag ervoor (per nummer), dus dezelfde
+   dagGroei() als de tegel "Vandaag erbè": geen extra Supabase-vraag. YouTube: zelfde titel (track + eigen video)
+   samen, net als Meest bekeke/Groeiâhs. Spotify hoort hier bewust niet bij (geen dagcijfers, alleen CSV's). */
+const VN_MAX=15;                         // eerst de top 15; knop "Toon allâh" voor de rest
+const VN_ALLES={yt:false,sc:false};      // knop aangetikt? (alleen tot herladen)
+function vandaagNummers(bron){
+  const yt=bron==="yt",snaps=yt?YT.snaps:SCL.snaps,idV=yt?"video_id":"track_id",veld=yt?"views":"plays";
+  const g=dagGroei(snaps,idV,veld);
+  if(!g||!g.prevDag)return {g,rijen:[]};
+  const titel=new Map((yt?YT.videos:SCL.tracks).map(x=>[x[idV],x.title]));
+  const stand=new Map();snaps.forEach(s=>{if(s.snap_date===g.last&&s[veld]!=null)stand.set(s[idV],+s[veld])});
+  const per=new Map();
+  g.per.forEach((d,id)=>{const naam=String(titel.get(id)||id).trim(),k=yt?naam.toLowerCase():id;
+    let r=per.get(k);if(!r){r={naam,n:0,tot:0,versies:0};per.set(k,r)}
+    r.n+=d;r.tot+=stand.get(id)||0;r.versies++});
+  const rijen=[...per.values()].filter(r=>r.n>=1).sort((a,b)=>b.n-a.n||a.naam.localeCompare(b.naam,"nl"));
+  return {g,rijen};
+}
+function renderVandaagNummers(bron){
+  const yt=bron==="yt",el=$(yt?"ytVandaag":"sclVandaag"),sub=$(yt?"ytVandaagSub":"sclVandaagSub");
+  if(!el)return;
+  const eenheid=yt?"weergaven":"plays",kleur=yt?"yt":"sc",L=LIVE[bron]||{},vandaag=L.vandaag||vandaagAms();
+  const leeg=t=>{el.innerHTML=`<p class="sub vnleeg">${t}</p>`};
+  if(yt?YT.err:SCL.err){sub.textContent="Per nummâh wat er vandaag bij kwam.";leeg("Geen cijfers: ophalen lukte nie (zie hierboven).");return}
+  const {g,rijen}=vandaagNummers(bron);
+  // uitleg: wat er gemeten is, wanneer, en dat het iets achterloopt
+  const nu=g&&g.last===vandaag?(L.om&&L.vandaag===g.last?"vandaag "+tijdAms(L.om):"vandaag"):null;
+  const toen=!g||!g.prevDag?"":g.prevDag===gisteren(g.last)?(L.vorige_om&&L.vorige_dag===g.prevDag?"gistâh "+tijdAms(L.vorige_om):"gistâh"):dKort(g.prevDag);
+  sub.textContent=`Per nummâh hoeveel ${eenheid} er vandaag bij kwamen: meting ${nu||"van vandaag"} min die van ${toen||"gistâh"}. `+
+    `Loopt iets achter: het dashboard meet hooguit 1x per 10 min (na Ververse 5)${yt?" en YouTube telt zelf ook met vertraging":""}.`;
+  if(!g){leeg(LIVE.bezig?"Effe bèwerke… de eerste meting wordt opgehaald.":"Nog geen metingen. Tik bovenaan op Ververse.");return}
+  if(!g.prevDag){leeg("Eerste meting: vanaf morgen zie je hier per nummâh wat erbè kwam.");return}
+  if(g.last!==vandaag){leeg(LIVE.bezig?"Effe bèwerke… de meting van vandaag wordt opgehaald."
+    :`Vandaag nog geen meting (laatste: ${dKort(g.last)}). Tik bovenaan op Ververse${L.fout?"; live ophalen lukte net nie":""}.`);return}
+  if(!rijen.length){leeg(`Nog niks erbè vandaag (sinds ${toen}${nu?", gemeten "+nu:""}). Kom later nog effe kèke.`);return}
+  const som=rijen.reduce((a,r)=>a+r.n,0),alles=VN_ALLES[bron]||rijen.length<=VN_MAX,toon=alles?rijen:rijen.slice(0,VN_MAX);
+  const verschil=som!==g.erbe?` <span class="sub">(tegel Vandaag erbè: ${g.erbe>0?"+":""}${nf0.format(g.erbe)}, want bij een nummâh ging de teller omlaag)</span>`:"";
+  el.innerHTML=`<p class="vnsamen"><b>${rijen.length}</b> nummâh${rijen.length===1?"":"s"} gedraaid · samen <b>+${nf0.format(som)}</b> ${eenheid}${verschil}</p>
+    <div class="chart vnchart"></div>
+    ${rijen.length>VN_MAX?`<button class="btn vnmeer" type="button" data-vnalles="${bron}">${alles?"Alleen de top "+VN_MAX:"Toon allâh "+rijen.length+" nummâhs"}</button>`:""}`;
+  vnGrafiek(el.querySelector(".vnchart"),toon,kleur,eenheid,yt);
+}
+// liggende staven: naam links (telefoon afgekapt, volledig bij tikken/aanwijzen), staaf, aantal aan het eind
+function vnGrafiek(box,rijen,kleur,eenheid,yt){
+  const W=Math.max(280,Math.round(box.clientWidth||800)),tel=W<600;
+  const rh=tel?26:28,bh=tel?14:16,mt=22,mb=4;                       // mt: ruimte voor het getal boven de bovenste staaf
+  const naamW=tel?Math.min(130,Math.max(92,Math.round(W*.34))):Math.min(240,Math.round(W*.26));
+  const x0=naamW+8,valW=48,iw=W-x0-valW,max=rijen[0].n,H=mt+rijen.length*rh+mb;
+  const rechts=(x,y,w,h,r)=>{r=Math.min(r,h/2,w);return `M${x},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h-r}Q${x+w},${y+h} ${x+w-r},${y+h}H${x}Z`};
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${yt?"YouTube-weergaven":"SoundCloud-plays"} vandaag per nummer">`;
+  rijen.forEach((r,i)=>{const y=mt+i*rh,yb=y+(rh-bh)/2,w=Math.max(3,r.n/max*iw),ym=y+rh/2+4;
+    s+=`<text class="vnnaam" x="${naamW}" y="${ym}" text-anchor="end">${esc(r.naam)}</text>`;
+    s+=`<path fill="var(--${kleur})" d="${rechts(x0,yb,w,bh,4)}"/>`;
+    s+=`<text class="vnval" x="${x0+w+6}" y="${ym}">+${nf0.format(r.n)}</text>`;
+    s+=`<rect class="hit" data-i="${i}" x="0" y="${y}" width="${W}" height="${rh}"${staafGetal(x0+w/2,y+4,"+"+nf0.format(r.n)+" "+eenheid,r.naam)}/>`});
+  s+=`<line class="base" x1="${x0}" x2="${x0}" y1="${mt-2}" y2="${H-mb}"/>`;
+  box.innerHTML=s+"</svg>";
+  // te lange namen afkappen met … (gemeten, dus past precies); volledige naam bij tikken (toonGetal) en aanwijzen
+  box.querySelectorAll("text.vnnaam").forEach(t=>{let vol=t.textContent,k=vol;
+    try{while(k.length>1&&t.getComputedTextLength()>naamW-4){k=k.slice(0,-1);t.textContent=k.trimEnd()+"…"}}catch(e){}});
+  box.querySelectorAll(".hit").forEach(h=>{const r=rijen[+h.dataset.i];
+    h.addEventListener("mousemove",e=>showTip(e,`<div class="t">${esc(r.naam)}</div><div class="r"><span><i class="dot ${kleur}"></i>Vandaag erbij</span><b class="num">+${nf0.format(r.n)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(r.tot)}</b></div>${r.versies>1?`<div class="r"><span>${r.versies} versies samen</span></div>`:""}`));
+    h.addEventListener("mouseleave",hideTip)});
+}
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-vnalles]");if(!b)return;
+  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];renderVandaagNummers(bron)});

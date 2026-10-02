@@ -457,6 +457,7 @@ function ytCompute(venster=7){
 // zijn er nog geen 31 dagen metingen? dan kort erbij zetten vanaf wanneer er gemeten wordt
 function muziekKort(y,days){return y.multiDay&&days<y.venster-1?` · metingen pas vanaf ${dLabel(y.base)}`:""}
 function renderYouTube(){
+  renderVandaagNummers("yt");   // kaart "Wat draaide d'r vandaag?" (live.js)
   if(YT.err){$("ytStats").innerHTML=`<p class="sub">YouTube-cijfers ophalen lukte niet: ${esc(YT.err)}</p>`;return}
   const y=ytCompute(MUZIEK_DAGEN);
   if(!y.last){$("ytStats").innerHTML='<p class="sub">Nog geen metingen. Tik bovenaan op Ververse.</p>';$("ytChart").innerHTML="";$("ytTop").innerHTML="";$("ytGrow").innerHTML="";$("ytTable").innerHTML="";$("cmpStats").innerHTML="";$("cmpTable").innerHTML="";return}
@@ -606,6 +607,7 @@ function sclMoney(y){
     return {...t,paid:o?o.paid:0,usd:o?o.usd:0,last:o?o.last:""}});
 }
 function renderSCLive(){
+  renderVandaagNummers("sc");   // kaart "Wat draaide d'r vandaag?" (live.js)
   const clear=()=>["sclChart","sclTop","sclGrow","sclTable","sclMoneyStats","sclMoneyTable"].forEach(i=>$(i).innerHTML="");
   if(SCL.err){$("sclStats").innerHTML=`<p class="sub">SoundCloud-cijfers ophalen lukte niet: ${esc(SCL.err)}</p>`;clear();return}
   const y=sclCompute(MUZIEK_DAGEN);
