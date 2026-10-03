@@ -991,15 +991,18 @@ function kansPopBijStart(){
 }
 function kansNaWijzig(){kansBadge();if(sectie==="kansen")renderKansen();else if(sectie==="ovahzicht")renderOvahzicht();else if(sectie==="muziek")render()}
 
+// Ovâhzicht-tegel (sinds 03-10): alleen wat loopt. Open kansen ("Doe dit deze week") staan alleen nog onder Kansâh.
+// Niks lopend en geen rapport klaar → geen tegel.
 function kansTegel(){
-  const alle=kansenAlle(),g=kansGroepen(alle,"alles");
-  const lijst=[...g.bezig.filter(x=>x.k&&!x.k.stil).map(x=>x.k),...g.open].sort((a,b)=>b.score-a.score);
+  const g=kansGroepen(kansenAlle(),"alles");
   const loopt=KP.rijen.filter(p=>!p.rapport),volgende=loopt.filter(kRapDatumVast).map(p=>p.rapport_op).sort()[0],nieuw=kansNieuweRapporten().length;
+  if(!loopt.length&&!nieuw)return "";
+  const bezig=g.bezig.slice(0,3).map(({p,k})=>`<div class="trij"><span class="k">${bronChip(p.bron)}</span><span class="v">${k?k.big:p.big||""}</span><span class="s">${k?k.h:p.kop||esc(p.sleutel)}</span></div>`).join("");
   return `<article class="tegel">
-    <div class="tkop"><h2>Kansâh</h2><span class="tag">${g.open.length} open</span></div>
-    <p class="tlbl">Doe dit deze week</p>
-    <div class="trijen">${lijst.slice(0,3).map(k=>`<div class="trij"><span class="k">${bronChip(k.bron)}${k.bezig?' <span class="chip warn">mee bezig</span>':""}</span><span class="v">${k.big}</span><span class="s">${k.h}</span></div>`).join("")||'<p class="s">Niks open. Lekkâh bezig!</p>'}
-      ${loopt.length||nieuw?`<div class="trij klik" data-kansgesch role="button" tabindex="0"><span class="k">Lopende kansâh<span class="trijpijl" aria-hidden="true">›</span></span><span class="v">${nf0.format(loopt.length)}</span><span class="s">${nieuw?`<b class="up">${nieuw} rapport${nieuw>1?"en":""} klaar</b>`:""}${nieuw&&volgende?" · ":""}${volgende?"volgende rapport "+kD(volgende):""}</span></div>`:""}</div>
+    <div class="tkop"><h2>Kansâh</h2><span class="tag">${nf0.format(loopt.length)} lopend</span></div>
+    <p class="tlbl">${g.bezig.length?"Mee bezig":"Lopende kansâh"}</p>
+    <div class="trijen">${bezig}
+      <div class="trij klik" data-kansgesch role="button" tabindex="0"><span class="k">Lopende kansâh<span class="trijpijl" aria-hidden="true">›</span></span><span class="v">${nf0.format(loopt.length)}</span><span class="s">${nieuw?`<b class="up">${nieuw} rapport${nieuw>1?"en":""} klaar</b>`:""}${nieuw&&volgende?" · ":""}${volgende?"volgende rapport "+kD(volgende):""}</span></div></div>
     <button class="btn yellow" type="button" data-ga="kansen">Kèk bè Kansâh</button>
   </article>`;
 }
