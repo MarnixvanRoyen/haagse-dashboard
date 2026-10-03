@@ -74,6 +74,14 @@ async function kpWijzig(p,velden){
   if(KP.lokaal){kpLokaalBewaar();return}
   const {error}=await sb.from("kans_poging").update(velden).eq("id",p.id);if(error)throw error;
 }
+// zelf toegevoegd of weggehaald per poging: {plus:[media_id], min:[media_id], nummers:[track_id]}
+const KP_EXTRA_LOK="hc_kans_extra";
+function kpExtra(p){if(p.extra&&typeof p.extra==="object")return p.extra;try{return JSON.parse(store.get(KP_EXTRA_LOK)||"{}")[p.id]||{}}catch(e){return {}}}
+async function kpExtraZet(p,extra){
+  const lokaal=()=>{let a={};try{a=JSON.parse(store.get(KP_EXTRA_LOK)||"{}")}catch(e){}a[p.id]=extra;store.set(KP_EXTRA_LOK,JSON.stringify(a));p.extra=extra};
+  if(KP.lokaal||!("extra" in p)){lokaal();if(!KP.lokaal)showMsg("Bewaard in deze browser. Draai 21_kansen_extra.sql om het overal te zien.");return}
+  try{await kpWijzig(p,{extra})}catch(e){lokaal();showMsg("Bewaren in Supabase lukte nie ("+(e.message||e)+"), nu alleen in deze browser.")}
+}
 async function kpWis(p){
   KP.rijen=KP.rijen.filter(x=>x!==p);KP.met.delete(p.id);
   if(KP.lokaal){kpLokaalBewaar();return}
@@ -398,7 +406,7 @@ function kansBezigKaart({p,k}){
   return `<article class="ins kans k-bezig" data-kp="${p.id}">
     <div class="kkop">${bronChip(p.bron)}<span class="chip warn">mee bezig</span>${k&&k.stil?'<span class="chip mute" title="De cijfâhs geven nu geen aanleiding meer voor deze kaart (misschien al gelukt, misschien veranderd). Het dashboard blijft wel meten tot het rapport.">staat nu nie meer bij je kansâh</span>':""}</div>
     <span class="big">${k?k.big:p.big||""}</span><h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${k&&!k.stil?`<p>${k.p}</p>`:""}<div class="act">${k?k.a:p.actie||""}</div>
-    ${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
+    ${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):kTeltMeeHTML(p)}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
     <div class="kknop">
       <button class="btn" type="button" data-kz="gedaan">Gedaan ✓</button>
       <button class="btn" type="button" data-kz="gestopt">Gestopt</button>
@@ -409,7 +417,7 @@ function kansBezigKaart({p,k}){
 function kansWachtKaart({p,k}){
   return `<article class="ins kans k-wacht" data-kp="${p.id}">
     <div class="kkop">${bronChip(p.bron)}${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':'<span class="chip good">gedaan ✓</span>'}</div>
-    <h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
+    <h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):kTeltMeeHTML(p)}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
   </article>`;
 }
 function kansNuHTML(alle,bron){
@@ -486,7 +494,11 @@ function kansRapportMaak(p){
   let oordeel="onbekend",grond=null;
   if(rm!=null){grond="meet";oordeel=rm>=0.1?(ru!=null&&ru<=-0.1?"deels":"werkte"):rm<=-0.1?"slechter":"geen"}
   else if(ru!=null){grond="uitkomst";oordeel=ru>=0.1?"werkte":ru<=-0.1?"slechter":"geen"}
-  return {v:1,oordeel,grond,hoofd:hoofd?hoofd.naam:null,
+  let nummers=null;const ms=/^muziek-sc-(momentum|nieuw)-(.+)$/.exec(p.sleutel);
+  if(ms){const ids=[(SCL.tracks.find(x=>kSlug(String(x.track_id))===ms[2])||{}).track_id,...(kpExtra(p).nummers||[])].filter(Boolean);
+    nummers=ids.map(id=>{const t=SCL.tracks.find(x=>x.track_id===id),a=kStand(SCL.snaps.filter(x=>x.track_id===id),"track_id","plays",kDag(v.van,-1)),b=kStand(SCL.snaps.filter(x=>x.track_id===id),"track_id","plays",v.tot);
+      return {titel:t?t.title:id,erbij:a&&b?b.t-a.t:null,handmatig:id!==ids[0]}})}
+  return {v:1,oordeel,grond,hoofd:hoofd?hoofd.naam:null,nummers,
     periode:{van:v.van,tot:v.tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:v.L},meet,uitkomsten,gemaakt:new Date().toISOString()};
 }
 // rapport voor een taak met meetplan: de taak-posts t.o.v. je normaal en t.o.v. de verwachting, plus je account in die periode
@@ -496,7 +508,7 @@ function kmRapportMaak(p,st){
   const uitkomsten=kUitkomsten(p.bron,v);
   return {v:2,oordeel:o.oordeel,verw:o.verw,grond:"plan",hoofd:null,
     plan:{maat:st.maat,wat:st.plan.wat,deadline:st.deadline,doenAantal:st.doenAantal||null,factor:st.factor,factorBron:st.factorBron,alleMed:st.alleMed,E:st.E,curveBron:st.curveBron,klaarNaFeed:st.klaarNaFeed,klaarNaReel:st.klaarNaReel,taakStart:p.gestart_om,
-      taak:st.taak.map(r=>({...r,plaatje:null}))},
+      taak:st.taak.map(r=>({...r,plaatje:null,bijschrift:kEersteRegel(r.bijschrift)})),nietMee:(st.nietMee||[]).map(x=>({...x,bijschrift:kEersteRegel(x.bijschrift)}))},
     periode:{van,tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:L},meet:null,uitkomsten,gemaakt:new Date().toISOString()};
 }
 // bewaard rapport weer als "stand" tekenen (zelfde HTML als tijdens de meting)
@@ -552,6 +564,7 @@ function kansRapportHTML(p){
   if(r.uitkomsten.length)h+=`<div class="tablewrap"><table class="ktab"><thead><tr><th>Cijfâh</th><th class="n"><span class="pc">${L} d </span>ervóór</th><th class="n"><span class="pc">${L} d ${r.plan?"":"mee "}</span>${r.plan?"sinds start":"bezig"}</th><th class="n">Verschil</th></tr></thead><tbody>
     ${r.uitkomsten.map(x=>`<tr${x.naam===r.hoofd?' class="hoofd"':""}><td>${esc(x.naam)}</td><td class="n">${kWaarde(x.voor,x.fmt)}</td><td class="n">${kWaarde(x.na,x.fmt)}</td><td class="n">${kVerschil(x.voor,x.na,x.beter)}</td></tr>`).join("")}
     </tbody></table></div><p class="sub kdata">${r.plan?"Je hele account, ter vergelijking. ":""}Ervóór: ${dKort(r.periode.voor_van)} t/m ${dKort(r.periode.voor_tot)} · ${r.plan?"sinds start":"mee bezig"}: ${dKort(r.periode.van)} t/m ${dKort(r.periode.tot)}</p>`;
+  if(r.nummers&&r.nummers.length)h+=`<div class="ktelt"><p class="ktelkop">Nummâhs in de challenge (plays erbij in de periode)</p><ul>${r.nummers.map(n=>`<li><b>${esc(n.titel)}</b>${n.handmatig?" (zelf toegevoegd)":""} · ${n.erbij!=null?kPlus(n.erbij):"nog geen meting"}</li>`).join("")}</ul></div>`;
   if(p.actie)h+=`<details class="kwat"><summary>Wat je ging doen</summary><div class="act">${p.actie}</div></details>`;
   h+=`<p class="sub">Samenhang is geen bewijs: er gebeurt in ${L} dagen meer dan alleen deze actie.</p></div>`;
   return h;
@@ -623,11 +636,11 @@ function kmPlan(sleutel){
   const mooi=naam=>{for(const x of IG.posts)for(const l of (x.labels||[]))if(kSlug(l.label)===naam)return l.label;return naam.replace(/-/g," ")};
   const metLabel=(soort,naam)=>p=>labelsVan(p,soort).some(l=>kSlug(l)===naam)||(soort==="onderwerp"&&String(p.bijschrift||"").toLowerCase().includes(naam.replace(/-/g," ")));
   // doen: {aantal, termijn} = wat de kaart vraagt ("plan deze week 2 posts" → 2 posts, deadline zondag 23:59 van de startweek)
-  if((m=/^insta-onderwerp-minder-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:null,termijn:"week",tekst:`${mooi(m[1])} combineren met een sterker onderwerp`}};
-  if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"}};
-  if(sl==="insta-meer-reels")return {maat:"bereik",wat:"reels",hoort:p=>soortNaam(p)==="Reel",groep:p=>soortNaam(p)==="Reel",perSoort:false,doen:{aantal:1,termijn:"week"}};
-  if((m=/^insta-tijd-(.+)$/.exec(sl)))return {maat:"bereik",wat:"posts in dat dagdeel",hoort:p=>kSlug(dagdeel(p.uur??12))===m[1],groep:p=>kSlug(dagdeel(p.uur??12))===m[1],doen:{aantal:3,termijn:14}};
-  if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&l[0]!=="(geen)"};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"}}}
+  if((m=/^insta-onderwerp-minder-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:null,termijn:"week",tekst:`${mooi(m[1])} combineren met een sterker onderwerp`},nie:`nie over ${mooi(m[1])}`};
+  if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"},nie:`nie over ${mooi(m[1])}`};
+  if(sl==="insta-meer-reels")return {maat:"bereik",wat:"reels",hoort:p=>soortNaam(p)==="Reel",groep:p=>soortNaam(p)==="Reel",perSoort:false,doen:{aantal:1,termijn:"week"},nie:"geen reel"};
+  if((m=/^insta-tijd-(.+)$/.exec(sl)))return {maat:"bereik",wat:"posts in dat dagdeel",hoort:p=>kSlug(dagdeel(p.uur??12))===m[1],groep:p=>kSlug(dagdeel(p.uur??12))===m[1],doen:{aantal:3,termijn:14},nie:"ander dagdeel"};
+  if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&l[0]!=="(geen)"};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"},nie:"geen eigen muziek gekozen"}}
   if(sl==="insta-nieuw-naar-volger")return {maat:"volgers",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:7,tekst:"elke post eindigen met een volg-zin + 3 toppâhs vastzetten"}};
   if(sl==="insta-bewaren")return {maat:"bewaard",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:14,tekst:"een bewaar-post maken (tips, plekken, tijden)"}};
   return null;
@@ -642,7 +655,17 @@ function kmStand(p){
   const plan=kmPlan(p.sleutel);if(!plan||IG.err||!IG.posts.length)return null;
   const M=KM_MAAT[plan.maat];
   const deadline=kmDeadline(p,plan),startDag=dagNL(p.gestart_om),eindTs=p.gestopt_om?Date.parse(p.gestopt_om):Math.min(Date.now(),deadline?Date.parse(deadline):Infinity);
-  const taak=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=eindTs&&plan.hoort(x)).sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);
+  const ex=kpExtra(p),plus=new Set(ex.plus||[]),min=new Set(ex.min||[]);
+  const auto=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=eindTs&&plan.hoort(x));
+  const taak=[...auto.filter(x=>!min.has(x.media_id)),...IG.posts.filter(x=>plus.has(x.media_id)&&!auto.includes(x))].sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);
+  // om zelf toe te voegen: posts van een week vóór de start t/m nu die er nog nie in zitten
+  const kiesbaar=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=kDag(startDag,-7)&&!taak.includes(x)).sort((a,b)=>a.gepost_om<b.gepost_om?1:-1).slice(0,25)
+    .map(x=>({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),bijschrift:x.bijschrift}));
+  // nie meegeteld: posts in de periode die nie bij de taak passen, en posts ná afmelden/deadline (max 7 dagen erna)
+  const nietMee=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=Math.min(Date.now(),eindTs+7*864e5)&&!taak.includes(x))
+    .sort((a,b)=>a.gepost_om<b.gepost_om?-1:1)
+    .map(x=>({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,
+      reden:min.has(x.media_id)?"zelf weggehaald":Date.parse(x.gepost_om)>eindTs?(p.gestopt_om&&deadline&&Math.abs(Date.parse(p.gestopt_om)-Date.parse(deadline))<2000?"na de deadline":p.gestopt_om?"na je afmelding":"na de deadline"):(plan.nie||"past nie bij de taak")}));
   // basis = posts van vóór de start (120 dagen, anders 365), zonder de taak-posts
   const voor=d=>IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)<startDag&&Date.parse(x.gepost_om)>Date.parse(p.gestart_om)-d*864e5&&M.f(x)!=null);
   let basis=voor(120);if(basis.length<15)basis=voor(365);
@@ -660,13 +683,13 @@ function kmStand(p){
     const a=kmLeeftijd(x,nu),normaal=normaalVoor(x),waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
     const deel=M.curve?kmDeel(x,a):1,klaar=a>=klaarNa;
     const eind=waarde==null?null:M.curve?(klaar||deel>=0.95?waarde:a>=0.5?waarde/deel:null):(a>=1?waarde:null);
-    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,
+    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
       leeftijd:a,waarde,normaal,normaalNu:normaal!=null&&M.curve?normaal*deel:normaal,verwacht:normaal!=null?normaal*factor:null,
       eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel}});
   const laatsteKlaar=rij.length?rij.map(r=>r.klaarOp).sort().pop():null;
   const rapportOp=p.gestopt_om?(laatsteKlaar&&laatsteKlaar>p.gestopt_om?laatsteKlaar:new Date(Date.parse(p.gestopt_om)+(rij.length?0:864e5)).toISOString()):null;
   const xs=rij.map(r=>r.x).filter(v=>v!=null),E=xs.length?kMed(xs):null;
-  return {plan,maat:plan.maat,M,taak:rij,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,rapportOp,
+  return {plan,maat:plan.maat,M,taak:rij,nietMee,kiesbaar,pid:p.id,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,rapportOp,
     curveBron:M.curve?kmCurve(rij[0]?kmGroep(IG.posts.find(x=>x.media_id===rij[0].id)):"feed").bron:null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
 }
 function kmOordeel(s){
@@ -684,18 +707,77 @@ function kmHTML(s,{rapport=false}={}){
   let h=`<div class="kmverw"><span class="k">Verwachting bij de start</span>
     <span class="v">${s.alleMed!=null?`${M.fmt(s.alleMed*s.factor)} <small>${M.kort}${M.curve?" per post":""}</small>`:"—"}</span>
     <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
-  if(!s.taak.length)return h+`<p class="sub kmleeg">Nog geen ${esc(s.plan.wat)} gevonden sinds ${kD(s.taakStart||new Date().toISOString())}. Label je post in de Insta-tab als hij nie herkend wordt (labels komen er ook elke nacht vanzelf bij).</p>`;
+  const knop=!rapport&&s.pid!=null;
+  const kies=knop&&(s.kiesbaar||[]).length?`<label class="kmkies">Post toevoegen <select data-kmkies data-kpid="${s.pid}"><option value="">kies een post…</option>${s.kiesbaar.map(x=>`<option value="${esc(x.id)}">${dKort(dagNL(x.ts))} ${tijdAms(x.ts)} · ${esc(x.soort)} · ${esc(kEersteRegel(x.bijschrift).slice(0,40))}</option>`).join("")}</select></label>`:"";
+  const nie=((s.nietMee||[]).length?`<details class="kmnie"${knop?" open":""}><summary>Nie meegeteld (${s.nietMee.length})</summary><ul>${s.nietMee.map(x=>`<li><a href="${esc(x.link||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.ts))} · ${esc(x.soort)}</a> <span class="sub">${esc(kEersteRegel(x.bijschrift))}</span> <span class="chip mute">${esc(x.reden)}</span>${knop?` <button class="lnk" type="button" data-kmplus="${esc(x.id)}" data-kpid="${s.pid}">Tel mee</button>`:""}</li>`).join("")}</ul></details>`:"")+kies;
+  if(!s.taak.length)return h+`<p class="sub kmleeg">Nog geen ${esc(s.plan.wat)} gevonden sinds ${kD(s.taakStart||new Date().toISOString())}. Label je post in de Insta-tab als hij nie herkend wordt (labels komen er ook elke nacht vanzelf bij).</p>`+nie;
+  h+=`<p class="ktelkop">Telt mee in de challenge: <b>${s.taak.length} ${s.taak.length===1?"post":"posts"}</b>${s.doenAantal?` (doel ${s.doenAantal})`:""}</p>`;
   h+=`<div class="kmposts">${s.taak.map(r=>{
     const pr=r.verwacht?Math.min(1.5,(r.eind??r.waarde??0)/r.verwacht):0;
     return `<div class="kmpost">
       <a class="kmthumb" href="${esc(r.link||"#")}" target="_blank" rel="noopener">${r.plaatje?`<img src="${esc(r.plaatje)}" alt="" loading="lazy">`:""}</a>
-      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} · ${esc(r.soort)}</b> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span></span>
+      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
         <span class="kmcijf">${M.kort} nu <b>${r.waarde!=null?M.fmt(r.waarde):"—"}</b>${M.curve&&!r.klaar&&r.normaalNu!=null?` · normaal op deze leeftijd ${M.fmt(r.normaalNu)}`:""}</span>
         <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${r.x>=1.1?"up":r.x<=0.9?"down":""}">${kX(r.x)}</b> je normaal`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
         <div class="kbalk kmbalk" title="t.o.v. de verwachting"><i style="width:${(Math.min(1,pr/1.5)*100).toFixed(1)}%"></i><s style="left:${(100/1.5).toFixed(1)}%"></s></div></div>
     </div>`}).join("")}</div>`;
+  h+=nie;
   if(s.E!=null){const o=kmOordeel(s);h+=`<p class="kmsom">${rapport?"Uitkomst":"Stand nu"}: je ${esc(s.plan.wat)} doen <b>${kX(s.E)}</b> je normaal${s.taak.length>1?" (middelste post)":""} · ${KM_VERW[o.verw]||""}</p>`}
   return h;
+}
+
+const kEersteRegel=t=>{const r=String(t||"").split(/\n/)[0].trim();return r.length>70?r.slice(0,68)+"…":r};
+// "Telt mee": welke posts, nummers, links of bezoekers het dashboard voor deze kans meetelt (sinds de start)
+function kTeltMeeHTML(p){
+  let m;const sl=p.sleutel,van=dagNL(p.gestart_om),tot=vandaagAms(),items=[];let uitleg="";
+  const blok=(kop,lijst,ul)=>`<div class="ktelt"><p class="ktelkop">${kop}</p>${lijst.length?`<ul>${lijst.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}${ul?`<p class="sub">${ul}</p>`:""}</div>`;
+  // stand van een nummer (SoundCloud/YouTube-snapshots) op de dag vóór de start en nu
+  const groei=(snaps,idv,id,veld)=>{const r=(snaps||[]).filter(x=>x[idv]===id&&x[veld]!=null).sort((a,b)=>a.snap_date<b.snap_date?-1:1);if(!r.length)return null;
+    const b=[...r].reverse().find(x=>x.snap_date<van)||r[0],e=r[r.length-1];return {erbij:+e[veld]-(+b[veld]),nu:+e[veld],sinds:b.snap_date}};
+  if((m=/^muziek-spotify-grens-(.+)$/.exec(sl))){
+    const t=SP.snaps&&SP.snaps.length?spCompute().list.find(x=>kSlug(tKey(x.title))===m[1]):null;
+    if(t)items.push(`<b>${esc(t.title)}</b> · ${nf0.format(t.y12)} streams in 12 maanden${t.y12exact?"":" (schatting)"} · nog ${nf0.format(Math.max(0,1000-t.y12))} tot de grens`);
+    uitleg="Spotify geeft geen dagcijfers: de stand komt uit je laatste Spotify-CSV.";
+    return blok("Telt mee in de challenge: dit nummâh",items,uitleg)}
+  if((m=/^muziek-sc-(momentum|nieuw)-(.+)$/.exec(sl))){
+    const t=SCL.tracks.find(x=>kSlug(String(x.track_id))===m[2]);
+    if(t){const g=groei(SCL.snaps,"track_id",t.track_id,"plays");
+      items.push(`<a href="${esc(t.permalink_url||"#")}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a> op SoundCloud${g?` · <b>${kPlus(g.erbij)}</b> plays sinds ${dKort(g.sinds)} (nu ${nf0.format(g.nu)})`:""}`);
+      const v=YT.videos.find(x=>tKey(x.title)===tKey(t.title)),gy=v?groei(YT.snaps,"video_id",v.video_id,"views"):null;
+      if(gy)items.push(`<b>${esc(v.title)}</b> op YouTube · ${kPlus(gy.erbij)} weergaven sinds ${dKort(gy.sinds)}`)}
+    const ig=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=van&&labelsVan(x,"muziek").some(l=>t&&tKey(l)===tKey(t.title)));
+    ig.forEach(x=>items.push(`Insta-post <a href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.gepost_om))} · ${esc(soortNaam(x))}</a> met dit nummâh eronder`));
+    if(t&&!ig.length)uitleg="Nog geen Insta-post sinds de start met dit nummâh als muziek gekozen (kies het in de Insta-tab bij de post, dan telt hij hier mee).";
+    const ex=kpExtra(p),nrs=(ex.nummers||[]).map(id=>SCL.tracks.find(x=>x.track_id===id)).filter(Boolean);
+    nrs.forEach(x=>{const g=groei(SCL.snaps,"track_id",x.track_id,"plays");
+      items.push(`<a href="${esc(x.permalink_url||"#")}" target="_blank" rel="noopener"><b>${esc(x.title)}</b></a> op SoundCloud <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>${g?` · <b>${kPlus(g.erbij)}</b> plays sinds ${dKort(g.sinds)}`:""} <button class="lnk" type="button" data-kmnrmin="${esc(x.track_id)}" data-kpid="${p.id}">Haal eruit</button>`)});
+    const rest=SCL.tracks.filter(x=>x!==t&&!nrs.includes(x)).sort((a,b)=>String(a.title).localeCompare(String(b.title)));
+    const kies=!p.rapport&&rest.length?`<label class="kmkies">Nummâh toevoegen <select data-kmnr data-kpid="${p.id}"><option value="">kies een nummâh…</option>${rest.map(x=>`<option value="${esc(x.track_id)}">${esc(x.title)}</option>`).join("")}</select></label>`:"";
+    return blok("Telt mee in de challenge",items,uitleg)+kies}
+  if(sl==="muziek-top3"){const d=compute(),tt=[...d.tracks].sort((a,b)=>b.total-a.total).slice(0,3);
+    return blok("Telt mee: je top 3 t.o.v. al je muziekgeld",tt.map(t=>`<b>${esc(t.track)}</b> · ${eur(t.total)}`),"Uit je SoundCloud-afrekeningen (CSV) en DJ·World; verandert pas bij een nieuwe upload.")}
+  if(/^muziek-(abonnees|land|label-vs-sc|downloads|spotify-ontbreekt|te-boeken)/.test(sl)){
+    const bron=/label|downloads|te-boeken/.test(sl)?"je DJ·World-overzicht (PDF)":"je SoundCloud-afrekeningen (CSV)";
+    return blok(`Telt mee: alle nummâhs uit ${bron}`,[],"Deze cijfers veranderen alleen als je een nieuwe afrekening inlaadt.")}
+  if(sl==="insta-label-muziek"){const x=IG.posts.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van);
+    return blok(`Telt mee: posts die je een muziek-keuze gaf (${IG.posts.filter(q=>labelsVan(q,"muziek").length).length} in totaal)`,
+      x.slice(0,8).map(q=>`${dKort(dagNL(q.gepost_om))} · ${esc(soortNaam(q))} ${labelsVan(q,"muziek").length?`<span class="chip good">${esc(labelsVan(q,"muziek")[0])}</span>`:'<span class="chip mute">nog geen keuze</span>'}`),
+      x.length?"Posts sinds de start; oudere posts labelen telt ook mee.":"Nog geen posts sinds de start; oudere posts labelen telt ook mee.")}
+  if(sl==="insta-naar-plays"){const x=IG.posts.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van&&labelsVan(q,"muziek").some(l=>l!=="(geen)"&&l!=="(eigen muziek)"));
+    return blok(`Telt mee: posts sinds ${dKort(van)} met een nummâh eronder`,x.map(q=>`<a href="${esc(q.permalink||"#")}" target="_blank" rel="noopener">${dKort(dagNL(q.gepost_om))} · ${esc(soortNaam(q))}</a> · ♪ ${esc(labelsVan(q,"muziek")[0])}`),x.length?"":"Nog geen. Kies in de Insta-tab welk nummâh eronder zat.")}
+  if(sl==="insta-stories-afhaken"){const x=IG.stories.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van);
+    return blok(`Telt mee: je stories sinds ${dKort(van)} (${x.length})`,[],x.length?`Verdeeld over ${new Set(x.map(q=>dagNL(q.gepost_om))).size} dagen; dagen met 3 of meer stories tellen voor het afhaken.`:"Nog geen stories sinds de start.")}
+  if(sl.startsWith("sneek-")){
+    const br=(GC.bronnen||[]).filter(r=>String(r.dag).slice(0,10)>=van);
+    const som=f=>br.filter(f).reduce((a,r)=>a+(+r.aantal||0),0);
+    const gd=(GC.dag||[]).filter(r=>String(r.dag).slice(0,10)>=van),gs=f=>gd.filter(f).reduce((a,r)=>a+(+r.aantal||0),0);
+    if(sl==="sneek-bio-link")return blok("Telt mee: bezoekâhs via je bio-link (?ref=bio)",[`<b>${nf0.format(som(r=>String(r.bron).toLowerCase()==="bio"))}</b> sinds ${dKort(van)}`],"");
+    if(/^sneek-(story-links|beste-story)/.test(sl)){const per=new Map();br.filter(r=>/^story-/i.test(r.bron)).forEach(r=>{const k=String(r.bron).toLowerCase();per.set(k,(per.get(k)||0)+(+r.aantal||0))});
+      return blok("Telt mee: je story-links (?ref=story-…) sinds de start",[...per].sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<code>${esc(k)}</code> · <b>${nf0.format(n)}</b> bezoekâhs`),per.size?"":"Nog geen bezoek via een story-link sinds de start.")}
+    if(sl==="sneek-insta-zakt")return blok("Telt mee: bezoekâhs via Insta en Facebook",[`<b>${nf0.format(som(r=>igBronGroep(r.bron)!=="rest"))}</b> sinds ${dKort(van)}`],"");
+    const b=gs(r=>!r.event),pt=gs(r=>r.pad==="potje-gestart"),gg=gs(r=>r.pad==="score-gedeeld");
+    return blok("Telt mee: alle Sneek-bezoekâhs sinds de start",[`${nf0.format(b)} bezoekâhs · ${nf0.format(pt)} speelden${b?` (${pct(Math.min(1,pt/b))})`:""} · ${nf0.format(gg)} scoâhs gedeeld`],"")}
+  return "";
 }
 
 /* ---------- na het laden: oude stand overzetten, dagmeting, rapporten maken ---------- */
@@ -833,7 +915,7 @@ function khRij(p){
     <summary><span class="khkop">${bronChip(p.bron)}${chip}${p.rapport&&!p.gelezen_om?'<span class="chip kbron" style="--c:var(--hy)">nieuw</span>':""}</span>
       <span class="khtitel">${p.big?`<b class="khbig">${p.big}</b> `:""}${p.kop||esc(p.sleutel)}</span>
       <span class="khmeta">${wanneer}${meet?" · "+meet:""}</span></summary>
-    <div class="khbody">${p.rapport?kansRapportHTML(p):`${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p)}${kSpark(lijn)}${p.actie?`<div class="act">${p.actie}</div>`:""}`}
+    <div class="khbody">${p.rapport?kansRapportHTML(p):`${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):kTeltMeeHTML(p)}${kMeetRegel(p)}${kSpark(lijn)}${p.actie?`<div class="act">${p.actie}</div>`:""}`}
       <p class="khwis"><button class="lnk" type="button" data-khwis="${p.id}">Wis uit geschiedenis</button></p></div>
   </details>`;
 }
@@ -940,6 +1022,9 @@ document.addEventListener("click",async e=>{
     if(w.dataset.zeker!=="1"){w.dataset.zeker="1";w.textContent="Zeker? Tik nog een keer om te wissen";return}
     const p=KP.rijen.find(x=>x.id==w.dataset.khwis);if(p)try{await kpWis(p)}catch(x){showMsg("Wissen lukte nie: "+(x.message||x))}
     kansNaWijzig();return}
+  // zelf posts/nummâhs toevoegen of eruit halen
+  const km=t.closest("[data-kmplus],[data-kmmin],[data-kmnrmin]");
+  if(km){const p=KP.rijen.find(x=>x.id==km.dataset.kpid);if(p)await kmExtraWijzig(p,km.dataset.kmplus?{plus:km.dataset.kmplus}:km.dataset.kmmin?{min:km.dataset.kmmin}:{nrmin:km.dataset.kmnrmin});return}
   // knoppen op de kaarten
   const b=t.closest("[data-kz]");if(!b)return;
   b.disabled=true;
@@ -957,6 +1042,24 @@ document.addEventListener("click",async e=>{
   }catch(x){showMsg("Bewaren lukte nie: "+(x.message||x))}
   kansNaWijzig();
 });
+document.addEventListener("change",async e=>{
+  const sel=e.target.closest&&e.target.closest("select[data-kmkies],select[data-kmnr]");if(!sel||!sel.value)return;
+  const p=KP.rijen.find(x=>x.id==sel.dataset.kpid);if(!p)return;
+  await kmExtraWijzig(p,sel.matches("[data-kmkies]")?{plus:sel.value}:{nr:sel.value});
+});
+// plus/min/nummer verwerken, rapportdatum bijwerken (meetplan) en alles opnieuw tekenen (ook de pop-up)
+async function kmExtraWijzig(p,w){
+  const ex=JSON.parse(JSON.stringify(kpExtra(p)));ex.plus=ex.plus||[];ex.min=ex.min||[];ex.nummers=ex.nummers||[];
+  const weg=(a,v)=>a.filter(x=>x!==v);
+  if(w.plus){ex.min=weg(ex.min,w.plus);const st=kmStand({...p,extra:{...ex,plus:[]}});if(!(st&&st.taak.some(r=>r.id===w.plus))&&!ex.plus.includes(w.plus))ex.plus.push(w.plus)}
+  if(w.min){if(ex.plus.includes(w.min))ex.plus=weg(ex.plus,w.min);else if(!ex.min.includes(w.min))ex.min.push(w.min)}
+  if(w.nr&&!ex.nummers.includes(w.nr))ex.nummers.push(w.nr);
+  if(w.nrmin)ex.nummers=weg(ex.nummers,w.nrmin);
+  await kpExtraZet(p,ex);
+  if(p.gestopt_om&&!p.rapport&&kmPlan(p.sleutel)){const st=kmStand(p);if(st&&st.rapportOp&&st.rapportOp!==p.rapport_op)try{await kpWijzig(p,{rapport_op:st.rapportOp})}catch(x){}}
+  if(KVOORT)kansVoortOpen();
+  kansNaWijzig();
+}
 // rapport openklappen in de geschiedenis = gelezen
 document.addEventListener("toggle",async e=>{
   const d=e.target;if(!d.matches||!d.matches("details[data-kh]"))return;

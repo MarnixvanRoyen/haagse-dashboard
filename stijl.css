@@ -352,6 +352,18 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kmbalk{position:relative;margin-top:4px;height:6px;overflow:visible}
 .kmbalk s{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2);border-radius:1px;text-decoration:none}
 .kmsom{margin:0;font-size:14px}
+.ktelkop{margin:0;font-size:13px;font-weight:700;color:var(--ink-2)}.ktelkop b{color:var(--hy)}
+.ktelt{display:grid;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+.ktelt ul,.kmnie ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.ktelt .sub{margin:0;font-size:12px}
+.ktelt a,.kmnie a,.kmpost a{color:var(--hy)}
+.kmbs{color:var(--ink-2);font-weight:500}
+.kmnie summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
+.kmnie ul{margin-top:6px}
+.kmkies{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.krap,.khbody,.kmposts,.ins.kans{min-width:0}.krap,.khbody{grid-template-columns:minmax(0,1fr)}
+.kmkies select{flex:1 1 200px;width:100%;min-width:0;max-width:100%;text-overflow:ellipsis;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;font-weight:500}
+.kmuit{color:var(--muted);font-size:12px}.kmnie .chip{font-size:11px}
 .kmleeg{margin:0}
 .alarm.meting{border-color:var(--hy);background:var(--warn-soft)}
 .alarm.meting .alarmicoon{background:var(--hy);color:var(--hy-ink)}
