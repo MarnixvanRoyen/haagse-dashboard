@@ -389,8 +389,9 @@ function kansKaart(k){
     <span class="big">${k.big}</span><h3>${k.h}</h3><p>${k.p}</p><div class="act">${k.a}</div>
     ${k.trend?`<div class="kvoort">Trend: ${k.trend}</div>`:""}${k.vorige?kVorigeRegel(k.vorige):""}
     ${kmPlan(k.id)?kmOpenRegel(k):`<div class="kloopt">Looptijd <b>${k.dagen} dagen</b>: begin je nu, dan krijg je op ${rap} een rapport.</div>`}
+    ${(b=>b?`<div class="kloopt kbezet">Je bent al bezig met een ${BRON[k.bron][0]}-challenge: <b>${esc(kTekst(b.kop)).slice(0,70)}</b>. Meld die eerst af (Gedaan of Gestopt), dan kun je deze starten. Waarom: 1 challenge per onderdeel tegelijk, zodat je weet waar een effect vandaan komt.</div>`:"")(kBezigBron(k.bron))}
     <div class="kknop">
-      <button class="btn" type="button" data-kz="start">Mee bezig</button>
+      <button class="btn" type="button" data-kz="start"${kBezigBron(k.bron)?" disabled":""}>Mee bezig</button>
       <button class="btn kweg" type="button" data-kz="verborgen">${k.verborgen?"Toch tonen":"Nie voor mij"}</button></div>
   </article>`;
 }
@@ -824,7 +825,10 @@ async function kansNaLaden(){
 }
 
 /* ---------- knoppen ---------- */
+// 1 challenge per onderdeel tegelijk in de "doen"-fase (meten van een afgemelde mag doorlopen)
+const kBezigBron=bron=>KP.rijen.find(p=>p.bron===bron&&!p.gestopt_om)||null;
 async function kansStart(k){
+  const al=kBezigBron(k.bron);if(al){showMsg(`Je bent al bezig met een ${BRON[k.bron][0]}-challenge. Meld die eerst af.`);return}
   const nu=new Date();
   const p=await kpNieuw({sleutel:k.id,bron:k.bron,kop:k.h,actie:k.a,big:k.big,looptijd_dagen:k.dagen,gestart_om:nu.toISOString(),
     rapport_op:new Date(nu.getTime()+k.dagen*864e5).toISOString(),

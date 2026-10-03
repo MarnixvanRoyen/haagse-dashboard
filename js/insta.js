@@ -544,7 +544,7 @@ function renderInsta(){
   // 4. toppâhs (laatste 90 dagen of allâh tijde)
   renderIgTop();
   renderIgT5();   // 4b. Top 5 (alleen telefoon)
-  if(typeof renderIgSamen==="function")renderIgSamen();   // 5. samenwerkingen (samenwerking.js)
+  // 5. samenwerkingen: sinds 03-10 in het eigen menu-onderdeel Partnâhs (renderPartners in samenwerking.js)
 
   renderIgStories();
   renderIgMuziek();

@@ -363,7 +363,9 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kmkies{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13px;font-weight:700;color:var(--ink-2)}
 .krap,.khbody,.kmposts,.ins.kans{min-width:0}.krap,.khbody{grid-template-columns:minmax(0,1fr)}
 .kmkies select{flex:1 1 200px;width:100%;min-width:0;max-width:100%;text-overflow:ellipsis;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;font-weight:500}
-.kmuit{color:var(--muted);font-size:12px}.kmnie .chip{font-size:11px}
+.kmuit{color:var(--muted);font-size:12px}
+.kbezet{background:var(--warn-soft);border-radius:10px;padding:7px 10px}
+.kknop .btn:disabled{opacity:.45;cursor:not-allowed}.kmnie .chip{font-size:11px}
 .kmleeg{margin:0}
 .alarm.meting{border-color:var(--hy);background:var(--warn-soft)}
 .alarm.meting .alarmicoon{background:var(--hy);color:var(--hy-ink)}
@@ -571,3 +573,5 @@ body.popopen{overflow:hidden}
 #bkDownload:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:640px){.bkvoorbeeld{grid-template-columns:1fr}}
 .bkstatus details{margin-top:6px}.bkstatus summary{cursor:pointer;font-weight:800;color:var(--ink)}.bkstatus ol{margin:6px 0 0;padding-left:20px}
+/* menu Partnâhs (samenwerking.js, renderPartners): tabjes per kanaal; tabel mag nooit de pagina breder maken */
+#s-partners>div{min-width:0}

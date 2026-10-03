@@ -45,6 +45,7 @@
     <button type="button" data-s="muziek">Muziek</button>
     <button type="button" data-s="apps">Apps</button>
     <button type="button" data-s="kansen">Kansâh</button>
+    <button type="button" data-s="partners" class="pc">Partnâhs</button>
   </nav>
 
   <section class="sectie" id="s-ovahzicht" hidden>
@@ -332,24 +333,6 @@
           </div></div></div>
         <div id="igStories"></div></div>
       <div class="card pc">
-        <div class="cardhead"><div><h2>Samenwerkinge: wie helpt je groeie?</h2><p class="sub" id="igsSub"></p></div>
-          <div class="igtopknoppen">
-          <div class="seg" id="igsSorteer" role="group" aria-label="Sorteer partners op">
-            <button type="button" data-v="extra" aria-pressed="true">Extra volgâhs</button>
-            <button type="button" data-v="eigen" aria-pressed="false">Eigen effect</button>
-            <button type="button" data-v="grootte" aria-pressed="false" hidden>T.o.v. grootte</button>
-            <button type="button" data-v="vaak" aria-pressed="false">Vaakst samen</button>
-          </div>
-          <div class="seg" id="igsPeriode" role="group" aria-label="Periode samenwerkingen">
-            <button type="button" data-v="365" aria-pressed="true">Laatste jaar</button>
-            <button type="button" data-v="alles" aria-pressed="false">Allâh tijde</button>
-          </div></div></div>
-        <div class="ytstats" id="igsStats"></div>
-        <div class="tablewrap" style="margin-top:14px"><table id="igSamen"></table></div>
-        <button class="btn" id="igsMeer" type="button" hidden style="margin-top:10px">Alle partners tonen</button>
-        <div class="igsonder" id="igsOnder"></div>
-      </div>
-      <div class="card pc">
         <div class="cardhead"><div><h2>Welk nummâh zat eronder?</h2><p class="sub" id="igLabelSub"></p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <div class="seg" id="igSorteer" role="group" aria-label="Sorteer">
@@ -483,6 +466,34 @@
     <p class="sub">Klik <b>Mee bezig</b>: dan start de looptijd van die kans en onthoudt het dashboard de stand van dat moment. Meld je af met <b>Gedaan</b> of <b>Gestopt</b>. Na de looptijd krijg je een rapport (ook als je eerder afmeldt), alles terug te zien onder <b>Geschiedenis</b>. <b>Nie voor mij</b> zet een kans weg. Samenhang is geen bewijs: kijk ook naar hoe zeker een kaart is.</p>
     </div>
     <div id="kansGesch" class="kansblok" hidden></div>
+  </section>
+
+  <!-- Partnâhs: alle partner-performance (samenwerking.js, bedankkaart.js). Nu alleen Insta; later meer kanalen. Alleen Mac/iPad. -->
+  <section class="sectie" id="s-partners" hidden>
+    <nav class="appkeuze" id="ptTabs" aria-label="Partnâhs per kanaal">
+      <button type="button" data-pt="insta" aria-selected="true">Insta</button>
+    </nav>
+    <div id="ptAlarm"></div>
+    <div id="pt-insta">
+      <div class="card">
+        <div class="cardhead"><div><h2>Samenwerkinge: wie helpt je groeie?</h2><p class="sub" id="igsSub"></p></div>
+          <div class="igtopknoppen">
+          <div class="seg" id="igsSorteer" role="group" aria-label="Sorteer partners op">
+            <button type="button" data-v="extra" aria-pressed="true">Extra volgâhs</button>
+            <button type="button" data-v="eigen" aria-pressed="false">Eigen effect</button>
+            <button type="button" data-v="grootte" aria-pressed="false" hidden>T.o.v. grootte</button>
+            <button type="button" data-v="vaak" aria-pressed="false">Vaakst samen</button>
+          </div>
+          <div class="seg" id="igsPeriode" role="group" aria-label="Periode samenwerkingen">
+            <button type="button" data-v="365" aria-pressed="true">Laatste jaar</button>
+            <button type="button" data-v="alles" aria-pressed="false">Allâh tijde</button>
+          </div></div></div>
+        <div class="ytstats" id="igsStats"></div>
+        <div class="tablewrap" style="margin-top:14px"><table id="igSamen"></table></div>
+        <button class="btn" id="igsMeer" type="button" hidden style="margin-top:10px">Alle partners tonen</button>
+        <div class="igsonder" id="igsOnder"></div>
+      </div>
+    </div>
   </section>
 
   <footer class="eind"><span class="sig">Gemaakt in 070, âhwe!</span></footer>

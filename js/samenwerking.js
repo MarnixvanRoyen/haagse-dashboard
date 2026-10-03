@@ -1,4 +1,4 @@
-// samenwerking.js — kaart "Samenwerkinge" in de Insta-tab + waarschuwing voor de Facebook-sleutel.
+// samenwerking.js — kaart "Samenwerkinge" (menu Partnâhs → Insta, sinds 03-10; was in de Insta-tab) + waarschuwing voor de Facebook-sleutel.
 // Data: ig_partner / ig_partner_post / ig_partner_info / fb_token (supabase/12_samenwerkingen.sql)
 //       + de cijfers per post uit IG.posts (ig_post_stats, insta.js).
 // Rekenregels (afgesproken 30-09):
@@ -439,7 +439,18 @@ function fbAlarmHTML(){
   </div>`;
 }
 
+/* ---------- menu-onderdeel Partnâhs (sinds 03-10): tabjes per kanaal, nu alleen Insta ---------- */
+let ptTab="insta";
+function renderPartners(){
+  if(!$("s-partners"))return;
+  document.querySelectorAll("#ptTabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.pt===ptTab));
+  document.querySelectorAll('#s-partners [id^="pt-"]').forEach(d=>d.hidden=d.id!=="pt-"+ptTab);
+  $("ptAlarm").innerHTML=fbAlarmHTML();   // Facebook-sleutel: ook hier, want daar draait alles op
+  if(ptTab==="insta")renderIgSamen();
+}
+
 document.addEventListener("click",e=>{
+  const t=e.target.closest("#ptTabs button");if(t){ptTab=t.dataset.pt;renderPartners();return}
   const p=e.target.closest("#igsPeriode button");if(p){igsPeriode=p.dataset.v;renderIgSamen();return}
   const s=e.target.closest("#igsSorteer button");if(s){igsSorteer=s.dataset.v;renderIgSamen();return}
   if(e.target.closest("#igsMeer")){igsAlles=!igsAlles;renderIgSamen()}
