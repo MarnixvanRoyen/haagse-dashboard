@@ -25,6 +25,7 @@ let IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:null};
 let igsPeriode="365";     // "365" (laatste jaar) of "alles"
 let igsSorteer="extra";   // "extra" (extra volgâhs), "eigen" (eigen effect), "grootte" (t.o.v. z'n grootte) of "vaak" (vaakst samen)
 let igsAlles=false;       // alle partners tonen of de eerste 12
+let IGS_S=null;           // laatste uitkomst van igSamen() (voor de bedankkaart, bedankkaart.js)
 const IGS_MIN=3;          // vanaf zoveel posts een oordeel
 const IGS_WACHT=3;        // posts jonger dan zoveel dagen tellen nog niet mee (cijfers groeien nog)
 const IGS_LAAT=3*864e5;   // aangenomen meer dan 3 dagen na de post = laat (we checken elke 3 uur, dus ± 2½–3 dagen echt)
@@ -236,6 +237,7 @@ function igSamen(){
   });
   const eigen=igsEigen([...bruik.values()],grBij);
   rijen.forEach(r=>r.eigen=eigen.per.get(r.naam)||null);
+  rijen.forEach(r=>r.bedank=igsBedank(r));
   if(igsSorteer==="vaak")rijen.sort((a,b)=>b.n-a.n||(b.extra??-1e9)-(a.extra??-1e9));
   else rijen.sort((a,b)=>b.zeker-a.zeker||(b.extra??-1e9)-(a.extra??-1e9)||b.n-a.n);
 
@@ -266,6 +268,22 @@ function igSamen(){
     solo:{n:solo.length,medB:med(solo.map(x=>x.b)),medV:med(solo.map(x=>x.v)),...kwal(solo)},
     zonderCijfers:pp.filter(x=>(perPost.get(x.media_id)||{}).opTijd>0&&!bruik.has(x.media_id)).length,
     gecheckt:IGS.posts.length,metGrootte:rijen.some(r=>r.info&&r.info.volgers!=null)};
+}
+
+// Mag deze partner een bedankkaart krijgen? (afspraak 03-10: goed + kansrijk)
+//   "goed"     = oordeel Goed voor je (≥ IGS_MIN posts)
+//   "kansrijk" = nog te vroeg, maar volgens dezelfde regel al goed (≥ 1,25× volgers per post én ≥ 2 extra),
+//                of het eigen effect laat duidelijk plus zien (≥ 1 volger per post erbij, niet minder kijkers, leunt niet op 1 post)
+function igsBedank(r){
+  if(r.zeker&&r.oordeel==="goed")return "goed";
+  const regel=!r.zeker&&r.extra!=null&&r.extra>=2&&r.gewoonV!=null&&r.vpp>=1.25*r.gewoonV;
+  const eigen=r.eigen&&!r.eigen.leunt&&r.eigen.plus>=1&&r.eigen.fB>=1;
+  return regel||eigen?"kansrijk":null;
+}
+const IGS_HART='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+function igsBedankKnop(r){
+  return r.bedank?`<button type="button" class="bkknop" data-bk="${esc(r.naam)}" title="Bedankkaart maken voâh @${esc(r.naam)} (${r.bedank==="goed"?"goed voor je":"kansrijk"})" aria-label="Bedankkaart maken voor @${esc(r.naam)}">${IGS_HART}</button>`
+    :`<button type="button" class="bkknop" data-bk="${esc(r.naam)}" disabled title="Bedankkaart kan alleen bij goede of kansrijke partners" aria-label="Bedankkaart (alleen bij goede of kansrijke partners)">${IGS_HART}</button>`;
 }
 
 /* ---------- tekenen ---------- */
@@ -326,6 +344,7 @@ function renderIgSamen(){
   if(grKnop)grKnop.hidden=!metVerw;
   if(!metVerw&&igsSorteer==="grootte"){igsSorteer="eigen";
     document.querySelectorAll("#igsSorteer button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igsSorteer));s=igSamen()}
+  IGS_S=s;
   const c=s.collab,o=s.solo;
   $("igsSub").innerHTML=`Welke partners helpen je groeien? Per partner: de posts waarop die partner je uitnodiging <b>aannam</b>, vergeleken met al je andere samenwerkingen${igsPeriode==="365"?" van het laatste jaar":""}. Een partner die niet aannam telt niet mee: dan staat de post niet op hun profiel.`;
   $("igsStats").innerHTML=[
@@ -337,7 +356,7 @@ function renderIgSamen(){
 
   const toon=igsAlles?s.rijen:s.rijen.slice(0,12);
   $("igSamen").innerHTML=s.rijen.length?`<thead><tr><th>Partnâh</th><th class="n">Posts samen</th>${s.metGrootte?'<th class="igszelf" title="Hun eigen account: volgers, hoe vaak ze posten, hoe actief hun publiek is">Partnâh zelf</th>':""}<th class="n igseigen" title="Wat deze partner zelf toevoegt, los van de andere partners op dezelfde post">Eigen effect</th><th class="n">Neemt aan</th><th class="n">Kijkâhs</th><th class="n">Volgâhs per post</th><th class="n">Extra volgâhs</th><th class="n">Volgâhs per 1.000</th><th class="n">Profielbezoek per 1.000</th><th class="n">Likes + delen per kijkâh</th><th class="igsoordeel">Oordeel</th></tr></thead><tbody>`+
-    toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a>${r.u.laatst?`<span class="igsvs">laatst ${dLabel(dagNL(r.u.laatst),1)}</span>`:""}<div class="igsmob">${r.info&&r.info.volgers!=null?`<span class="igsvs">${igsKort(r.info.volgers)} volgâhs${r.info.per_week!=null?` · ${igNf1.format(+r.info.per_week)} posts/wk`:""}</span>`:""}${igsOordeel(r)}<div class="igsmobeigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}"><span class="igsvs">Eigen effect:</span>${igsEigenCel(r)}</div></div></td>
+    toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a>${igsBedankKnop(r)}${r.u.laatst?`<span class="igsvs">laatst ${dLabel(dagNL(r.u.laatst),1)}</span>`:""}<div class="igsmob">${r.info&&r.info.volgers!=null?`<span class="igsvs">${igsKort(r.info.volgers)} volgâhs${r.info.per_week!=null?` · ${igNf1.format(+r.info.per_week)} posts/wk`:""}</span>`:""}${igsOordeel(r)}<div class="igsmobeigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}"><span class="igsvs">Eigen effect:</span>${igsEigenCel(r)}</div></div></td>
       <td class="n">${nf0.format(r.n)}</td>
       ${s.metGrootte?`<td class="igszelf">${igsZelfCel(r)}</td>`:""}
       <td class="n igseigen${!r.eigen||r.eigen.n<IGS_MIN?" vroeg":""}">${igsEigenCel(r)}</td>

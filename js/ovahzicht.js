@@ -28,11 +28,12 @@ function streamRij(k,v,tot,s,attr=""){return `<div class="trij${attr?" klik":""}
 function tegelRij(k,v,s,attr=""){return `<div class="trij${attr?" klik":""}"${attr}><span class="k">${k}${attr?'<span class="trijpijl" aria-hidden="true">›</span>':""}</span><span class="v">${v}</span>${s?`<span class="s">${s}</span>`:""}</div>`}
 
 function renderOvahzicht(){
-  if($("ovAlarm")){$("ovAlarm").innerHTML=igAlarmHTML();igBadge()}   // Insta-koppeling stuk? meteen zichtbaar
+  if($("ovAlarm")){$("ovAlarm").innerHTML=igAlarmHTML()+thAlarmHTML()+kansMeldingHTML();igBadge();thBadge();kansBadge()}   // + klaar kans-rapport (kansen.js)   // Insta-koppeling stuk? meteen zichtbaar
   const poen=SC.reduce((a,r)=>a+r.usd,0)*state.rate+LABEL.periods.reduce((a,p)=>a+p.net,0);
   const sc=dagGroei(SCL.snaps,"track_id","plays"), yt=dagGroei(YT.snaps,"video_id","views");
   $("ovTegels").innerHTML=`
   ${instaTegel()}
+  ${threadsTegel()}
   <article class="tegel">
     <div class="tkop"><h2>Muziek</h2><span class="tag">Marreman Rojas & Beuk</span></div>
     <p class="tlbl">Poen tot nu toe</p>

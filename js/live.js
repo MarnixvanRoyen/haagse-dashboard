@@ -4,7 +4,7 @@
    YouTube en SoundCloud: bij het openen vraagt de app Supabase om nieuwe cijfers (rpc muziek_live,
    hooguit 1x per 10 min). "Vandaag erbè" = laatste meting van vandaag min de laatste meting van de dag ervoor.
    Spotify heeft geen API: daar is het verschil tussen de laatste twee CSV-exports. */
-const LIVE={yt:null,sc:null,gc:null,ig:null,bezig:false,t:0};
+const LIVE={yt:null,sc:null,gc:null,ig:null,th:null,bezig:false,t:0};
 store.del("hc_muziek_gezien");                         // oude "sinds je vorige bezoek"-telling opruimen
 function vandaagAms(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Amsterdam"}).format(new Date())}
 function tijdAms(ts){return ts?new Date(ts).toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Amsterdam"}):""}
@@ -47,18 +47,18 @@ function liveInfo(bron,g){
 // laatste meettijd van vandaag, voor de uitleg bovenaan de tabbladen
 function laatsteMeting(bron,g){const L=LIVE[bron]||{};
   return g?dLabel(g.last,1)+(L.om&&g.last===(L.vandaag||vandaagAms())?" "+tijdAms(L.om):""):"nog geen"}
-// YouTube, SoundCloud, GoatCounter (Sneek-bezoekers) en Insta tegelijk verversen, elk een eigen vraag (i.v.m. tijdslimiet)
+// YouTube, SoundCloud, GoatCounter (Sneek-bezoekers), Insta en Threads tegelijk verversen, elk een eigen vraag (i.v.m. tijdslimiet)
 async function muziekLive(){
   if(!sb||LIVE.bezig||Date.now()-LIVE.t<10*60e3)return;
   LIVE.bezig=true;LIVE.t=Date.now();hertekenLive();
-  const bronnen=["yt","sc","gc","ig"];
+  const bronnen=["yt","sc","gc","ig","th"];
   // na de Ververse-knop bovenaan mag het al na 5 min opnieuw (de oude "Nâh ververse"-knoppen per tabblad deden dat ook); gewoon openen: 10 min
   const mm=VERVERS_GEDRUKT?5:10;VERVERS_GEDRUKT=false;
-  const res=await Promise.all(bronnen.map(b=>(b==="gc"?sb.rpc("gc_live",{min_minuten:mm}):b==="ig"?sb.rpc("ig_live",{min_minuten:mm}):sb.rpc("muziek_live",{bron:b,min_minuten:mm})).then(r=>r,e=>({error:e}))));
+  const res=await Promise.all(bronnen.map(b=>(b==="gc"?sb.rpc("gc_live",{min_minuten:mm}):b==="ig"?sb.rpc("ig_live",{min_minuten:mm}):b==="th"?sb.rpc("th_live",{min_minuten:mm}):sb.rpc("muziek_live",{bron:b,min_minuten:mm})).then(r=>r,e=>({error:e}))));
   const laden=[];
   res.forEach((r,i)=>{const b=bronnen[i];
     LIVE[b]=r.error?{fout:r.error.message||String(r.error)}:r.data;
-    if(r.data&&r.data.ververst)laden.push(b==="yt"?loadYT():b==="sc"?loadSCL():b==="ig"?loadIG():loadGC());});
+    if(r.data&&r.data.ververst)laden.push(b==="yt"?loadYT():b==="sc"?loadSCL():b==="ig"?loadIG():b==="th"?loadTH():loadGC());});
   await Promise.all(laden);
   LIVE.bezig=false;
   hertekenLive();
@@ -68,6 +68,7 @@ function hertekenLive(){
   else if(sectie==="muziek"&&(state.tab==="youtube"||state.tab==="sclive"))render();
   else if(sectie==="apps")renderSneek();
   else if(sectie==="insta")renderInsta();
+  else if(sectie==="threads")renderThreads();
   else if(sectie==="kansen")renderKansen();
 }
 // statusstukje achter een live-getal: bezig / fout / wanneer bijgewerkt

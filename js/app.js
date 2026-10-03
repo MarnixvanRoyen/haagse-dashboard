@@ -1,6 +1,6 @@
-// app.js — het hoofdmenu: Ovâhzicht · Insta · Muziek · Apps · Kansâh
+// app.js — het hoofdmenu: Ovâhzicht · Insta · Threads · Muziek · Apps · Kansâh
 
-const SECTIES=["ovahzicht","insta","muziek","apps","kansen"];
+const SECTIES=["ovahzicht","insta","threads","muziek","apps","kansen"];
 let sectie="ovahzicht";                            // bij openen altijd op het Ovâhzicht beginnen
 store.del("hc_sectie");                            // oude "laatste plek" opruimen
 // na de Ververse-knop: terug naar het onderdeel waar je was (alleen voor die ene keer, niet bij gewoon openen)
@@ -15,6 +15,7 @@ function setSectie(s){
   if(s==="ovahzicht")renderOvahzicht();
   if(s==="apps")renderSneek();
   if(s==="insta")renderInsta();
+  if(s==="threads")renderThreads();
   if(s==="kansen")renderKansen();
 }
 document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));

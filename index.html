@@ -41,6 +41,7 @@
   <nav class="hoofdmenu" aria-label="Onderdelen">
     <button type="button" data-s="ovahzicht">Ovâhzicht</button>
     <button type="button" data-s="insta">Insta</button>
+    <button type="button" data-s="threads">Threads</button>
     <button type="button" data-s="muziek">Muziek</button>
     <button type="button" data-s="apps">Apps</button>
     <button type="button" data-s="kansen">Kansâh</button>
@@ -367,6 +368,65 @@
     </div>
   </section>
 
+  <section class="sectie" id="s-threads" hidden>
+    <div id="thAlarm"></div>
+    <div id="thBlok" class="sectie">
+      <div class="card">
+        <div class="cardhead"><div><h2>Threads · @the_hague_beachlife</h2><p class="sub" id="thSub"></p><div id="thStatus"></div></div></div>
+        <div class="ytstats" id="thStats"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Weergaven per dag</h2><p class="sub">Laatste 30 Meta-dagen (Amerikaanse tijd, bij ons van 09:00 tot 09:00). Hoe vaak je Threads bekeken werd, volgens Meta's account-cijfâhs. Onderin je volgâhs per dag, netto (groen = meer erbij, rood = meer weg): Meta geeft geen nieuw/weg apart, dus dit is het verschil in de stand van dag tot dag. De laatste dag loopt nog, daarom met een stippelrand.</p></div>
+          <div class="legend"><span><i class="dot hy"></i>Weergaven</span></div></div>
+        <div class="chart" id="thChart"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2 id="thPostKop">Weergaven per post</h2><p class="sub" id="thPostSub"></p></div>
+          <div class="igtopknoppen">
+          <div class="seg" id="thPostMaat" role="group" aria-label="Welk cijfer">
+            <button type="button" data-v="views" aria-pressed="true">Weergaven</button>
+            <button type="button" data-v="inter" aria-pressed="false">Interactie</button>
+          </div></div></div>
+        <div class="legend" style="margin:-4px 0 10px"><span><i class="dot hy"></i>Per post</span><span><i class="dot good"></i>Trend (middelste van 5 posts)</span></div>
+        <div class="chart" id="thPostChart"></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Threads vs Insta</h2><p class="sub" id="thVsSub"></p></div></div>
+        <div class="tablewrap"><table id="thVs"></table></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Je Threads-toppâhs</h2><p class="sub" id="thTopSub"></p></div>
+          <div class="igtopknoppen">
+          <div class="seg" id="thTopPer" role="group" aria-label="Periode">
+            <button type="button" data-v="30" aria-pressed="true">30 d</button>
+            <button type="button" data-v="90" aria-pressed="false">90 d</button>
+            <button type="button" data-v="alles" aria-pressed="false">Allâh tijde</button>
+          </div>
+          <div class="seg igtopop" id="thTopOp" role="group" aria-label="Sorteer op">
+            <button type="button" data-v="views" aria-pressed="true">Weergaven</button>
+            <button type="button" data-v="likes" aria-pressed="false">Likes</button>
+            <button type="button" data-v="replies" aria-pressed="false">Reacties</button>
+            <button type="button" data-v="reposts" aria-pressed="false">Reposts</button>
+            <button type="button" data-v="inter" aria-pressed="false">Interactie</button>
+          </div></div></div>
+        <div class="tablewrap"><table id="thTop"></table></div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><div><h2>Waâh wone je volgâhs?</h2><p class="sub" id="thDemoSub"></p></div>
+          <div class="seg" id="thDemoOp" role="group" aria-label="Stad of land">
+            <button type="button" data-v="city" aria-pressed="true">Stad</button>
+            <button type="button" data-v="country" aria-pressed="false">Land</button>
+          </div></div>
+        <div class="bars" id="thDemo"></div>
+      </div>
+    </div>
+    <div class="card binnenkort" id="thNog" hidden>
+      <h2>Threads · @the_hague_beachlife</h2>
+      <p class="kd">Komt d'r an, âhwe!</p>
+      <p class="sub" id="thNogTekst"></p>
+    </div>
+  </section>
+
   <section class="sectie" id="s-apps" hidden>
     <nav class="appkeuze" aria-label="Kies een app"><button type="button" aria-selected="true">Haagse Sneek</button></nav>
     <div class="card">
@@ -404,6 +464,11 @@
   </section>
 
   <section class="sectie" id="s-kansen" hidden>
+    <nav class="appkeuze" id="kansTabs" aria-label="Kansâh">
+      <button type="button" data-kt="nu" aria-selected="true">Nu</button>
+      <button type="button" data-kt="geschiedenis" aria-selected="false">Geschiedenis</button>
+    </nav>
+    <div id="kansNu" class="kansblok">
     <div class="card khero">
       <div class="cardhead"><div><h2>Waâh zit nog wat?</h2><p class="sub" id="kansSub"></p></div>
         <div class="seg" id="kansFilter" role="group" aria-label="Filter">
@@ -415,12 +480,35 @@
       <div class="ktop"><h3>Doe dit deze week</h3><ol id="kansTop"></ol></div>
     </div>
     <div id="kansLijst"></div>
-    <p class="sub">Klik <b>Mee bezig</b> of <b>Gedaan</b>: dan onthoudt het dashboard de stand van dat moment en zie je bij de kaart of het betâh gaat. <b>Nie voor mij</b> zet een kans weg. Samenhang is geen bewijs: kijk ook naar hoe zeker een kaart is.</p>
+    <p class="sub">Klik <b>Mee bezig</b>: dan start de looptijd van die kans en onthoudt het dashboard de stand van dat moment. Meld je af met <b>Gedaan</b> of <b>Gestopt</b>. Na de looptijd krijg je een rapport (ook als je eerder afmeldt), alles terug te zien onder <b>Geschiedenis</b>. <b>Nie voor mij</b> zet een kans weg. Samenhang is geen bewijs: kijk ook naar hoe zeker een kaart is.</p>
+    </div>
+    <div id="kansGesch" class="kansblok" hidden></div>
   </section>
 
   <footer class="eind"><span class="sig">Gemaakt in 070, âhwe!</span></footer>
 </div>
 <div id="tip" hidden></div>
+
+<!-- pop-up bedankkaart voor een partner (bedankkaart.js, bkOpen vanuit het hartje in Samenwerkinge) -->
+<div class="vnpop" id="bkPop" hidden>
+  <div class="vnpopkaart card bkkaart" role="dialog" aria-modal="true" aria-labelledby="bkTitel">
+    <div class="cardhead"><div><h2 id="bkTitel">Bedankkaart</h2><p class="sub" id="bkSub"></p></div>
+      <button class="btn" type="button" id="bkDicht" aria-label="Sluite">✕</button></div>
+    <div class="bkkeuze">
+      <div class="seg" id="bkTaal" role="group" aria-label="Taal van de kaart">
+        <button type="button" data-v="haags" aria-pressed="true">Haags</button>
+        <button type="button" data-v="en" aria-pressed="false">English</button>
+      </div>
+      <label class="bkpost">Voorbeeldpost <select id="bkPost"></select></label>
+    </div>
+    <div class="bkvoorbeeld">
+      <label class="bkoptie"><span><input type="checkbox" id="bkPng" checked> Plaatje voâh de chat <small>1080×1350 · PNG</small></span><canvas id="bkCanvas" width="1080" height="1350" aria-label="Voorbeeld plaatje"></canvas></label>
+      <label class="bkoptie"><span><input type="checkbox" id="bkPdf" checked> A4 <small>PDF · links klikbaar</small></span><canvas id="bkA4" width="1654" height="2339" aria-label="Voorbeeld A4"></canvas></label>
+    </div>
+    <p class="sub bkstatus" id="bkStatus"></p>
+    <button class="btn yellow" type="button" id="bkDownload">Downloade</button>
+  </div>
+</div>
 
 <!-- pop-up "Wat draaide d'r vandaag?" vanaf de Ovâhzicht-tegel Muziek (live.js, vnPopOpen) -->
 <div class="vnpop" id="vnPop" hidden>
@@ -429,6 +517,15 @@
       <button class="btn" type="button" id="vnPopDicht" aria-label="Sluite">✕</button></div>
     <div id="vnPopInhoud"></div>
     <button class="btn yellow vnpopnaar" type="button" id="vnPopNaar">Kèk bè SoundCloud live</button>
+  </div>
+</div>
+<!-- pop-up "Rapport klaar" van een kans (kansen.js, kansPopOpen) -->
+<div class="vnpop" id="kansPop" hidden>
+  <div class="vnpopkaart card" role="dialog" aria-modal="true" aria-labelledby="kansPopTitel">
+    <div class="cardhead"><div><h2 id="kansPopTitel">Rapport klaar!</h2><p class="sub" id="kansPopSub"></p></div>
+      <button class="btn" type="button" id="kansPopDicht" aria-label="Sluite">✕</button></div>
+    <div id="kansPopInhoud"></div>
+    <div class="kpopknop"><button class="btn yellow" type="button" id="kansPopGelezen">Gelezen ✓</button><button class="btn" type="button" id="kansPopLater">Later</button></div>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
@@ -440,6 +537,8 @@
 <script src="js/apps.js"></script>
 <script src="js/insta.js"></script>
 <script src="js/samenwerking.js"></script>
+<script src="js/bedankkaart.js"></script>
+<script src="js/threads.js"></script>
 <script src="js/kansen.js"></script>
 <script src="js/ovahzicht.js"></script>
 <script src="js/app.js"></script>
