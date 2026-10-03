@@ -46,8 +46,7 @@ function renderOvahzicht(){
     </div>
     <button class="btn yellow" type="button" data-ga="muziek">Kèk bè Muziek</button>
   </article>
-  ${appsTegel()}
-  ${kansTegel()}`;
+  ${appsTegel()}`;   // Kansâh-tegel weg (03-10): lopende kansen staan bovenaan in #ovAlarm (kansMetingHTML)
 }
 
 function appsTegel(){

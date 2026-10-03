@@ -936,12 +936,20 @@ function kansBadge(){
 }
 // taken met meetplan die na afmelden nog meten (voor de voortgang-pop-up en de melding)
 function kansMetingen(){return KP.rijen.filter(p=>p.gestopt_om&&!p.rapport&&kmPlan(p.sleutel)).sort((a,b)=>a.rapport_op<b.rapport_op?-1:1)}
+// Bovenaan Ovâhzicht (sinds 03-10, wens Marnix: Kansâh-tegel weg, alleen boven de lopende kansen):
+// alle pogingen zonder rapport, zowel "mee bezig" (doen-fase) als "meet nog" (afgemeld, rapport volgt).
 function kansMetingHTML(){
-  const l=kansMetingen();if(!l.length)return "";
+  const l=KP.rijen.filter(p=>!p.rapport).sort((a,b)=>(!!a.gestopt_om-!!b.gestopt_om)||(a.rapport_op<b.rapport_op?-1:1));
+  if(!l.length)return "";
+  const regel=p=>{
+    if(!p.gestopt_om)return `${bronChip(p.bron)} ${esc(kTekst(p.kop)).slice(0,80)} · <b>mee bezig</b>${kRapDatumVast(p)?` · rapport ${kD(p.rapport_op)}`:` sinds ${kD(p.gestart_om)}`}`;
+    const st=kmPlan(p.sleutel)?kmStand(p):null,E=st&&st.E;
+    return `${bronChip(p.bron)} ${esc(kTekst(p.kop)).slice(0,80)} · meet nog · rapport ${kD(p.rapport_op)}${E!=null?` · nu <b>${kX(E)}</b> je normaal`:""}`;
+  };
   return `<div class="alarm meting" role="status">
-    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">◔</span><h2>${l.length===1?"Meting loopt":l.length+" metingen lopen"}</h2></div>
-    <p>${l.slice(0,3).map(p=>{const st=kmStand(p),E=st&&st.E;return `${bronChip(p.bron)} ${esc(kTekst(p.kop)).slice(0,80)} · rapport ${kD(p.rapport_op)}${E!=null?` · nu <b>${kX(E)}</b> je normaal`:""}`}).join("<br>")}</p>
-    <p><button class="btn" type="button" data-kansvoort>Bekijk de voortgang</button></p>
+    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">◔</span><h2>${l.length===1?"Lopende kans":l.length+" lopende kansâh"}</h2></div>
+    <p>${l.slice(0,4).map(regel).join("<br>")}${l.length>4?`<br>en nog ${l.length-4}`:""}</p>
+    <p>${kansMetingen().length?'<button class="btn" type="button" data-kansvoort>Bekijk de voortgang</button> ':""}<button class="btn" type="button" data-ga="kansen">Kèk bè Kansâh</button></p>
   </div>`;
 }
 function kansMeldingHTML(){
@@ -990,22 +998,6 @@ function kansPopBijStart(){
   if(kansMetingen().length){const d=vandaagAms();if(store.get("hc_kans_voort")===d)return;store.set("hc_kans_voort",d);kansVoortOpen()}
 }
 function kansNaWijzig(){kansBadge();if(sectie==="kansen")renderKansen();else if(sectie==="ovahzicht")renderOvahzicht();else if(sectie==="muziek")render()}
-
-// Ovâhzicht-tegel (sinds 03-10): alleen wat loopt. Open kansen ("Doe dit deze week") staan alleen nog onder Kansâh.
-// Niks lopend en geen rapport klaar → geen tegel.
-function kansTegel(){
-  const g=kansGroepen(kansenAlle(),"alles");
-  const loopt=KP.rijen.filter(p=>!p.rapport),volgende=loopt.filter(kRapDatumVast).map(p=>p.rapport_op).sort()[0],nieuw=kansNieuweRapporten().length;
-  if(!loopt.length&&!nieuw)return "";
-  const bezig=g.bezig.slice(0,3).map(({p,k})=>`<div class="trij"><span class="k">${bronChip(p.bron)}</span><span class="v">${k?k.big:p.big||""}</span><span class="s">${k?k.h:p.kop||esc(p.sleutel)}</span></div>`).join("");
-  return `<article class="tegel">
-    <div class="tkop"><h2>Kansâh</h2><span class="tag">${nf0.format(loopt.length)} lopend</span></div>
-    <p class="tlbl">${g.bezig.length?"Mee bezig":"Lopende kansâh"}</p>
-    <div class="trijen">${bezig}
-      <div class="trij klik" data-kansgesch role="button" tabindex="0"><span class="k">Lopende kansâh<span class="trijpijl" aria-hidden="true">›</span></span><span class="v">${nf0.format(loopt.length)}</span><span class="s">${nieuw?`<b class="up">${nieuw} rapport${nieuw>1?"en":""} klaar</b>`:""}${nieuw&&volgende?" · ":""}${volgende?"volgende rapport "+kD(volgende):""}</span></div></div>
-    <button class="btn yellow" type="button" data-ga="kansen">Kèk bè Kansâh</button>
-  </article>`;
-}
 
 document.addEventListener("click",async e=>{
   const t=e.target;if(!t.closest)return;
