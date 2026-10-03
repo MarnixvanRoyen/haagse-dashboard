@@ -43,6 +43,7 @@ const kD=ts=>dKort(dagNL(ts));                                            // "za
 const KP_LOK="hc_kans_pogingen";
 function kpLokaalBewaar(){store.set(KP_LOK,JSON.stringify(KP.rijen.map(p=>({...p,metingen:Object.fromEntries(KP.met.get(p.id)||[])}))))}
 async function loadKansen(){
+  KM_CURVE_CACHE=null;kmLaden();   // ig_media_dag (meetplan per taak), loopt parallel; KM_LAADT wacht erop in kansNaLaden
   try{
     const {data,error}=await sb.from("kans_status").select("sleutel,status,waarde_toen,tekst_toen,gezet_om");
     if(error)throw error;
@@ -155,7 +156,7 @@ function kansenMuziek(d){
   if(lnd.length>=3){const gem=d.countries.reduce((a,c)=>a+c.v,0)/Math.max(1,d.countries.reduce((a,c)=>a+c.units,0))*1000;
     const beste=lnd.map(c=>({...c,per:c.v/c.units*1000})).filter(c=>c.c!==d.countries[0].c).sort((a,b)=>b.per-a.per)[0];
     if(beste&&gem&&beste.per>=1.3*gem)out.push({id:"muziek-land-"+beste.c,bron:"muziek",impact:25,n:beste.units>=500?10:6,
-      big:eur(beste.per),h:`per 1.000 streams in ${esc(cName(beste.c))}, ${nf1k.format(beste.per/gem)}× je gemiddelde`,
+      big:eur(beste.per),h:`per 1.000 streams in ${esc(cName(beste.c))}, ${kX(beste.per/gem)} je gemiddelde`,
       p:`Je meeste geld komt uit ${esc(cName(d.countries[0].c))}, maar een stream uit ${esc(cName(beste.c))} is meer waard (${nf0.format(beste.units)} streams gemeten).`,
       a:`<b>Doe:</b> gebruik Engelse bijschriften en tags die daar werken, en zoek SoundCloud-reposters of playlists uit ${esc(cName(beste.c))}.`})}
   // 7. label vs zelf uitbrengen
@@ -344,12 +345,24 @@ function kLaatste(p){const m=KP.met.get(p.id);if(!m||!m.size)return null;return 
 function kRicht(voor,na,beter){if(voor==null||na==null)return null;const d=voor===0?(na===0?0:Math.sign(na)):(na-voor)/Math.abs(voor);return beter==="lager"?-d:d}
 // balkje: hoe ver ben je in de looptijd, en wanneer komt het rapport
 function kLoop(p){
+  if(kmPlan(p.sleutel)&&!p.rapport)return kmLoop(p);
   const t0=Date.parse(p.gestart_om),t1=Date.parse(p.rapport_op),f=Math.max(0,Math.min(1,(Date.now()-t0)/Math.max(1,t1-t0)));
   const dag=Math.max(1,Math.min(p.looptijd_dagen,Math.floor((Date.now()-t0)/864e5)+1)),nog=Math.max(0,Math.ceil((t1-Date.now())/864e5));
   const voor=p.gestopt_om?`${p.afloop==="gestopt"?"Gestopt":"Gedaan"} op ${kD(p.gestopt_om)} · `:p.rapport?"":`Dag ${dag} van ${p.looptijd_dagen} · `;
   const rap=p.rapport?`rapport is klaar ✓ <button class="lnk" type="button" data-khopen="${p.id}">bekijk</button>${p.gestopt_om?"":" · meld je af met Gedaan of Gestopt"}`
     :`rapport op <b>${kD(p.rapport_op)}</b> ${nog?`(nog ${nog} dag${nog>1?"en":""})`:"(vandaag)"}`;
   return `<div class="kloop"><div class="kloopt">${voor}${rap}</div><div class="kbalk" role="progressbar" aria-label="Looptijd" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(f*100)}"><i style="width:${(f*100).toFixed(1)}%"></i></div></div>`;
+}
+// looptijd van een taak met meetplan: doen (tot je afmeldt) → meten (tot de laatste post ± 95% van z'n eindstand heeft)
+function kmLoop(p){
+  if(!p.gestopt_om){const plan=kmPlan(p.sleutel),dl=kmDeadline(p,plan),st=kmStand(p),n=st?st.taak.length:0,a=plan.doen&&plan.doen.aantal;
+    const t0=Date.parse(p.gestart_om),t1=dl?Date.parse(dl):t0,f=dl?Math.max(0,Math.min(1,(Date.now()-t0)/Math.max(1,t1-t0))):0,nog=dl?Math.max(0,kDagen(vandaagAms(),dagNL(t1))):0;
+    return `<div class="kloop"><div class="kloopt"><b>Doen:</b> ${kmDoenTekst(plan,dl)}${dl?nog?` (nog ${nog} dag${nog===1?"":"en"})`:" (vandaag)":""} · ${a?`<b>${n} van ${a}</b> gedaan${n>=a?" ✓":""}`:`${n} ${esc(plan.wat)} tot nu`}</div>
+      <div class="kbalk" role="progressbar" aria-label="Tijd tot de deadline" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(f*100)}"><i style="width:${(f*100).toFixed(1)}%"></i></div>
+      <div class="kloopt">Meld je af met Gedaan of Gestopt als je klaar bent; doe je dat nie, dan sluit de taak vanzelf op de deadline. Daarna meet het dashboard door tot je laatste post z'n eindstand heeft.</div></div>`}
+  const t0=Date.parse(p.gestopt_om),t1=Date.parse(p.rapport_op),f=Math.max(0,Math.min(1,(Date.now()-t0)/Math.max(1,t1-t0))),nog=Math.max(0,kDagen(vandaagAms(),dagNL(t1)));
+  const st=kmStand(p),a=st&&st.doenAantal,n=st?st.taak.length:0,auto=st&&st.deadline&&Math.abs(Date.parse(st.deadline)-t0)<2000;
+  return `<div class="kloop"><div class="kloopt">${auto?"Deadline voorbij":p.afloop==="gestopt"?"Gestopt":"Gedaan"} op ${kD(p.gestopt_om)}${a?` (${n} van ${a} ${n>=a?"✓":"gedaan"})`:""} · <b>meting loopt</b> · rapport op <b>${kD(p.rapport_op)}</b> ${nog?`(nog ${nog} dag${nog>1?"en":""})`:"(vandaag)"}</div><div class="kbalk" role="progressbar" aria-label="Meting" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(f*100)}"><i style="width:${(f*100).toFixed(1)}%"></i></div></div>`;
 }
 function kMeetRegel(p,nu){
   if(!p.meet_naam||p.waarde_start==null)return "";
@@ -367,11 +380,17 @@ function kansKaart(k){
     <div class="kkop">${bronChip(k.bron)}${kansGrootte(k)}${kansZeker(k)}</div>
     <span class="big">${k.big}</span><h3>${k.h}</h3><p>${k.p}</p><div class="act">${k.a}</div>
     ${k.trend?`<div class="kvoort">Trend: ${k.trend}</div>`:""}${k.vorige?kVorigeRegel(k.vorige):""}
-    <div class="kloopt">Looptijd <b>${k.dagen} dagen</b>: begin je nu, dan krijg je op ${rap} een rapport.</div>
+    ${kmPlan(k.id)?kmOpenRegel(k):`<div class="kloopt">Looptijd <b>${k.dagen} dagen</b>: begin je nu, dan krijg je op ${rap} een rapport.</div>`}
     <div class="kknop">
       <button class="btn" type="button" data-kz="start">Mee bezig</button>
       <button class="btn kweg" type="button" data-kz="verborgen">${k.verborgen?"Toch tonen":"Nie voor mij"}</button></div>
   </article>`;
+}
+function kmOpenRegel(k){
+  let s=null;try{s=kmStand({sleutel:k.id,gestart_om:new Date().toISOString(),gestopt_om:null})}catch(e){}
+  const M=s&&s.M;
+  const plan=kmPlan(k.id),dl=kmDeadline({sleutel:k.id,gestart_om:new Date().toISOString()},plan);
+  return `<div class="kloopt"><b>Doen:</b> ${kmDoenTekst(plan,dl)}. <b>Meten:</b> daarna tot je laatste post z'n eindstand heeft (± ${s?s.klaarNaFeed:5} dagen, reel ± ${s?s.klaarNaReel:10}), dan het rapport.${s&&s.alleMed!=null?` Verwachting: <b>${M.fmt(s.alleMed*s.factor)}</b> ${M.kort}${M.curve?" per post":""}${s.factor!==1?` (${kX(s.factor)} je normaal)`:""}.`:""}</div>`;
 }
 // mee bezig: looptijd + voortgang + afmelden
 function kansBezigKaart({p,k}){
@@ -379,7 +398,7 @@ function kansBezigKaart({p,k}){
   return `<article class="ins kans k-bezig" data-kp="${p.id}">
     <div class="kkop">${bronChip(p.bron)}<span class="chip warn">mee bezig</span>${k&&k.stil?'<span class="chip mute" title="De cijfâhs geven nu geen aanleiding meer voor deze kaart (misschien al gelukt, misschien veranderd). Het dashboard blijft wel meten tot het rapport.">staat nu nie meer bij je kansâh</span>':""}</div>
     <span class="big">${k?k.big:p.big||""}</span><h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${k&&!k.stil?`<p>${k.p}</p>`:""}<div class="act">${k?k.a:p.actie||""}</div>
-    ${kLoop(p)}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
+    ${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
     <div class="kknop">
       <button class="btn" type="button" data-kz="gedaan">Gedaan ✓</button>
       <button class="btn" type="button" data-kz="gestopt">Gestopt</button>
@@ -390,7 +409,7 @@ function kansBezigKaart({p,k}){
 function kansWachtKaart({p,k}){
   return `<article class="ins kans k-wacht" data-kp="${p.id}">
     <div class="kkop">${bronChip(p.bron)}${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':'<span class="chip good">gedaan ✓</span>'}</div>
-    <h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${kLoop(p)}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
+    <h3>${k?k.h:p.kop||esc(p.sleutel)}</h3>${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p,k&&k.meet?k.meet.waarde:null)}
   </article>`;
 }
 function kansNuHTML(alle,bron){
@@ -449,6 +468,7 @@ function kUitkomsten(bron,v){
   return u;
 }
 function kansRapportMaak(p){
+  if(kmPlan(p.sleutel)){const st=kmStand(p);if(st)return kmRapportMaak(p,st)}
   const v=kVenster(p),rapDag=dagNL(p.rapport_op),start=v.van;
   const m=[...(KP.met.get(p.id)||new Map())].sort((a,b)=>a[0]<b[0]?-1:1);
   let meet=null;
@@ -469,6 +489,18 @@ function kansRapportMaak(p){
   return {v:1,oordeel,grond,hoofd:hoofd?hoofd.naam:null,
     periode:{van:v.van,tot:v.tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:v.L},meet,uitkomsten,gemaakt:new Date().toISOString()};
 }
+// rapport voor een taak met meetplan: de taak-posts t.o.v. je normaal en t.o.v. de verwachting, plus je account in die periode
+function kmRapportMaak(p,st){
+  const o=kmOordeel(st),van=dagNL(p.gestart_om),tot=dagNL(p.rapport_op),L=Math.max(1,kDagen(van,tot)+1);
+  const v={L,van,tot,vvan:kDag(van,-L),vtot:kDag(van,-1)};
+  const uitkomsten=kUitkomsten(p.bron,v);
+  return {v:2,oordeel:o.oordeel,verw:o.verw,grond:"plan",hoofd:null,
+    plan:{maat:st.maat,wat:st.plan.wat,deadline:st.deadline,doenAantal:st.doenAantal||null,factor:st.factor,factorBron:st.factorBron,alleMed:st.alleMed,E:st.E,curveBron:st.curveBron,klaarNaFeed:st.klaarNaFeed,klaarNaReel:st.klaarNaReel,taakStart:p.gestart_om,
+      taak:st.taak.map(r=>({...r,plaatje:null}))},
+    periode:{van,tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:L},meet:null,uitkomsten,gemaakt:new Date().toISOString()};
+}
+// bewaard rapport weer als "stand" tekenen (zelfde HTML als tijdens de meting)
+function kmUitRapport(r){const P=r.plan;return {...P,M:KM_MAAT[P.maat],plan:{wat:P.wat},taak:P.taak.map(t=>({...t,plaatje:(IG.posts.find(x=>x.media_id===t.id)||{}).plaatje||null}))}}
 const kWaarde=(x,fmt)=>x==null?"—":fmt==="0"?nf0.format(x):fmt==="pct"?nf0.format(x)+"%":nf1k.format(x);
 function kVerschil(voor,na,beter){
   if(voor==null||na==null)return '<span class="sub">nog geen data</span>';
@@ -485,6 +517,12 @@ function kSpark(reeks){
   return `<svg class="kspark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Verloop van ${reeks.length} metingen"><path d="M${pt.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join("L")}" fill="none" stroke="var(--hy)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${pt[pt.length-1][0].toFixed(1)}" cy="${pt[pt.length-1][1].toFixed(1)}" r="3.2" fill="var(--hy)"/></svg>`;
 }
 function kOordeelUitleg(r,p){
+  if(r.plan){const P=r.plan,M=KM_MAAT[P.maat],n=P.taak.length,w=esc(P.wat);
+    if(!n)return `Geen ${w} gevonden tussen de start en het afmelden, dus nix te meten. Werd je post nie herkend? Label hem in de Insta-tab.`;
+    const xs=`${n===1?"Je post deed":`Je ${n} ${w} deden (middelste)`} <b>${kX(P.E||0)}</b> je normaal (${M.naam})`;
+    const vw=r.verw==="boven"?"Dat is méér dan verwacht":r.verw==="onder"?"Dat is minder dan verwacht":"Dat is zoals verwacht";
+    const vt=`${vw} (${kX(P.factor)}).`;
+    return r.oordeel==="werkte"?`${xs}. ${vt} Blijven doen, âhwe!`:r.oordeel==="slechter"?`${xs}: onder je normaal. ${vt}`:r.oordeel==="geen"?`${xs}: ongeveer je normaal. ${vt}`:`${xs}. Te weinig data voor een oordeel.`+(n<3?"":"")}
   const L=r.periode.dagen,m=r.meet,h=r.uitkomsten.find(x=>x.naam===r.hoofd);
   const mt=m&&m.eind!=null?`${esc(m.naam)} ging van ${kFmt(p)(m.start)} naâh ${kFmt(p)(m.eind)}`:"";
   const ht=h?`${h.naam.toLowerCase()} ${kWaarde(h.voor,h.fmt)} → ${kWaarde(h.na,h.fmt)} (${L} dagen ervóór vs ${L} dagen mee bezig)`:"";
@@ -501,19 +539,162 @@ function kansRapportHTML(p){
   const O=KANS_OORDEEL[r.oordeel]||KANS_OORDEEL.onbekend,f=kFmt(p),L=r.periode.dagen;
   const af=p.gestopt_om?`${p.afloop==="gestopt"?"gestopt":"gedaan"} op <b>${kD(p.gestopt_om)}</b> (na ${Math.max(1,kDagen(dagNL(p.gestart_om),dagNL(p.gestopt_om)))} dag${kDagen(dagNL(p.gestart_om),dagNL(p.gestopt_om))>1?"en":""})`:"nog nie afgemeld";
   let h=`<div class="krap">
-    <div class="kkop">${bronChip(p.bron)}<span class="chip ${O.c}">${O.t}</span>${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':p.afloop?'<span class="chip good">gedaan ✓</span>':'<span class="chip warn">nog mee bezig</span>'}</div>
+    <div class="kkop">${bronChip(p.bron)}<span class="chip ${O.c}">${O.t}</span>${r.verw?`<span class="chip mute">${KM_VERW[r.verw]}</span>`:""}${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':p.afloop?'<span class="chip good">gedaan ✓</span>':'<span class="chip warn">nog mee bezig</span>'}</div>
     <h3>${p.kop||esc(p.sleutel)}</h3>
-    <p class="kwanneer">Mee bezig vanaf <b>${kD(p.gestart_om)}</b> · ${af} · rapport na ${L} dagen</p>
+    <p class="kwanneer">Mee bezig vanaf <b>${kD(p.gestart_om)}</b> · ${af} · ${r.plan?`rapport op ${kD(p.rapport_op)}`:`rapport na ${L} dagen`}</p>
     <p class="kuitleg">${kOordeelUitleg(r,p)}</p>`;
+  if(r.plan&&r.plan.doenAantal){const n=r.plan.taak.length,a=r.plan.doenAantal;h+=`<p class="kwanneer"><b>Taak:</b> ${n} van ${a} ${esc(r.plan.wat)} ${n>=a?"gedaan ✓":"gedaan"}${r.plan.deadline?` (deadline ${kD(r.plan.deadline)})`:""}</p>`}
+  if(r.plan)h+=kmHTML(kmUitRapport(r),{rapport:true})+(r.plan.taak.length&&r.plan.taak.length<3?'<p class="sub">Let op: gemeten op maar '+r.plan.taak.length+' post'+(r.plan.taak.length>1?"s":"")+', dus voorzichtig met conclusies.</p>':"");
   const m=r.meet;
   if(m)h+=`<div class="kmeet"><div><span class="k">Doel-cijfâh: ${esc(m.naam)}</span>
       <span class="v">${m.start!=null?f(m.start):"—"} → ${m.eind!=null?f(m.eind):"—"}</span>
       <span class="s">${m.eind!=null&&m.start!=null?kVerschil(m.start,m.eind,m.beter)+" · ":""}${m.eind_dag?"gemeten op "+dKort(m.eind_dag):"geen meting aan het eind"} · ${m.beter==="lager"?"lagâh":"hogâh"} is betâh</span></div>${kSpark(m.reeks)}</div>`;
-  if(r.uitkomsten.length)h+=`<div class="tablewrap"><table class="ktab"><thead><tr><th>Cijfâh</th><th class="n"><span class="pc">${L} d </span>ervóór</th><th class="n"><span class="pc">${L} d mee </span>bezig</th><th class="n">Verschil</th></tr></thead><tbody>
+  if(r.uitkomsten.length)h+=`<div class="tablewrap"><table class="ktab"><thead><tr><th>Cijfâh</th><th class="n"><span class="pc">${L} d </span>ervóór</th><th class="n"><span class="pc">${L} d ${r.plan?"":"mee "}</span>${r.plan?"sinds start":"bezig"}</th><th class="n">Verschil</th></tr></thead><tbody>
     ${r.uitkomsten.map(x=>`<tr${x.naam===r.hoofd?' class="hoofd"':""}><td>${esc(x.naam)}</td><td class="n">${kWaarde(x.voor,x.fmt)}</td><td class="n">${kWaarde(x.na,x.fmt)}</td><td class="n">${kVerschil(x.voor,x.na,x.beter)}</td></tr>`).join("")}
-    </tbody></table></div><p class="sub kdata">Ervóór: ${dKort(r.periode.voor_van)} t/m ${dKort(r.periode.voor_tot)} · mee bezig: ${dKort(r.periode.van)} t/m ${dKort(r.periode.tot)}</p>`;
+    </tbody></table></div><p class="sub kdata">${r.plan?"Je hele account, ter vergelijking. ":""}Ervóór: ${dKort(r.periode.voor_van)} t/m ${dKort(r.periode.voor_tot)} · ${r.plan?"sinds start":"mee bezig"}: ${dKort(r.periode.van)} t/m ${dKort(r.periode.tot)}</p>`;
   if(p.actie)h+=`<details class="kwat"><summary>Wat je ging doen</summary><div class="act">${p.actie}</div></details>`;
   h+=`<p class="sub">Samenhang is geen bewijs: er gebeurt in ${L} dagen meer dan alleen deze actie.</p></div>`;
+  return h;
+}
+
+/* ---------- Meetplan per taak (03-10, v2) ----------
+   Voor Insta-kansen die over je POSTS gaan, meet het dashboard precies de posts die bij de taak horen:
+   - welke posts: geplaatst vanaf de startdag t/m het afmelden, en passend bij de taak (onderwerp, reel, dagdeel, eigen muziek, of alles).
+   - verwachting bij de start: je normaal (middelste bereik van vergelijkbare posts van vóór de start, per soort post)
+     × wat dit soort post bij jou gemiddeld extra doet (zelfde som als "Wat werkt", maar alleen met posts van vóór de start).
+   - wanneer zie je het: de groeicurve van je posts (uit ig_media_dag: hoeveel % van de eindstand een post na X dagen heeft).
+     Rapport = als de laatste taak-post ± 95% van z'n eindstand heeft (feed ± 5 dagen, reel ± 10; met eigen data dynamisch).
+   - tussendoor: per post het bereik nu, wat normaal is op die leeftijd, en de verwachte eindstand (bereik nu ÷ % van de curve).
+   Andere kansen (muziek, Sneek, rest Insta) houden de vaste looptijd vanaf Mee bezig. */
+let KM={dag:[],err:null},KM_LAADT=null;                      // ig_media_dag: {media_id, dag, reach, om}
+function kmLaden(){KM_LAADT=kmLadenEcht();return KM_LAADT}
+async function kmLadenEcht(){
+  try{
+    const since=new Date(Date.now()-75*864e5).toISOString().slice(0,10);
+    const rijen=await igAlles(()=>sb.from("ig_media_dag").select("media_id,dag,reach:cijfers->reach,om:gemeten_om").gte("dag",since).order("dag"));
+    KM={dag:rijen.filter(r=>r.reach!=null).map(r=>({id:r.media_id,dag:String(r.dag).slice(0,10),reach:+r.reach,om:r.om})),err:null};
+  }catch(e){KM={dag:[],err:e.message||String(e)}}
+}
+// standaard-groeicurves (deel van de eindstand na X dagen), tot er genoeg eigen metingen zijn
+const KM_CURVE_STD={
+  feed:[[0,0],[0.25,.3],[0.5,.5],[1,.72],[2,.85],[3,.9],[4,.93],[5,.95],[7,.97],[10,.99],[14,1]],
+  reel:[[0,0],[0.25,.2],[0.5,.35],[1,.55],[2,.7],[3,.78],[4,.83],[5,.87],[7,.92],[10,.97],[14,1]]};
+const KM_KNOPEN=[0.5,1,2,3,4,5,7,10];
+const kmGroep=p=>soortNaam(p)==="Reel"?"reel":"feed";
+const kmLeeftijd=(p,t)=>((t??Date.now())-Date.parse(p.gepost_om))/864e5;
+function kmInterp(c,a){if(a<=0)return 0;for(let i=1;i<c.length;i++)if(a<=c[i][0]){const [x0,y0]=c[i-1],[x1,y1]=c[i];return y0+(y1-y0)*(a-x0)/(x1-x0)}return 1}
+// eigen curve: posts met metingen vanaf ≤ 1,5 dag én tot ≥ 10 dagen; per knoop de middelste waarde (min. 5 posts)
+let KM_CURVE_CACHE=null;
+function kmCurve(g){
+  if(!KM_CURVE_CACHE){KM_CURVE_CACHE={};
+    const per=new Map();KM.dag.forEach(r=>{if(!per.has(r.id))per.set(r.id,[]);per.get(r.id).push(r)});
+    const posts=new Map(IG.posts.map(p=>[p.media_id,p]));
+    for(const gg of ["feed","reel"]){
+      const krommen=[];
+      per.forEach((rij,id)=>{const p=posts.get(id);if(!p||!p.gepost_om||kmGroep(p)!==gg)return;
+        const pt=rij.map(r=>[kmLeeftijd(p,Date.parse(r.om||r.dag+"T12:00:00Z")),r.reach]).filter(([a])=>a>0&&a<=16).sort((a,b)=>a[0]-b[0]);
+        if(pt.length<4||pt[0][0]>1.5||pt[pt.length-1][0]<10)return;
+        const eind=Math.max(...pt.map(x=>x[1]));if(!eind)return;
+        const c=[[0,0],...pt.map(([a,v])=>[a,v/eind])];krommen.push(c)});
+      if(krommen.length>=5){
+        let vorige=0;const c=[[0,0],...KM_KNOPEN.map(k=>{const v=Math.max(vorige,Math.min(1,kMed(krommen.map(kr=>kmInterp(kr,k)))));vorige=v;return [k,v]}),[14,1]];
+        KM_CURVE_CACHE[gg]={c,bron:`je eigen posts (${krommen.length})`};
+      }else KM_CURVE_CACHE[gg]={c:KM_CURVE_STD[gg],bron:"standaard-curve (nog te weinig eigen metingen)"};
+    }}
+  return KM_CURVE_CACHE[g];
+}
+const kmDeel=(p,a)=>kmInterp(kmCurve(kmGroep(p)).c,a);
+const kmKlaarNa=g=>{const c=kmCurve(g).c;const k=c.find(([a,v])=>v>=0.95);return Math.max(3,Math.ceil(k?k[0]:7))};   // dagen tot ± 95%
+
+// 00:00 Haagse tijd op een dag (JJJJ-MM-DD) als tijdstip
+function amsMiddernacht(dag){const t=Date.parse(dag+"T00:00:00Z");
+  const muur=Date.parse(new Date(t).toLocaleString("sv-SE",{timeZone:"Europe/Amsterdam"}).replace(" ","T")+"Z");return t-(muur-t)}
+// deadline van het "doen"-deel: "week" = zondag 23:59 van de startweek (start je in het weekend, dan de week erna); getal = zoveel dagen na de start
+function kmDeadline(p,plan){
+  plan=plan||kmPlan(p.sleutel);if(!plan||!plan.doen)return null;const t0=Date.parse(p.gestart_om);
+  if(plan.doen.termijn==="week"){const d=dagNL(t0),wd=new Date(d+"T12:00:00Z").getUTCDay(),totMa=wd===0?1:8-wd;
+    let dl=amsMiddernacht(kDag(d,totMa))-1000;if(dl-t0<2*864e5)dl=amsMiddernacht(kDag(d,totMa+7))-1000;return new Date(dl).toISOString()}
+  return new Date(amsMiddernacht(kDag(dagNL(t0),plan.doen.termijn+1))-1000).toISOString();   // einde van de dag, zoveel dagen na de start
+}
+const kmDoenTekst=(plan,dl)=>esc(plan.doen.tekst?plan.doen.tekst:plan.doen.aantal?`${plan.doen.aantal} ${plan.doen.aantal===1?plan.wat.replace(/^posts\b/,"post").replace(/^reels$/,"reel"):plan.wat}`:plan.wat)+(dl?` vóór ${kD(dl)} ${tijdAms(dl)}`:"");
+// welk plan hoort bij een kans? (null = gewone kans met vaste looptijd)
+function kmPlan(sleutel){
+  const sl=String(sleutel);let m;
+  const mooi=naam=>{for(const x of IG.posts)for(const l of (x.labels||[]))if(kSlug(l.label)===naam)return l.label;return naam.replace(/-/g," ")};
+  const metLabel=(soort,naam)=>p=>labelsVan(p,soort).some(l=>kSlug(l)===naam)||(soort==="onderwerp"&&String(p.bijschrift||"").toLowerCase().includes(naam.replace(/-/g," ")));
+  // doen: {aantal, termijn} = wat de kaart vraagt ("plan deze week 2 posts" → 2 posts, deadline zondag 23:59 van de startweek)
+  if((m=/^insta-onderwerp-minder-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:null,termijn:"week",tekst:`${mooi(m[1])} combineren met een sterker onderwerp`}};
+  if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"}};
+  if(sl==="insta-meer-reels")return {maat:"bereik",wat:"reels",hoort:p=>soortNaam(p)==="Reel",groep:p=>soortNaam(p)==="Reel",perSoort:false,doen:{aantal:1,termijn:"week"}};
+  if((m=/^insta-tijd-(.+)$/.exec(sl)))return {maat:"bereik",wat:"posts in dat dagdeel",hoort:p=>kSlug(dagdeel(p.uur??12))===m[1],groep:p=>kSlug(dagdeel(p.uur??12))===m[1],doen:{aantal:3,termijn:14}};
+  if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&l[0]!=="(geen)"};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"}}}
+  if(sl==="insta-nieuw-naar-volger")return {maat:"volgers",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:7,tekst:"elke post eindigen met een volg-zin + 3 toppâhs vastzetten"}};
+  if(sl==="insta-bewaren")return {maat:"bewaard",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:14,tekst:"een bewaar-post maken (tips, plekken, tijden)"}};
+  return null;
+}
+const KM_MAAT={
+  bereik:{naam:"bereik per post",kort:"bereik",f:p=>p.bereik,fmt:v=>nf0.format(v),curve:true},
+  volgers:{naam:"nieuwe volgâhs per 1.000 bereik",kort:"volgâhs/1.000",f:p=>p.bereik>=100&&p.nieuwe_volgers!=null?p.nieuwe_volgers*1000/p.bereik:null,fmt:v=>nf1k.format(v)},
+  bewaard:{naam:"bewaard per 1.000 bereik",kort:"bewaard/1.000",f:p=>p.bereik>=100&&p.bewaard!=null?p.bewaard*1000/p.bereik:null,fmt:v=>nf1k.format(v)}};
+
+// alles uitrekenen voor een poging: posts, normaal, verwachting, stand nu, wanneer klaar
+function kmStand(p){
+  const plan=kmPlan(p.sleutel);if(!plan||IG.err||!IG.posts.length)return null;
+  const M=KM_MAAT[plan.maat];
+  const deadline=kmDeadline(p,plan),startDag=dagNL(p.gestart_om),eindTs=p.gestopt_om?Date.parse(p.gestopt_om):Math.min(Date.now(),deadline?Date.parse(deadline):Infinity);
+  const taak=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=eindTs&&plan.hoort(x)).sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);
+  // basis = posts van vóór de start (120 dagen, anders 365), zonder de taak-posts
+  const voor=d=>IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)<startDag&&Date.parse(x.gepost_om)>Date.parse(p.gestart_om)-d*864e5&&M.f(x)!=null);
+  let basis=voor(120);if(basis.length<15)basis=voor(365);
+  const medVan=l=>kMed(l.map(M.f).filter(v=>v!=null));
+  const alleMed=medVan(basis);
+  const normaalVoor=x=>{const z=basis.filter(b=>soortNaam(b)===soortNaam(x));return plan.perSoort!==false&&z.length>=5?medVan(z):alleMed};
+  // verwachting: hoeveel doet dit soort post bij jou extra (alleen data van vóór de start)
+  let factor=1,factorN=0,factorBron="";
+  if(plan.groep&&alleMed){const g=basis.filter(plan.groep);factorN=g.length;
+    if(g.length>=3){factor=Math.max(0.5,Math.min(3,medVan(g)/alleMed));factorBron=`${g.length} eerdere ${plan.wat}: middelste ${M.fmt(medVan(g))} tegen ${M.fmt(alleMed)} voor al je posts`}
+    else factorBron=`nog maar ${g.length} eerdere ${plan.wat}: verwachting = je normaal`}
+  else if(plan.doel){factor=plan.doel;factorBron=`doel: ${pct(plan.doel-1)} betâh dan je normaal`}
+  const nu=Date.now();
+  const rij=taak.map(x=>{
+    const a=kmLeeftijd(x,nu),normaal=normaalVoor(x),waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
+    const deel=M.curve?kmDeel(x,a):1,klaar=a>=klaarNa;
+    const eind=waarde==null?null:M.curve?(klaar||deel>=0.95?waarde:a>=0.5?waarde/deel:null):(a>=1?waarde:null);
+    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,
+      leeftijd:a,waarde,normaal,normaalNu:normaal!=null&&M.curve?normaal*deel:normaal,verwacht:normaal!=null?normaal*factor:null,
+      eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel}});
+  const laatsteKlaar=rij.length?rij.map(r=>r.klaarOp).sort().pop():null;
+  const rapportOp=p.gestopt_om?(laatsteKlaar&&laatsteKlaar>p.gestopt_om?laatsteKlaar:new Date(Date.parse(p.gestopt_om)+(rij.length?0:864e5)).toISOString()):null;
+  const xs=rij.map(r=>r.x).filter(v=>v!=null),E=xs.length?kMed(xs):null;
+  return {plan,maat:plan.maat,M,taak:rij,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,rapportOp,
+    curveBron:M.curve?kmCurve(rij[0]?kmGroep(IG.posts.find(x=>x.media_id===rij[0].id)):"feed").bron:null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
+}
+function kmOordeel(s){
+  if(!s||!s.taak.length)return {oordeel:"onbekend",verw:null};
+  if(s.E==null)return {oordeel:"onbekend",verw:null};
+  const oordeel=s.E>=1.1?"werkte":s.E<=0.9?"slechter":"geen";
+  const r=s.E/s.factor,verw=r>=1.1?"boven":r<=0.9?"onder":"zoals";
+  return {oordeel,verw};
+}
+const kX=v=>new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1}).format(v)+"×";
+const KM_VERW={boven:"boven verwachting",zoals:"zoals verwacht",onder:"onder verwachting"};
+// HTML: verwachting + per post de stand (voor Mee bezig, meting loopt, pop-up en rapport)
+function kmHTML(s,{rapport=false}={}){
+  if(!s)return "";const M=s.M;
+  let h=`<div class="kmverw"><span class="k">Verwachting bij de start</span>
+    <span class="v">${s.alleMed!=null?`${M.fmt(s.alleMed*s.factor)} <small>${M.kort}${M.curve?" per post":""}</small>`:"—"}</span>
+    <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
+  if(!s.taak.length)return h+`<p class="sub kmleeg">Nog geen ${esc(s.plan.wat)} gevonden sinds ${kD(s.taakStart||new Date().toISOString())}. Label je post in de Insta-tab als hij nie herkend wordt (labels komen er ook elke nacht vanzelf bij).</p>`;
+  h+=`<div class="kmposts">${s.taak.map(r=>{
+    const pr=r.verwacht?Math.min(1.5,(r.eind??r.waarde??0)/r.verwacht):0;
+    return `<div class="kmpost">
+      <a class="kmthumb" href="${esc(r.link||"#")}" target="_blank" rel="noopener">${r.plaatje?`<img src="${esc(r.plaatje)}" alt="" loading="lazy">`:""}</a>
+      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} · ${esc(r.soort)}</b> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span></span>
+        <span class="kmcijf">${M.kort} nu <b>${r.waarde!=null?M.fmt(r.waarde):"—"}</b>${M.curve&&!r.klaar&&r.normaalNu!=null?` · normaal op deze leeftijd ${M.fmt(r.normaalNu)}`:""}</span>
+        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${r.x>=1.1?"up":r.x<=0.9?"down":""}">${kX(r.x)}</b> je normaal`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
+        <div class="kbalk kmbalk" title="t.o.v. de verwachting"><i style="width:${(Math.min(1,pr/1.5)*100).toFixed(1)}%"></i><s style="left:${(100/1.5).toFixed(1)}%"></s></div></div>
+    </div>`}).join("")}</div>`;
+  if(s.E!=null){const o=kmOordeel(s);h+=`<p class="kmsom">${rapport?"Uitkomst":"Stand nu"}: je ${esc(s.plan.wat)} doen <b>${kX(s.E)}</b> je normaal${s.taak.length>1?" (middelste post)":""} · ${KM_VERW[o.verw]||""}</p>`}
   return h;
 }
 
@@ -545,7 +726,16 @@ async function kansNaLaden(){
       if(!p.meet_naam)await kpWijzig(p,{meet_naam:k.meet.naam,meet_beter:k.meet.beter,meet_fmt:k.meet.fmt===eur?"eur":null,waarde_start:p.waarde_start!=null?p.waarde_start:+k.meet.waarde});
     }
     await kpMeet(meet);
-    for(const p of KP.rijen.filter(p=>!p.rapport&&Date.parse(p.rapport_op)<=Date.now()))
+    if(KM_LAADT)await KM_LAADT;KM_CURVE_CACHE=null;
+    for(const p of KP.rijen.filter(p=>!p.gestopt_om&&kmPlan(p.sleutel))){   // meetplan: deadline voorbij → taak sluit vanzelf (doel gehaald = gedaan, anders gestopt)
+      const dl=kmDeadline(p);if(!dl||Date.parse(dl)>Date.now())continue;
+      const st=kmStand(p),a=st&&st.doenAantal,n=st?st.taak.length:0;
+      await kpWijzig(p,{gestopt_om:dl,afloop:!a||n>=a?"gedaan":"gestopt"});
+    }
+    for(const p of KP.rijen.filter(p=>!p.rapport&&p.gestopt_om&&kmPlan(p.sleutel))){   // meetplan: rapportdatum schuift mee met je posts
+      const st=kmStand(p);if(st&&st.rapportOp&&Math.abs(Date.parse(st.rapportOp)-Date.parse(p.rapport_op))>6e4)await kpWijzig(p,{rapport_op:st.rapportOp});
+    }
+    for(const p of KP.rijen.filter(p=>!p.rapport&&Date.parse(p.rapport_op)<=Date.now()&&(p.gestopt_om||!kmPlan(p.sleutel))))
       await kpWijzig(p,{rapport:kansRapportMaak(p),rapport_klaar_om:new Date().toISOString()});
   }catch(e){console.warn("Kansâh na laden lukte nie",e)}
   kansBadge();
@@ -589,13 +779,14 @@ function renderInsights(d){
 }
 
 /* ---------- tab Geschiedenis ---------- */
+const kRapDatumVast=p=>!!p.gestopt_om||!kmPlan(p.sleutel);   // taak met meetplan die nog "doen" is: rapportdatum volgt pas na afmelden
 function khStatusVan(p){return p.rapport?"rapport":p.gestopt_om?"wacht":"loopt"}
 function renderKansGeschiedenis(){
   const el=$("kansGesch");if(!el)return;
   const alle=KP.rijen.filter(p=>khBron==="alles"||p.bron===khBron);
   const metRap=alle.filter(p=>p.rapport),bekend=metRap.filter(p=>p.rapport.oordeel!=="onbekend");
   const n=o=>bekend.filter(p=>p.rapport.oordeel===o).length;
-  const loopt=alle.filter(p=>!p.rapport),volgende=loopt.map(p=>p.rapport_op).sort()[0];
+  const loopt=alle.filter(p=>!p.rapport),volgende=loopt.filter(kRapDatumVast).map(p=>p.rapport_op).sort()[0];
   const af=alle.filter(p=>p.gestopt_om),gem=af.length?af.reduce((s,p)=>s+Math.max(0,Date.parse(p.gestopt_om)-Date.parse(p.gestart_om)),0)/af.length/864e5:null;
   const nieuw=metRap.filter(p=>!p.gelezen_om).length;
   const eerste=alle.map(p=>p.gestart_om).sort()[0];
@@ -635,13 +826,14 @@ function khRij(p){
   const chip=O?`<span class="chip ${O.c}">${O.t}</span>`:s==="wacht"?`<span class="chip mute">${p.afloop==="gestopt"?"gestopt":"gedaan ✓"} · rapport volgt</span>`:'<span class="chip warn">loopt</span>';
   const m=p.rapport&&p.rapport.meet,f=kFmt(p);
   const meet=m&&m.start!=null&&m.eind!=null?`${esc(m.naam)}: ${f(m.start)} → <b>${f(m.eind)}</b>`:!p.rapport&&p.meet_naam&&p.waarde_start!=null&&kLaatste(p)!=null?`${esc(p.meet_naam)}: ${f(+p.waarde_start)} → <b>${f(kLaatste(p))}</b>`:"";
-  const wanneer=`${kD(p.gestart_om)}${p.gestopt_om?` → ${kD(p.gestopt_om)}`:""} · ${p.looptijd_dagen} dagen`+(p.rapport?"":` · rapport ${kD(p.rapport_op)}`);
+  const plan=kmPlan(p.sleutel);
+  const wanneer=`${kD(p.gestart_om)}${p.gestopt_om?` → ${kD(p.gestopt_om)}`:""}`+(plan?"":` · ${p.looptijd_dagen} dagen`)+(p.rapport?"":plan&&!p.gestopt_om?" · doen":` · rapport ${kD(p.rapport_op)}`);
   const lijn=p.rapport?(p.rapport.meet&&p.rapport.meet.reeks):[...(KP.met.get(p.id)||new Map())].sort((a,b)=>a[0]<b[0]?-1:1);
   return `<details class="khrij${p.rapport&&!p.gelezen_om?" nieuw":""}" data-kh="${p.id}"${khOpen==p.id?" open":""}>
     <summary><span class="khkop">${bronChip(p.bron)}${chip}${p.rapport&&!p.gelezen_om?'<span class="chip kbron" style="--c:var(--hy)">nieuw</span>':""}</span>
       <span class="khtitel">${p.big?`<b class="khbig">${p.big}</b> `:""}${p.kop||esc(p.sleutel)}</span>
       <span class="khmeta">${wanneer}${meet?" · "+meet:""}</span></summary>
-    <div class="khbody">${p.rapport?kansRapportHTML(p):`${kLoop(p)}${kMeetRegel(p)}${kSpark(lijn)}${p.actie?`<div class="act">${p.actie}</div>`:""}`}
+    <div class="khbody">${p.rapport?kansRapportHTML(p):`${kLoop(p)}${kmPlan(p.sleutel)?kmHTML(kmStand(p)):""}${kMeetRegel(p)}${kSpark(lijn)}${p.actie?`<div class="act">${p.actie}</div>`:""}`}
       <p class="khwis"><button class="lnk" type="button" data-khwis="${p.id}">Wis uit geschiedenis</button></p></div>
   </details>`;
 }
@@ -656,13 +848,34 @@ function kansBadge(){
     if(!s){s=document.createElement("span");s.className="badge "+c;b.appendChild(s)}
     s.textContent=n;s.title=n===1?"1 nieuw kans-rapport":n+" nieuwe kans-rapporten"});
 }
+// taken met meetplan die na afmelden nog meten (voor de voortgang-pop-up en de melding)
+function kansMetingen(){return KP.rijen.filter(p=>p.gestopt_om&&!p.rapport&&kmPlan(p.sleutel)).sort((a,b)=>a.rapport_op<b.rapport_op?-1:1)}
+function kansMetingHTML(){
+  const l=kansMetingen();if(!l.length)return "";
+  return `<div class="alarm meting" role="status">
+    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">◔</span><h2>${l.length===1?"Meting loopt":l.length+" metingen lopen"}</h2></div>
+    <p>${l.slice(0,3).map(p=>{const st=kmStand(p),E=st&&st.E;return `${bronChip(p.bron)} ${esc(kTekst(p.kop)).slice(0,80)} · rapport ${kD(p.rapport_op)}${E!=null?` · nu <b>${kX(E)}</b> je normaal`:""}`}).join("<br>")}</p>
+    <p><button class="btn" type="button" data-kansvoort>Bekijk de voortgang</button></p>
+  </div>`;
+}
 function kansMeldingHTML(){
-  const l=kansNieuweRapporten();if(!l.length)return "";
+  const l=kansNieuweRapporten();if(!l.length)return kansMetingHTML();
   return `<div class="alarm rapport" role="status">
     <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">★</span><h2>${l.length===1?"Je kans-rapport is klaar":l.length+" kans-rapporten zijn klaar"}</h2></div>
     <p>${l.slice(0,3).map(p=>{const O=KANS_OORDEEL[p.rapport.oordeel]||KANS_OORDEEL.onbekend;return `${bronChip(p.bron)} ${esc(kTekst(p.kop)).slice(0,90)} <span class="chip ${O.c}">${O.t}</span>`}).join("<br>")}${l.length>3?`<br>en nog ${l.length-3}`:""}</p>
     <p><button class="btn yellow" type="button" data-kansrap>Bekijk ${l.length===1?"het rapport":"de rapporten"}</button></p>
-  </div>`;
+  </div>`+kansMetingHTML();
+}
+// pop-up "Meting loopt": voortgang van alle taken die nog meten
+let KVOORT=false;
+function kansVoortOpen(){
+  const l=kansMetingen();if(!l.length||!$("kansPop"))return;
+  KVOORT=true;KPOP=-1;$("kansPop").hidden=false;document.body.classList.add("popopen");
+  $("kansPopTitel").textContent=l.length===1?"Meting loopt":l.length+" metingen lopen";
+  $("kansPopSub").textContent="Zo doen de posts van je taak het tot nu toe";
+  $("kansPopInhoud").innerHTML=l.map(p=>`<div class="krap kvoortblok"><div class="kkop">${bronChip(p.bron)}</div><h3>${p.kop||esc(p.sleutel)}</h3>${kmLoop(p)}${kmHTML(kmStand(p))}</div>`).join("");
+  $("kansPopGelezen").hidden=true;$("kansPopLater").textContent="Sluite";
+  $("kansPopDicht").focus({preventScroll:true});
 }
 let KPOP=null;
 function kansPopOpen(id){
@@ -679,20 +892,23 @@ function kansPopTeken(){
   $("kansPopGelezen").textContent=l.filter(x=>x!==p).length?"Gelezen ✓ · volgende":"Gelezen ✓";
   $("kansPopLater").textContent=p.gelezen_om?"Sluite":"Later";
 }
-function kansPopDicht(){if(KPOP==null)return;KPOP=null;$("kansPop").hidden=true;document.body.classList.remove("popopen");kansNaWijzig()}
+function kansPopDicht(){if(KPOP==null)return;KPOP=null;KVOORT=false;$("kansPop").hidden=true;document.body.classList.remove("popopen");kansNaWijzig()}
 async function kansGelezen(p){if(!p||p.gelezen_om)return;try{await kpWijzig(p,{gelezen_om:new Date().toISOString()})}catch(e){showMsg("Bewaren lukte nie: "+(e.message||e))}}
 // bij het openen van de app: 1x per sessie de pop-up (na Ververse nie nog een keer)
+// eerst een nieuw rapport (1x per sessie); anders de voortgang van lopende metingen (1x per dag)
 function kansPopBijStart(){
-  if(sectie!=="ovahzicht"||!kansNieuweRapporten().length)return;
-  try{if(sessionStorage.getItem("hc_kans_pop"))return;sessionStorage.setItem("hc_kans_pop","1")}catch(e){}
-  kansPopOpen();
+  if(sectie!=="ovahzicht")return;
+  if(kansNieuweRapporten().length){
+    try{if(sessionStorage.getItem("hc_kans_pop"))return;sessionStorage.setItem("hc_kans_pop","1")}catch(e){}
+    kansPopOpen();return}
+  if(kansMetingen().length){const d=vandaagAms();if(store.get("hc_kans_voort")===d)return;store.set("hc_kans_voort",d);kansVoortOpen()}
 }
 function kansNaWijzig(){kansBadge();if(sectie==="kansen")renderKansen();else if(sectie==="ovahzicht")renderOvahzicht();else if(sectie==="muziek")render()}
 
 function kansTegel(){
   const alle=kansenAlle(),g=kansGroepen(alle,"alles");
   const lijst=[...g.bezig.filter(x=>x.k&&!x.k.stil).map(x=>x.k),...g.open].sort((a,b)=>b.score-a.score);
-  const loopt=KP.rijen.filter(p=>!p.rapport),volgende=loopt.map(p=>p.rapport_op).sort()[0],nieuw=kansNieuweRapporten().length;
+  const loopt=KP.rijen.filter(p=>!p.rapport),volgende=loopt.filter(kRapDatumVast).map(p=>p.rapport_op).sort()[0],nieuw=kansNieuweRapporten().length;
   return `<article class="tegel">
     <div class="tkop"><h2>Kansâh</h2><span class="tag">${g.open.length} open</span></div>
     <p class="tlbl">Doe dit deze week</p>
@@ -711,6 +927,7 @@ document.addEventListener("click",async e=>{
   if(t.closest("#kToonVerborgen")){kansToonVerborgen=!kansToonVerborgen;sectie==="kansen"?renderKansen():render();return}
   // pop-up
   if(t.closest("[data-kansrap]")){kansPopOpen();return}
+  if(t.closest("[data-kansvoort]")){kansVoortOpen();return}
   if(KPOP!=null){
     if(t.closest("#kansPopGelezen")){const p=KP.rijen.find(x=>x.id==KPOP);await kansGelezen(p);const v=kansNieuweRapporten()[0];if(v){KPOP=v.id;kansPopTeken()}else kansPopDicht();return}
     if(t.closest("#kansPopDicht")||t.closest("#kansPopLater")||t.id==="kansPop"){kansPopDicht();return}
@@ -730,7 +947,8 @@ document.addEventListener("click",async e=>{
     const kp=b.closest("[data-kp]");
     if(kp){const p=KP.rijen.find(x=>x.id==kp.dataset.kp);if(!p)return;
       if(b.dataset.kz==="oeps")await kpWis(p);
-      else await kpWijzig(p,{gestopt_om:new Date().toISOString(),afloop:b.dataset.kz});
+      else{await kpWijzig(p,{gestopt_om:new Date().toISOString(),afloop:b.dataset.kz});
+        if(kmPlan(p.sleutel)){const st=kmStand(p);if(st&&st.rapportOp)await kpWijzig(p,{rapport_op:st.rapportOp})}}   // meetplan: rapportdatum = als je laatste post z'n eindstand heeft
     }else{
       const id=b.closest("[data-kans]").dataset.kans,k=kansLaatste.find(x=>x.id===id);if(!k)return;
       if(b.dataset.kz==="start")await kansStart(k);

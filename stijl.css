@@ -336,6 +336,27 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kpopknop{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .kpopknop .btn{flex:1 1 140px}
 .khbron{margin-top:14px}
+/* meetplan per taak (03-10 v2) */
+.kmverw{display:grid;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+.kmverw .k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kmverw .v{font-family:var(--display);font-size:22px;line-height:1.15;color:var(--hy)}
+.kmverw .v small{font-family:var(--body);font-size:13px;color:var(--ink-2);font-weight:700}
+.kmverw .s{font-size:12.5px;color:var(--muted)}
+.kmposts{display:grid;gap:8px}
+.kmpost{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:start;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.kmthumb{display:block;width:48px;height:48px;border-radius:8px;overflow:hidden;background:var(--line-2)}
+.kmthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.kmtekst{display:grid;gap:2px;font-size:13px;min-width:0}
+.kmtekst .sub{font-size:12px}
+.kmcijf{color:var(--ink-2)}.kmcijf b{color:var(--ink)}.kmcijf b.up{color:var(--good)}.kmcijf b.down{color:var(--yt)}
+.kmbalk{position:relative;margin-top:4px;height:6px;overflow:visible}
+.kmbalk s{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2);border-radius:1px;text-decoration:none}
+.kmsom{margin:0;font-size:14px}
+.kmleeg{margin:0}
+.alarm.meting{border-color:var(--hy);background:var(--warn-soft)}
+.alarm.meting .alarmicoon{background:var(--hy);color:var(--hy-ink)}
+.kvoortblok{padding:12px 0;border-bottom:1px solid var(--line-2)}.kvoortblok:last-child{border-bottom:0}
+.kvoortblok h3{margin:4px 0 0}
 #khBron,#khStatus{flex-wrap:wrap;max-width:100%}
 #kansGesch .ytstats{grid-template-columns:repeat(auto-fit,minmax(128px,1fr))}
 .khlijst{display:grid;gap:10px}
