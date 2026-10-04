@@ -368,7 +368,7 @@ function igEffectHTML(eff){
 function roundBottom(x,yTop,w,h,r){r=Math.min(r,h,w/2);const yb=yTop+h;
   return `M${x},${yTop}V${yb-r}Q${x},${yb} ${x+r},${yb}H${x+w-r}Q${x+w},${yb} ${x+w},${yb-r}V${yTop}Z`}
 // gestapelde kolommen: data=[{d,parts:[{v,c}],m,o,w,ot,od,lopend,tip}]
-//   d.m = streepje (bijv. gemiddelde van de 7 dagen ervoor om dit tijdstip)
+//   d.m = streepje (bijv. normaal = middelste van de 7 dagen ervoor om dit tijdstip)
 //   onder={naam,c} = strook eronder met één getal per dag (d.o, bijv. nieuwe volgâhs)
 //   onder.weg={c,naam} = tweede strook, gespiegeld: staafjes hangen omlaag onder dezelfde lijn (d.w, bijv. unfollows).
 //     d.w: getal = gemeten, null = Meta gaf niks ("nie gemeten": grijs streepje, NIET als 0), undefined = geen dag-cijfâhs.
@@ -508,7 +508,7 @@ function renderInsta(){
   // 2. bereik per dag, volgers vs nieuw
   const dagen=[];for(let i=30;i>=1;i--)dagen.push(dagMin(c.vandaag,i-1));
   const per=new Map(IG.dag.map(r=>[r.dag,r.c]));
-  const vg=igVandaagVsGist(c);   // streepje bij vandaag: gemiddelde stand van de 7 dagen ervoor na evenveel tijd (null = nog geen eerlijke vergelijking)
+  const vg=igVandaagVsGist(c);   // streepje bij vandaag: normale stand (middelste van de 7 dagen ervoor) na evenveel tijd (null = nog geen eerlijke vergelijking)
   let grijs=false;
   const smal=window.matchMedia("(max-width:700px)").matches;   // telefoon: alleen netto per dag; Mac/iPad: erbij, weg én netto (zelfde grens als class pc/tel)
   igKolommen($("igChart"),dagen.map(d=>{const x=per.get(d)||{};const split=x.reach_nieuw!=null;
@@ -517,7 +517,7 @@ function renderInsta(){
     const m=d===c.vandaag&&vg?vg.g:null,lopend=d===c.vandaag;
     const v0=igVolgDag(per.has(d)?x:null),vs=smal?igNettoDag(v0):v0;   // strook onderin: nieuw (groen, omhoog) en weg (rood, omlaag), telefoon: netto
     return {d,parts,m,o:vs.o,w:vs.w,n:v0.n,ot:vs.ot,od:vs.ot!=null?dKort(d)+(lopend?" (loopt nog)":""):null,lopend,
-      tip:`${dLabel(d,1)}${lopend?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(m!=null?` · gem. ${vg.n} d om ${vg.tijdG}: ${nf0.format(m)}`:"")+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(v0.ot!=null?` · volgâhs ${v0.ot}`+(x.follows!=null&&x.reach?` (${igNf1.format(x.follows*1000/x.reach)} nieuw per 1.000 bereik)`:""):"")}}),
+      tip:`${dLabel(d,1)}${lopend?" (tot nu)":""}: bereik ${nf0.format(x.reach||0)}`+(m!=null?` · normaal om ${vg.tijdG}: ${nf0.format(m)}`:"")+(split?` · volgers ${nf0.format(x.reach_volgers)} · nieuw ${nf0.format(x.reach_nieuw)}`:"")+(v0.ot!=null?` · volgâhs ${v0.ot}`+(x.follows!=null&&x.reach?` (${igNf1.format(x.follows*1000/x.reach)} nieuw per 1.000 bereik)`:""):"")}}),
     "Bereik per dag",smal?{naam:"Netto volgâhs per dag",kort:"Netto volgâhs",nieuw:"erbij",c:"good",weg:{c:"weg",naam:"weg"}}
                          :{naam:"Volgâhs per dag",kort:"Volgâhs",c:"good",weg:{c:"weg"},netto:true});
   if($("igLegGist"))$("igLegGist").hidden=!vg;     // legenda: alleen tonen wat er in de grafiek staat (telefoon: nie meer regels dan eerst)
@@ -863,7 +863,7 @@ function igMetaStart(dag){
   const h=+new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"numeric",hourCycle:"h23"}).format(new Date(g));
   return g-h*36e5;
 }
-/* ---------- Bereik vandaag vs gemiddelde van de 7 dagen ervoor op hetzelfde tijdstip (18_bereik_uur.sql, sinds 01-10; gemiddelde sinds 04-10) ----------
+/* ---------- Bereik vandaag vs normaal (middelste van de 7 dagen ervoor) op hetzelfde tijdstip (18_bereik_uur.sql, sinds 01-10; 7 dagen sinds 04-10) ----------
    Meta geeft alleen "bereik van de Meta-dag tot nu", geen stand per uur. Daarom bewaart Supabase die stand zelf:
    elk uur op :28 (klusje instagram-bereik-uur) en bij elke ververs-ronde (ig_live). Tijd = minuten sinds de start
    van de Meta-dag (bij ons 09:00, rond de klokwissels een week 08:00), dus ook die week eerlijk.
@@ -897,22 +897,25 @@ function igStandOp(dag,m){   // bereik van Meta-dag 'dag' na m minuten, of null 
   if(dichtst&&Math.abs(dichtst.minuut-m)<=IG_UUR_MARGE)return {v:dichtst.bereik,manier:"dichtbij"};
   return null;
 }
-// Vandaag vs het GEMIDDELDE van de 7 dagen ervoor, elk na evenveel minuten Meta-dag (04-10; was: alleen gistâh).
+// Vandaag vs NORMAAL = de middelste (mediaan) van de 7 dagen ervoor, elk na evenveel minuten Meta-dag (04-10; was: alleen gistâh).
+// Mediaan i.p.v. gemiddelde: één virale dag maakt "normaal" anders te hoog, en dan valt een goeie dag vandaag nie meer op.
 // Waarom 7: dan zit elke weekdag er precies 1x in (zondag nie vergeleken met alleen zaterdag).
 // Dagen zonder eerlijke stand op dat tijdstip (geen meting in de buurt) tellen nie mee; n = hoeveel wél.
-function igVandaagVsGist(c){   // {nu, g (= gemiddelde), n, dagen, tijdNu, tijdG} of null
+function igVandaagVsGist(c){   // {nu, g (= normaal, mediaan), n, dagen, tijdNu, tijdG} of null
   const vd=(IG.uur||[]).filter(r=>r.dag===c.vandaag);if(!vd.length)return null;
   const nw=vd.reduce((a,r)=>r.minuut>a.minuut?r:a);
   const dagen=[];
   for(let i=1;i<=IG_UUR_DAGEN;i++){const d=dagMin(c.vandaag,i),st=igStandOp(d,nw.minuut);if(st)dagen.push({dag:d,v:st.v,manier:st.manier})}
   if(!dagen.length)return null;
-  const g=Math.round(dagen.reduce((a,x)=>a+x.v,0)/dagen.length);
+  const g=Math.round(igMiddel(dagen.map(x=>x.v)));
   return {nu:nw.bereik,g,n:dagen.length,dagen,tijdNu:tijdAms(nw.om),tijdG:tijdAms(nw.om)};
 }
+// middelste waarde (bij een even aantal: gemiddelde van de 2 middelste). Eén virale dag trekt "normaal" zo nie omhoog.
+function igMiddel(a){if(!a.length)return null;const b=[...a].sort((x,y)=>x-y),h=b.length>>1;return b.length%2?b[h]:(b[h-1]+b[h])/2}
 function igGemHeleDag(c){
   const per=new Map(IG.dag.map(r=>[r.dag,r.c])),w=[];
   for(let i=1;i<=IG_UUR_DAGEN;i++){const x=per.get(dagMin(c.vandaag,i));if(x&&x.reach!=null)w.push(+x.reach)}
-  return w.length?Math.round(w.reduce((a,b)=>a+b,0)/w.length):null;
+  return w.length?Math.round(igMiddel(w)):null;
 }
 // regel "Bereik vandaag": getal van vandaag, of uitleg waarom het er (nog) niet is, plus gistâh ter vergelijking
 function igBereikRij(c){   // geeft [kop, getal, uitleg]
@@ -928,14 +931,14 @@ function igBereikRij(c){   // geeft [kop, getal, uitleg]
   const v=igVandaagVsGist(c);
   if(v){   // eerlijk: vandaag tot nu vs gemiddelde van de 7 dagen ervoor na evenveel tijd Meta-dag (18_bereik_uur.sql) → pijl mag
     const d=v.g>=IG_UUR_MIN?v.nu/v.g-1:null,om=t=>`<span class="pc">om </span>${t}`;   // telefoon: zonder "om", zodat het op één regel past
-    const vs=d==null?"":d>=0.05?` · <span class="up">↑ ${pct(d)} meer</span>`:d<=-0.05?` · <span class="down">↓ ${pct(-d)} minder</span>`
+    const vs=d==null?"":d>=1?` · <span class="up"><b>↑ ${igNf1.format(d+1)}× normaal</b></span>`:d>=0.05?` · <span class="up">↑ ${pct(d)} meer</span>`:d<=-0.05?` · <span class="down">↓ ${pct(-d)} minder</span>`
             :Math.abs(d)<0.005?" · even veel":` · ${pct(Math.abs(d))} ${d>0?"meer":"minder"}`;
-    const wie=v.n>=IG_UUR_DAGEN?"gem. 7 d":`gem. ${v.n} d`;   // minder dan 7 dagen met metingen → eerlijk zeggen over hoeveel
-    const tip=`gemiddelde stand om dit tijdstip van ${v.n} ${v.n===1?"dag":"dagen"}: `+v.dagen.map(x=>`${dKort(x.dag)} ${nf0.format(x.v)}`).join(", ")
+    const wie=v.n>=IG_UUR_DAGEN?"normaal":`normaal (${v.n} d)`;   // normaal = middelste van 7 dagen; minder dagen met metingen → erbij zeggen
+    const tip=`normaal = de middelste stand om dit tijdstip van ${v.n} ${v.n===1?"dag":"dagen"} (één uitschietâh telt zo nie mee): `+v.dagen.map(x=>`${dKort(x.dag)} ${nf0.format(x.v)}`).join(", ")
              +(v.n<IG_UUR_DAGEN?` (metingen per uur bestaan pas sinds kort; dit worden er vanzelf ${IG_UUR_DAGEN})`:"");
     const heel=igGemHeleDag(c);
     s=`<span class="ignw">vandaag ${om(v.tijdNu)}: ${nf0.format(v.nu)}</span> · <span class="ignw" title="${esc(tip)}">${wie} ${om(v.tijdG)}: ${nf0.format(v.g)}</span><span class="ignw">${vs}</span>`
-     +`<br>${heel?`gem. hele dag ${nf0.format(heel)} · `:""}nog ${nog} te gaan<span class="pc"> (Meta-dag loopt tot ${tijdAms(eind)})</span>`+fout;
+     +`<br>${heel?`normaal hele dag ${nf0.format(heel)} · `:""}nog ${nog} te gaan<span class="pc"> (Meta-dag loopt tot ${tijdAms(eind)})</span>`+fout;
   }
   else if(nu!=null&&g){
     s=nu>=g?`gistâh ${nf0.format(g)} · <span class="up">↑ nu al ${pct(nu/g-1)} meer</span>`
