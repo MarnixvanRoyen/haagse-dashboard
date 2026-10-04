@@ -239,7 +239,7 @@ function igSamen(){
   rijen.forEach(r=>r.eigen=eigen.per.get(r.naam)||null);
   rijen.forEach(r=>r.bedank=igsBedank(r));
   if(igsSorteer==="vaak")rijen.sort((a,b)=>b.n-a.n||(b.extra??-1e9)-(a.extra??-1e9));
-  else rijen.sort((a,b)=>b.zeker-a.zeker||(b.extra??-1e9)-(a.extra??-1e9)||b.n-a.n);
+  else rijen.sort((a,b)=>(b.extra??-1e9)-(a.extra??-1e9)||b.n-a.n);
 
   const tel={goed:0,bereik:0,niks:0};rijen.forEach(r=>{if(r.zeker)tel[r.oordeel]++});
   let aan=0,alles=0;uit.forEach(u=>{aan+=u.aan;alles+=u.alles});
@@ -252,9 +252,9 @@ function igSamen(){
   const extraLaat=n=>(effect.get(n)||[]).reduce((a,e)=>a+(e.extraV??0),0);
   rijen.forEach(r=>{const l=effect.get(r.naam)||[];r.laatN=l.filter(e=>e.dV!=null).length;r.extraLaat=r.laatN?extraLaat(r.naam):0;
     r.totaal=r.extra==null?null:r.extra+r.extraLaat});
-  if(igsSorteer==="extra")rijen.sort((a,b)=>b.zeker-a.zeker||(b.totaal??-1e9)-(a.totaal??-1e9)||b.n-a.n);
-  if(igsSorteer==="grootte")rijen.sort((a,b)=>b.zeker-a.zeker||(b.eigen?.verw?.tV??-1e9)-(a.eigen?.verw?.tV??-1e9)||(b.eigen?.verw?.tB??0)-(a.eigen?.verw?.tB??0)||b.n-a.n);
-  if(igsSorteer==="eigen")rijen.sort((a,b)=>b.zeker-a.zeker||(b.eigen?.plus??-1e9)-(a.eigen?.plus??-1e9)||(b.eigen?.fB??0)-(a.eigen?.fB??0)||b.n-a.n);
+  if(igsSorteer==="extra")rijen.sort((a,b)=>(b.totaal??-1e9)-(a.totaal??-1e9)||b.n-a.n);
+  if(igsSorteer==="grootte")rijen.sort((a,b)=>(b.eigen?.verw?.tV??-1e9)-(a.eigen?.verw?.tV??-1e9)||(b.eigen?.verw?.tB??0)-(a.eigen?.verw?.tB??0)||b.n-a.n);
+  if(igsSorteer==="eigen")rijen.sort((a,b)=>(b.eigen?.plus??-1e9)-(a.eigen?.plus??-1e9)||(b.eigen?.fB??0)-(a.eigen?.fB??0)||b.n-a.n);
   // weggehaald in de laatste 90 dagen (alle posts, ook buiten de periode)
   const alleDatum=new Map(IGS.posts.map(x=>[x.media_id,x.gepost_om]));
   const weg=IGS.partners.filter(r=>r.weg&&r.weg_om&&Date.parse(r.weg_om)>Date.now()-90*864e5)
