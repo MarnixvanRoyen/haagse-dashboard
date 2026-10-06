@@ -21,7 +21,7 @@
 //     ig_partner_info + ig_partner_info_dag. Eigen effect met "verwacht bij z'n grootte" zodra ≥ IGS_GR_MIN partners een
 //     bekende grootte hebben: effect = α + γ·ln(volgers) + δ; δ = doet meer/minder dan z'n grootte (alleen als ± 95% zeker).
 
-let IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:null};
+let IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:null,tags:[],tagStand:null,tagErr:null};
 let igsPeriode="365";     // "365" (laatste jaar) of "alles"
 let igsSorteer="extra";   // "extra" (extra volgâhs), "eigen" (eigen effect), "grootte" (t.o.v. z'n grootte) of "vaak" (vaakst samen)
 let igsAlles=false;       // alle partners tonen of de eerste 12
@@ -46,8 +46,19 @@ async function igSamenLaden(){
                ()=>sb.from("fb_token").select("verloopt_op,data_verloopt_op,gelukt_om,fout,fout_om").eq("naam","facebook_access_token").limit(1)),
       sb.from("ig_partner_laat_effect").select("media_id,partner,gepost_om,aangenomen_om,basis_om,basis,na_om,na,voor_om,voor").range(0,1999).then(r=>r,()=>({data:[]}))]);
     for(const r of [i,f])if(r.error)throw r.error;
-    IGS={partners:p,posts:pp,info:i.data||[],hist:h||[],laat:(l&&!l.error&&l.data)||[],fb:(f.data&&f.data[0])||null,err:null};
-  }catch(e){IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:e.message||String(e)}}
+    IGS={partners:p,posts:pp,info:i.data||[],hist:h||[],laat:(l&&!l.error&&l.data)||[],fb:(f.data&&f.data[0])||null,err:null,tags:[],tagStand:null,tagErr:null};
+  }catch(e){IGS={partners:[],posts:[],info:[],hist:[],laat:[],fb:null,err:e.message||String(e),tags:[],tagStand:null,tagErr:null}}
+  await igsTagsLaden();
+}
+// wie tagt jou (26_tags.sql); los van de rest, zodat de samenwerkingen ook werken als 26 nog nie gedraaid is
+async function igsTagsLaden(){
+  try{
+    const [t,st]=await Promise.all([
+      igAlles(()=>sb.from("ig_tag").select("media_id,maker,gepost_om,soort,likes,reacties,link,weg").order("media_id")),
+      sb.from("ig_tag_stand").select("gelukt_om,volledig_om,aantal,fout,fout_om,melding").limit(1)]);
+    if(st.error)throw st.error;
+    IGS.tags=t;IGS.tagStand=(st.data&&st.data[0])||null;IGS.tagErr=null;
+  }catch(e){IGS.tags=[];IGS.tagStand=null;IGS.tagErr=e.message||String(e)}
 }
 
 /* ---------- rekenen ---------- */
@@ -331,6 +342,10 @@ function igsZelfCel(r){
 
 function renderIgSamen(){
   if(!$("igSamen"))return;
+  document.querySelectorAll("#igsKant button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igsKant));
+  if($("igsSorteer"))$("igsSorteer").hidden=igsKant==="tagt";
+  if($("igsKop"))$("igsKop").textContent=igsKant==="tagt"?"Wie tagt jou?":"Samenwerkinge: wie helpt je groeie?";
+  if(igsKant==="tagt")return renderIgTags();
   document.querySelectorAll("#igsPeriode button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igsPeriode));
   document.querySelectorAll("#igsSorteer button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igsSorteer));
   const leeg=msg=>{$("igsSub").innerHTML=msg;$("igsStats").innerHTML="";$("igSamen").innerHTML="";$("igsOnder").innerHTML=""};
@@ -411,6 +426,149 @@ function renderIgSamen(){
   $("igsOnder").innerHTML=delen.join("");
 }
 
+/* ---------- Tagt jou (06-10, 26_tags.sql): posts van anderen waarin jij getagd bent ----------
+   Meta geeft per tag-post: maker, datum, soort, likes (nie als ze die verbergen), reacties, link.
+   Nooit: bereik, bewaard of gedeeld van hún post, @jou in hun tekst of stories, wie jouw foto deelt.
+   - Hun post vs hun normaal = likes (en reacties) van de tag-post ÷ de middelste van hun eigen laatste posts
+     (Business Discovery, ig_partner_info; hun tag-posts tellen daar nie in mee). Alleen tags van ≥ IGS_WACHT dagen oud
+     (cijfers groeien nog) en van het laatste jaar (hun normaal is van nu).
+   - Rond hun post bij jou = jouw nieuwe volgers (en bereik) op de Meta-dag van de tag + de dag erna, tegen de middelste dag
+     van de 14 dagen ervóór. Signaal, geen bewijs: op zo'n dag kan ook je eigen post goed lopen (dat zetten we erbij). */
+let igsKant="jij";               // "jij" = jij tagt (samenwerkingen), "tagt" = wie tagt jou
+const IGS_TAG_VOOR=14;           // je normaal: de 14 Meta-dagen vóór de tag
+const IGS_TAG_VOOR_MIN=7;        // minstens zoveel van die dagen mét volgers-cijfer
+const IGS_TAG_OUD=365;           // hun post vs hun normaal alleen voor tags van het laatste jaar
+const igsLaDag=t=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Los_Angeles"}).format(new Date(t));   // Meta-dag
+const igsDagPlus=(d,n)=>new Date(Date.parse(d+"T12:00:00Z")+n*864e5).toISOString().slice(0,10);
+function igsGroei(n){
+  const h=IGS.hist.filter(r=>r.partner===n&&r.volgers!=null).map(r=>[Date.parse(r.dag),r.volgers]).sort((a,b)=>a[0]-b[0]);
+  if(h.length<2)return null;const a=h[0],b=h[h.length-1],dagen=(b[0]-a[0])/864e5;
+  return dagen>=7&&a[1]>0?{pct:b[1]/a[1]-1,dagen}:null;
+}
+// jouw volgers en bereik rond één tag (null = geen eerlijke vergelijking mogelijk)
+function igsRondTag(t,dag,eigenDagen,vandaag){
+  const d0=igsLaDag(t.gepost_om),d1=igsDagPlus(d0,1);
+  if(d1>=vandaag)return null;                                    // dag erna loopt nog (of nog nie begonnen)
+  const a=dag.get(d0),b=dag.get(d1);
+  if(!a||!b||a.follows==null||b.follows==null)return null;
+  const voor=[];for(let i=1;i<=IGS_TAG_VOOR;i++){const x=dag.get(igsDagPlus(d0,-i));if(x&&x.follows!=null)voor.push(x)}
+  if(voor.length<IGS_TAG_VOOR_MIN)return null;
+  const nV=med(voor.map(x=>x.follows)),rb=voor.filter(x=>x.reach>0).map(x=>x.reach),nB=rb.length>=IGS_TAG_VOOR_MIN?med(rb):null;
+  return {d0,maker:t.maker,v:a.follows+b.follows,normV:2*nV,extraV:a.follows+b.follows-2*nV,
+    bx:nB&&a.reach!=null&&b.reach!=null?(a.reach+b.reach)/(2*nB):null,zelf:eigenDagen.has(d0)||eigenDagen.has(d1)};
+}
+function igTags(){
+  const nu=Date.now(),grens=igsPeriode==="alles"?0:nu-365*864e5,jong=nu-IGS_WACHT*864e5,oud=nu-IGS_TAG_OUD*864e5;
+  const info=new Map(IGS.info.map(x=>[x.partner,x]));
+  const dag=new Map(((typeof IG!=="undefined"&&IG.dag)||[]).map(x=>[x.dag,{follows:x.c&&x.c.follows!=null?+x.c.follows:null,reach:x.c&&x.c.reach!=null?+x.c.reach:null}]));
+  const eersteDag=[...dag].filter(([,x])=>x.follows!=null).map(([d])=>d).sort()[0]||null;
+  const vandaag=igsLaDag(nu);
+  const eigenDagen=new Set(((typeof IG!=="undefined"&&IG.posts)||[]).filter(p=>p.gepost_om).map(p=>igsLaDag(p.gepost_om)));
+  const tags=IGS.tags.filter(t=>!t.weg&&t.gepost_om&&Date.parse(t.gepost_om)>=grens).sort((a,b)=>a.gepost_om<b.gepost_om?1:-1);
+  // ook partnâh bij jouw samenwerkingen? (aangenomen, nie weggehaald) + oordeel uit "Jij tagt"
+  const samen=new Map();IGS.partners.forEach(r=>{if(r.status==="Accepted"&&!r.weg)samen.set(r.partner,(samen.get(r.partner)||0)+1)});
+  let sj=null;try{sj=IGS.posts.length?igSamen():null}catch(e){sj=null}
+  const oordeel=new Map(((sj&&sj.rijen)||[]).map(r=>[r.naam,r]));
+  const per=new Map();
+  tags.forEach(t=>{const m=per.get(t.maker)||{naam:t.maker,tags:[]};m.tags.push(t);per.set(t.maker,m)});
+  const alleXl=[],alleRond=[];
+  const rijen=[...per.values()].map(m=>{
+    const i=info.get(m.naam),gr=i&&i.volgers!=null;
+    const perf=m.tags.filter(t=>Date.parse(t.gepost_om)<=jong&&Date.parse(t.gepost_om)>=oud);
+    const xl=gr&&i.likes_med>0?perf.filter(t=>t.likes!=null).map(t=>t.likes/i.likes_med):[];
+    const xr=gr&&i.reacties_med>0?perf.filter(t=>t.reacties!=null).map(t=>t.reacties/i.reacties_med):[];
+    alleXl.push(...xl);
+    const rond=m.tags.map(t=>igsRondTag(t,dag,eigenDagen,vandaag)).filter(Boolean);alleRond.push(...rond);
+    m.rond=rond;
+    return {naam:m.naam,n:m.tags.length,n90:m.tags.filter(t=>Date.parse(t.gepost_om)>nu-90*864e5).length,laatst:m.tags[0].gepost_om,
+      info:i||null,groei:igsGroei(m.naam),nPerf:perf.length,xl:med(xl),nL:xl.length,xr:med(xr),nR:xr.length,
+      verborgen:perf.filter(t=>t.likes==null).length,
+      rond:rond.length?{n:rond.length,extraV:rond.reduce((a,x)=>a+x.extraV,0),bx:med(rond.map(x=>x.bx).filter(v=>v!=null)),zelf:rond.filter(x=>x.zelf).length,ook:[]}:null,
+      samen:samen.get(m.naam)||0,oordeel:oordeel.get(m.naam)||null};
+  }).sort((a,b)=>b.n-a.n||(a.laatst<b.laatst?1:-1));
+  // tags van verschillende makers op (bijna) dezelfde dagen: dan delen ze dezelfde volgers → erbij zeggen, nie dubbel tellen
+  rijen.forEach(r=>{if(!r.rond)return;const eigen=per.get(r.naam).rond,ook=new Set();
+    eigen.forEach(x=>alleRond.forEach(y=>{if(y.maker!==r.naam&&Math.abs(Date.parse(y.d0)-Date.parse(x.d0))<=864e5)ook.add(y.maker)}));
+    r.rond.ook=[...ook]});
+  const n90=tags.filter(t=>Date.parse(t.gepost_om)>nu-90*864e5).length;
+  // per tag-dag 1× tellen (twee makers op dezelfde dag = dezelfde volgers)
+  const perDag=new Map();alleRond.forEach(x=>perDag.set(x.d0,x));
+  return {rijen,tags,n90,xl:med(alleXl),nXl:alleXl.length,rond:[...perDag.values()],eersteDag,
+    ookPartner:rijen.filter(r=>r.samen>0).length,
+    metGrootte:rijen.filter(r=>r.info&&r.info.volgers!=null).length,
+    nieTeZien:rijen.filter(r=>r.info&&r.info.volgers==null&&r.info.fout&&IGS_NIETEZIEN.test(r.info.fout)).length};
+}
+const igsX=(f,woord)=>`<b class="${f>=1.25?"up":f<=0.8?"down":""}">×${igsF(f)}</b> ${woord}`;
+const igsDatum=t=>{const d=dagNL(t);return Date.parse(t)>Date.now()-300*864e5?dKort(d):dLabel(d,1)};
+function igsTagPerfCel(r){
+  const i=r.info;
+  if(!i||i.volgers==null)return `—<span class="igsvs">${i&&i.fout&&IGS_NIETEZIEN.test(i.fout)?"hun normaal nie te zien":"hun normaal nog nie gemeten"}</span>`;
+  if(!r.nPerf)return `—<span class="igsvs">geen tag van ≥ ${IGS_WACHT} dagen in het laatste jaar</span>`;
+  const l=[];
+  if(r.xl!=null)l.push(igsX(r.xl,"likes"));
+  if(r.xr!=null)l.push(igsX(r.xr,"reacties"));
+  if(!l.length)return `—<span class="igsvs">${i.likes_verborgen||r.verborgen?"likes verborgen":"te weinig cijfers"}</span>`;
+  return l.join("<br>")+`<span class="igsvs">${r.nPerf} tag${r.nPerf===1?"":"s"} t.o.v. hun eigen posts</span>`
+    +(r.verborgen?`<span class="igsvs">likes verborgen bij ${r.verborgen}</span>`:"");
+}
+function igsTagRondCel(r,eersteDag){
+  const e=r.rond;
+  if(!e)return `—<span class="igsvs">${eersteDag?"geen dagcijfers rond hun tag":"nog geen dagcijfers"}</span>`;
+  return `<b class="${e.extraV>=2?"up":e.extraV<=-2?"down":""}">${plus(Math.round(e.extraV))}</b> volgâhs`
+    +(e.bx!=null?`<br>${igsX(e.bx,"bereik")}`:"")
+    +`<span class="igsvs">${e.n} tag${e.n===1?"":"s"} · t.o.v. je normaal</span>`
+    +(e.zelf?`<span class="igsvs">je postte zelf ook (${e.zelf}×)</span>`:"")
+    +(e.ook.length?`<span class="igsvs">zelfde dagen als ${e.ook.slice(0,2).map(n=>"@"+esc(n)).join(", ")}${e.ook.length>2?` +${e.ook.length-2}`:""}</span>`:"");
+}
+function igsTagPartnerCel(r){
+  if(r.oordeel){const o=r.oordeel;const [k,t]=IGS_OORDEEL[o.oordeel];
+    return `<span class="chip ${o.zeker?k:"mute"}">${o.zeker?t:"te vroeg"}</span><span class="igsvs">${r.samen}× samen aangenomen</span>`}
+  return r.samen?`${r.samen}× samen<span class="igsvs">nog geen cijfers</span>`:`—<span class="igsvs">alleen tags</span>`;
+}
+function renderIgTags(){
+  const leeg=msg=>{$("igsSub").innerHTML=msg;$("igsStats").innerHTML="";$("igSamen").innerHTML="";$("igsOnder").innerHTML="";$("igsMeer").hidden=true};
+  if(IGS.tagErr)return leeg(/relation|schema cache|does not exist/i.test(IGS.tagErr)
+    ?"Nog niet klaar: draai eerst <code>supabase/26_tags.sql</code> in Supabase."
+    :"Tags ophalen lukte niet: "+esc(IGS.tagErr));
+  const st=IGS.tagStand||{};
+  const fout=st.fout&&(!st.gelukt_om||Date.parse(st.fout_om||0)>Date.parse(st.gelukt_om))
+    ?`<p class="sub"><b>Ophalen lukte laatst nie:</b> ${esc(st.fout)}${/\(#10\)|permission/i.test(st.fout)?" (de Facebook-sleutel mist het recht <code>instagram_manage_comments</code>)":""}.</p>`:"";
+  if(!IGS.tags.length)return leeg("Nog geen tags opgehaald. Dat gebeurt elke nacht vanzelf (07:22), of draai <code>select public.ig_tags_refresh(true);</code> in Supabase."+fout);
+  const s=igTags();
+  $("igsSub").innerHTML=`Wie tagt jou in hún post? Per maker: hoe vaak, hoe hun post het deed t.o.v. hun eigen normaal, en wat er rond die dag bij jou gebeurde${igsPeriode==="365"?" (laatste jaar)":""}. Bereik, bewaard en gedeeld van hún post geeft Meta nooit.`;
+  const rMid=med(s.rond.map(x=>x.extraV));
+  $("igsStats").innerHTML=[
+    igStat("Tags",nf0.format(s.tags.length),`door ${nf0.format(s.rijen.length)} makers · laatste 90 dagen ${nf0.format(s.n90)} (± ${igNf1.format(s.n90/13)} per week)`),
+    igStat("Hun post vs hun normaal",s.xl==null?"—":"×"+igsF(s.xl),s.nXl?`likes van de middelste tag-post t.o.v. hun eigen posts (${nf0.format(s.nXl)} tags)`:"nog geen tags met hun normaal erbij"),
+    igStat("Ook partnâh",`${nf0.format(s.ookPartner)} van ${nf0.format(s.rijen.length)}`,"makers die ook je samenwerkingen aannemen"),
+    igStat("Rond hun post",s.rond.length?plus(Math.round(rMid)):"—",s.rond.length?`volgâhs bij jou per tag-dag (middelste van ${nf0.format(s.rond.length)}), t.o.v. je normaal · signaal, geen bewijs`:"nog geen tags met jouw dagcijfers erbij")
+  ].join("");
+  const toon=igsAlles?s.rijen:s.rijen.slice(0,12);
+  $("igSamen").innerHTML=s.rijen.length?`<thead><tr><th>Wie tagt jou</th><th class="n">Tags</th><th class="igszelf" title="Hun eigen account: volgers, hoe vaak ze posten, hoe actief hun publiek is">Partnâh zelf</th><th class="n" title="Likes en reacties van hun post waarin jij getagd bent, t.o.v. hun eigen andere posts">Hun post vs hun normaal</th><th class="n" title="Jouw nieuwe volgers en bereik op de dag van hun post + de dag erna, t.o.v. je normaal. Signaal, geen bewijs.">Rond hun post bij jou</th><th>Ook partnâh?</th></tr></thead><tbody>`+
+    toon.map(r=>`<tr><td><a href="https://www.instagram.com/${encodeURIComponent(r.naam)}/" target="_blank" rel="noopener">@${esc(r.naam)}</a></td>
+      <td class="n"><b>${nf0.format(r.n)}</b><span class="igsvs">laatst ${igsDatum(r.laatst)}</span>${r.n90?`<span class="igsvs">${r.n90} in 90 dagen</span>`:""}</td>
+      <td class="igszelf">${igsZelfCel(r)}</td>
+      <td class="n igseigen">${igsTagPerfCel(r)}</td>
+      <td class="n igseigen">${igsTagRondCel(r,s.eersteDag)}</td>
+      <td>${igsTagPartnerCel(r)}</td></tr>`).join("")+"</tbody>"
+    :`<tbody><tr><td class="sub">Geen tags in deze periode.</td></tr></tbody>`;
+  $("igsMeer").hidden=s.rijen.length<=12;$("igsMeer").textContent=igsAlles?"Minder tonen":`Alle ${nf0.format(s.rijen.length)} makers tonen`;
+  const delen=[];
+  const laatste=s.tags.slice(0,10);
+  if(laatste.length)delen.push(`<p><b>Laatste tags:</b> ${laatste.map(t=>`<a class="chip mute" href="${esc(t.link||("https://www.instagram.com/"+encodeURIComponent(t.maker)+"/"))}" target="_blank" rel="noopener">${igsDatum(t.gepost_om)} · @${esc(t.maker)} · ${t.soort==="REELS"?"reel":"post"}${t.likes!=null?` · ${igsKort(t.likes)} likes`:" · likes verborgen"}</a>`).join(" ")}</p>`);
+  delen.push(`<p class="sub"><b>Wat je wel en nie ziet.</b> Meta geeft per post waarin jij getagd bent: wie, wanneer, reel of post, likes (nie als ze die verbergen), reacties en de link. `
+    +`Bereik, bewaard en gedeeld van hún post krijg je nooit. @jou in hun tekst of in hun story, en wie jouw foto deelt, kan Meta ook nie laten zien.</p>`);
+  delen.push(`<p class="sub"><b>Hun post vs hun normaal</b> = likes (en reacties) van hun post met jouw tag, gedeeld door de middelste van hun eigen laatste posts. ×2 = twee keer zoveel likes als normaal bij hen. `
+    +`Alleen tags van minstens ${IGS_WACHT} dagen oud (cijfers groeien nog) en van het laatste jaar (hun normaal is van nu). Bij persoonlijke of privé-accounts kan Meta hun normaal nie laten zien.</p>`);
+  delen.push(`<p class="sub"><b>Rond hun post bij jou</b> = jouw nieuwe volgers op de dag van hun post en de dag erna, min wat je op twee gewone dagen krijgt (de middelste dag van de ${IGS_TAG_VOOR} dagen ervóór); bereik idem als ×. `
+    +`Dit is een <b>signaal, geen bewijs</b>: op die dag kan ook je eigen post goed lopen (staat erbij als "je postte zelf ook"), of iets anders. Taggen twee makers je op dezelfde dagen, dan delen ze dezelfde volgers ("zelfde dagen als @…"); de tegel bovenaan telt elke dag maar 1×. Profielbezoek per dag geeft Meta nie voor je hele account, alleen per eigen post. `
+    +`${s.eersteDag?`Jouw dagcijfers beginnen op ${dLabel(s.eersteDag,1)}: oudere tags hebben hier geen cijfer.`:""}</p>`);
+  delen.push(`<p class="sub"><b>Partnâh zelf</b>: ${nf0.format(s.metGrootte)} van ${nf0.format(s.rijen.length)} makers gemeten${s.nieTeZien?`, ${nf0.format(s.nieTeZien)} nie te zien (persoonlijk of privé-account)`:""}. Nieuwe makers worden vanzelf gemeten (elk uur tot 15, samen met je partners). `
+    +`Tags ophalen: elke nacht de nieuwste, 1× per week de hele lijst${st.volledig_om?` (laatst ${igTijd(Date.parse(st.volledig_om))}, ${nf0.format(st.aantal||0)} posts)`:""}. Verdwijnt een post of tag, dan telt hij nie meer mee.`
+    +(st.melding?` <i>${esc(st.melding)}</i>`:"")+`</p>`+fout);
+  $("igsOnder").innerHTML=delen.join("");
+}
+
 /* ---------- waarschuwing: Facebook-sleutel (verlengt zichzelf niet, 60 dagen) ---------- */
 const FB_SLEUTELFOUT=/access token|oauth|session has expired|not authori[sz]ed|\(#190\)|Vault/i;
 function fbKoppeling(){
@@ -428,9 +586,9 @@ function fbAlarmHTML(){
     <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">!</span><h2>${k.kop}</h2></div>
     <p>${k.tekst}</p>
     <details><summary>Zo maak je een nieuwe sleutel (5 minuten)</summary><ol>
-      <li>Ga naar de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>. Rechts: <b>Meta App</b> = haagse-dashboard, <b>User or Page</b> = User Token, en bij Permissions <code>instagram_basic</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code> en <code>instagram_manage_insights</code> (voor de partnergegevens).</li>
+      <li>Ga naar de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>. Rechts: <b>Meta App</b> = haagse-dashboard, <b>User or Page</b> = User Token, en bij Permissions <code>instagram_basic</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>instagram_manage_insights</code> (voor de partnergegevens) en <code>instagram_manage_comments</code> (voor wie jou tagt; wordt alleen gelezen). Dat zijn er 5.</li>
       <li>Klik <b>Generate Access Token</b>. Kies in het venster "<b>current Pages only</b>" (The Hague Beachlife) en "<b>current Instagram accounts only</b>" (the_hague_beachlife).</li>
-      <li>Klik op het blauwe <b>i</b>-rondje links in het sleutelvak → <b>Open in Access Token Tool</b> → <b>Extend Access Token</b> → <b>Debug</b>. Bij <i>Expires</i> moet nu "in about 2 months" staan.</li>
+      <li>Klik op het blauwe <b>i</b>-rondje links in het sleutelvak → <b>Open in Access Token Tool</b> → <b>Extend Access Token</b> → <b>Debug</b>. Bij <i>Expires</i> moet nu "in about 2 months" staan, en bij <i>Scopes</i> alle 5 rechten.</li>
       <li>Kopieer de sleutel uit het vak bovenaan (klik erin, Cmd+A, Cmd+C). Plak hem nergens anders dan in de Vault.</li>
       <li>Supabase → <b>Integrations</b> → <b>Vault</b> → <code>facebook_access_token</code> → <b>Edit</b> → plakken → <b>Save</b>.</li>
       <li>Wil je niet tot vannacht wachten: SQL Editor → <code>select public.fb_token_check(), public.ig_partners_refresh(45);</code> → Run. Daarna verdwijnt deze melding.</li>
@@ -453,5 +611,6 @@ document.addEventListener("click",e=>{
   const t=e.target.closest("#ptTabs button");if(t){ptTab=t.dataset.pt;renderPartners();return}
   const p=e.target.closest("#igsPeriode button");if(p){igsPeriode=p.dataset.v;renderIgSamen();return}
   const s=e.target.closest("#igsSorteer button");if(s){igsSorteer=s.dataset.v;renderIgSamen();return}
+  const k=e.target.closest("#igsKant button");if(k){igsKant=k.dataset.v;igsAlles=false;renderIgSamen();return}
   if(e.target.closest("#igsMeer")){igsAlles=!igsAlles;renderIgSamen()}
 });

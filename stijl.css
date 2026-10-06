@@ -485,6 +485,7 @@ td.igszelf .igsvs{white-space:normal}
 .igsgr{margin-top:4px;font-size:11px}
 .igsmob > .igsvs{margin-bottom:4px}
 .seg button[hidden]{display:none}
+.seg[hidden]{display:none}
 
 /* telefoon: alleen de hoofdzaken; tabellen, uploads en details (class "pc") alleen op de computer */
 @media (max-width:700px){.pc{display:none!important}}
