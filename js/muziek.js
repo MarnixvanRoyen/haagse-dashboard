@@ -159,6 +159,7 @@ function renderTracks(d){
     <td><div class="mini" title="${pct(t.total/tot)}"><span style="width:${Math.max(2,t.total/tot*100)}%;background:var(--${t.lb>t.sc?"lb":"sc"})"></span></div></td></tr>`).join("");
   h+=`</tbody><tfoot><tr><td>Totaal (${list.length})</td><td></td><td></td><td class="n">${eur(sums.sc)}</td><td class="n">${eur(sums.lb)}</td><td class="n">${eur(sums.total)}</td><td class="n">${nf0.format(sums.units)}</td><td></td><td></td></tr></tfoot>`;
   $("trackTable").innerHTML=h;
+  plakKop("trackTable");
   $("trackTable").querySelectorAll("th.sortable").forEach(th=>{const go=()=>{const nk=th.dataset.k;if(state.sortKey===nk)state.sortDir*=-1;else{state.sortKey=nk;state.sortDir=(nk==="track"||nk==="artist")?1:-1}renderTracks(compute())};
     th.addEventListener("click",go);th.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}})});
 }
@@ -539,12 +540,32 @@ function tsKlik(th){const naam=th.dataset.tabel,k=th.dataset.k,st=TS[naam];
   TS_TEKEN[naam]()}
 document.addEventListener("click",e=>{const th=e.target.closest&&e.target.closest("th[data-tabel]");if(th)tsKlik(th)});
 document.addEventListener("keydown",e=>{const th=(e.key==="Enter"||e.key===" ")&&e.target.closest&&e.target.closest("th[data-tabel]");if(th){e.preventDefault();tsKlik(th)}});
-// vaste kolomkoppen: past de tabel in de breedte → koppen plakken bovenaan het scherm terwijl je de pagina scrolt.
-// Te breed (smal venster) → de tabel krijgt een eigen scrollvak (max. ± 3/4 scherm) en de koppen plakken daarin.
-function plakKop(id){const t=$(id),w=t&&t.closest(".tablewrap");if(!w||!w.offsetWidth)return;
-  w.classList.remove("plak","scrollkop");w.classList.add(t.scrollWidth<=w.clientWidth+1?"plak":"scrollkop")}
-const TS_TABELLEN=["cmpTable","ytTable","sclMoneyTable","sclTable","spMoneyTable","spTable"];
-addEventListener("resize",()=>{TS_TABELLEN.forEach(plakKop)});
+// vaste kolomkoppen (v2, 06-10): zodra de echte kop boven uit beeld scrolt, zweeft een kopie van de kop bovenaan het scherm
+// (position:fixed, zelfde kolombreedtes, schuift mee als de tabel zijwaarts scrolt). Geen position:sticky meer: dat werkte
+// nie als de tabel breder was dan de kaart (eigen scrollvak) en is wisselvallig in Safari. Tikken op de zwevende kop sorteert ook.
+const VK=new Map();                                   // tabel-id → {t, w, kop, bouw}
+function plakKop(id){const t=$(id);if(!t)return;const w=t.closest(".tablewrap");if(!w)return;
+  let o=VK.get(id);
+  if(!o){const kop=document.createElement("div");kop.className="vastekop";kop.hidden=true;document.body.appendChild(kop);
+    o={w,kop};VK.set(id,o);w.addEventListener("scroll",()=>{kop.scrollLeft=w.scrollLeft},{passive:true});
+    // tik op de zwevende kop = tik op de echte kop (die sorteert); zelf niet doorgeven, anders sorteert hij 2x
+    kop.addEventListener("click",e=>{const c=e.target.closest("th");if(!c)return;e.stopPropagation();
+      const i=[...c.parentNode.children].indexOf(c),echt=o.t.tHead&&o.t.tHead.rows[0].cells[i];if(echt)echt.click()})}
+  o.t=t;o.bouw=true;vkTeken(o)}
+function vkTeken(o){const {t,w,kop}=o,th=t.tHead;
+  if(!th||!w.offsetParent||!t.tBodies[0]||!t.tBodies[0].rows.length){kop.hidden=true;return}   // tabblad dicht / leeg
+  const r=th.getBoundingClientRect(),tr=t.getBoundingClientRect(),wr=w.getBoundingClientRect(),h=r.height;
+  if(!(r.top<0&&tr.bottom>h+12)){kop.hidden=true;return}                       // echte kop nog in beeld, of tabel al voorbij
+  if(o.bouw||kop.hidden){o.bouw=false;
+    const br=[...th.rows[0].cells].map(c=>c.getBoundingClientRect().width);
+    kop.innerHTML=`<table style="width:${tr.width}px">${th.outerHTML}</table>`;
+    [...kop.querySelectorAll("th")].forEach((c,i)=>{c.style.width=br[i]+"px";c.tabIndex=-1});}
+  kop.style.left=wr.left+"px";kop.style.width=w.clientWidth+"px";kop.hidden=false;kop.scrollLeft=w.scrollLeft}
+function vkAlles(){VK.forEach(vkTeken)}
+const TS_TABELLEN=["cmpTable","ytTable","sclMoneyTable","sclTable","spMoneyTable","spTable","trackTable"];
+addEventListener("scroll",vkAlles,{passive:true});
+addEventListener("resize",()=>{VK.forEach(o=>{o.bouw=true});vkAlles()});
+document.addEventListener("click",()=>requestAnimationFrame(vkAlles));         // ander tabblad/onderdeel → zwevende kop weg
 
 /* ---------- YouTube vs. SoundCloud-afrekening ---------- */
 // Titel -> sleutel: kleine letters, zonder (Original Mix)/[..], zonder leestekens. Spaties eromheen = hele woorden matchen.

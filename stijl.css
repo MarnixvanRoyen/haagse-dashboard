@@ -147,11 +147,11 @@ nav.tabs button[aria-selected=true],nav.appkeuze button[aria-selected=true]{colo
 
 /* tables */
 .tablewrap{overflow-x:auto;margin-inline:-4px}
-/* vaste kolomkoppen (06-10, chat 14, plakKop in muziek.js): .plak = tabel past, koppen plakken bovenaan het scherm;
-   .scrollkop = tabel te breed, eigen scrollvak en koppen plakken daarin. Rand onder de kop als schaduw (border plakt nie mee). */
-.tablewrap.plak{overflow:visible}
-.tablewrap.scrollkop{overflow:auto;max-height:75vh}
-.tablewrap.plak thead th,.tablewrap.scrollkop thead th{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:0;box-shadow:inset 0 -2px 0 var(--ink)}
+/* vaste kolomkoppen v2 (06-10, chat 14, plakKop/vkTeken in muziek.js): zwevende kopie van de kop bovenaan het scherm */
+.vastekop{position:fixed;top:0;z-index:20;overflow:hidden;background:var(--surface);box-shadow:0 6px 14px rgba(0,0,0,.28);pointer-events:auto}
+.vastekop[hidden]{display:none}
+.vastekop table{table-layout:fixed;border-collapse:collapse;font-size:14px}
+.vastekop th{box-sizing:border-box;background:var(--surface);border-bottom:0;box-shadow:inset 0 -2px 0 var(--ink)}
 .seg.cmpfilter{flex-wrap:wrap;margin-top:14px}
 .seg.cmpfilter .seg-n{opacity:.7;font-weight:600;margin-left:2px}
 table{border-collapse:collapse;width:100%;font-size:14px}
