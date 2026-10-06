@@ -517,14 +517,23 @@ function renderYouTube(){
 /* ---------- Sorteerbare tabel + vaste kolomkoppen (06-10, chat 14) ----------
    kolommen: [{k,l,n(getal),w(waarde-functie),t(title)}]. Tik/klik op een kop = sorteren, nog een keer = andersom.
    Lege waarden (null/"") staan altijd onderaan. Stand per tabel in TS (alleen tot herladen). */
-const TS={cmp:{k:"views",dir:-1,status:"alle"},ytt:{k:"views",dir:-1}};
+const TS={cmp:{k:"views",dir:-1,status:"alle"},ytt:{k:"views",dir:-1},scm:{k:"plays",dir:-1},sct:{k:"plays",dir:-1},spm:{k:"streams",dir:-1,status:"alle"},spt:{k:"streams",dir:-1}};
 function tsKop(naam,kols){const st=TS[naam];
   return "<thead><tr>"+kols.map(c=>`<th class="${c.n?"n ":""}sortable" data-tabel="${naam}" data-k="${c.k}" tabindex="0"${c.t?` title="${esc(c.t)}"`:""}${st.k===c.k?` aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}</th>`).join("")+"</tr></thead>"}
 function tsSorteer(naam,rijen,kols){const st=TS[naam],c=kols.find(x=>x.k===st.k)||kols[0];
   const leeg=v=>v==null||v==="";
   return [...rijen].sort((a,b)=>{const x=c.w(a),y=c.w(b);if(leeg(x)||leeg(y))return leeg(x)-leeg(y);
     return (typeof x==="string"?x.localeCompare(y,"nl"):x-y)*st.dir})}
-const TS_TEKEN={cmp:()=>renderYtCompare(ytCompute(MUZIEK_DAGEN)),ytt:()=>renderYouTube()};
+const TS_TEKEN={cmp:()=>renderYtCompare(ytCompute(MUZIEK_DAGEN)),ytt:()=>renderYouTube(),scm:()=>renderSCLive(),sct:()=>renderSCLive(),spm:()=>renderSpotify(),spt:()=>renderSpotify()};
+// status-filter: knopjes "Allâh · <status> …" (alleen statussen die voorkomen, met aantal); geeft de zichtbare rijen terug
+function tsFilter(naam,elId,rijen,orde,stVan){const st=TS[naam],tel=new Map();rijen.forEach(o=>{const t=stVan(o);tel.set(t,(tel.get(t)||0)+1)});
+  if(st.status!=="alle"&&!tel.has(st.status))st.status="alle";
+  const el=$(elId);if(el)el.innerHTML=[["alle",`Allâh <span class="seg-n">${rijen.length}</span>`],...orde.filter(t=>tel.has(t)).map(t=>[t,`${t} <span class="seg-n">${tel.get(t)}</span>`])]
+    .map(([v,l])=>`<button type="button" data-tabel="${naam}" data-tsst="${esc(v)}" aria-pressed="${st.status===v}">${l}</button>`).join("");
+  return rijen.filter(o=>st.status==="alle"||stVan(o)===st.status)}
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-tsst]");if(!b)return;TS[b.dataset.tabel].status=b.dataset.tsst;TS_TEKEN[b.dataset.tabel]()});
+// totaal-label: "Totaal (36)" of "Totaal (32 van 36)" bij een filter
+const tsTot=(zicht,alle)=>`Totaal (${zicht.length===alle.length?alle.length:zicht.length+" van "+alle.length})`;
 function tsKlik(th){const naam=th.dataset.tabel,k=th.dataset.k,st=TS[naam];
   if(st.k===k)st.dir*=-1;else{st.k=k;st.dir=th.classList.contains("n")?-1:1}   // getallen: hoogste eerst; tekst: A-Z
   TS_TEKEN[naam]()}
@@ -534,7 +543,8 @@ document.addEventListener("keydown",e=>{const th=(e.key==="Enter"||e.key===" ")&
 // Te breed (smal venster) → de tabel krijgt een eigen scrollvak (max. ± 3/4 scherm) en de koppen plakken daarin.
 function plakKop(id){const t=$(id),w=t&&t.closest(".tablewrap");if(!w||!w.offsetWidth)return;
   w.classList.remove("plak","scrollkop");w.classList.add(t.scrollWidth<=w.clientWidth+1?"plak":"scrollkop")}
-addEventListener("resize",()=>{["cmpTable","ytTable"].forEach(plakKop)});
+const TS_TABELLEN=["cmpTable","ytTable","sclMoneyTable","sclTable","spMoneyTable","spTable"];
+addEventListener("resize",()=>{TS_TABELLEN.forEach(plakKop)});
 
 /* ---------- YouTube vs. SoundCloud-afrekening ---------- */
 // Titel -> sleutel: kleine letters, zonder (Original Mix)/[..], zonder leestekens. Spaties eromheen = hele woorden matchen.
@@ -578,16 +588,12 @@ function renderYtCompare(y){
     <div class="ytstat"><span class="k">Per 1.000 weergaven</span><span class="v">${views?eur(ex(usdT)/views*1000):"—"}</span><span class="s">wat een weergave je ongeveer oplevert</span></div>`;
   // status-filter (knopjes boven de tabel): alleen statussen die voorkomen, met aantal
   const stOrde=["Loopt achter","Niet via SoundCloud","Klopt","Meer dan je kanaal","Via label","Geen video gevonden"];
-  const telSt=new Map();rows.forEach(o=>telSt.set(o.st.t,(telSt.get(o.st.t)||0)+1));
-  if(TS.cmp.status!=="alle"&&!telSt.has(TS.cmp.status))TS.cmp.status="alle";
-  $("cmpFilter").innerHTML=[["alle",`Allâh <span class="seg-n">${rows.length}</span>`],...stOrde.filter(t=>telSt.has(t)).map(t=>[t,`${t} <span class="seg-n">${telSt.get(t)}</span>`])]
-    .map(([v,l])=>`<button type="button" data-cmpst="${esc(v)}" aria-pressed="${TS.cmp.status===v}">${l}</button>`).join("");
   const kols=[{k:"title",l:"Nummer",w:o=>o.title},{k:"st",l:"Status",w:o=>stOrde.indexOf(o.st.t)},
     {k:"views",l:"YouTube",n:1,w:o=>o.views||null},{k:"paid",l:"Afgerekend",n:1,w:o=>o.paid||null},
     {k:"other",l:"Via anderen",n:1,t:"Afgerekend via video's van anderen (Content ID)",w:o=>o.other||null},
     {k:"pct",l:"% terug",n:1,w:o=>o.views&&o.paid?o.paid/o.views:null},{k:"usd",l:"Verdiend",n:1,w:o=>o.usd||null},
     {k:"p1k",l:"€/1.000",n:1,t:"Verdiend per 1.000 afgerekende weergaven",w:o=>o.paid>=25?o.usd/o.paid:null},{k:"last",l:"T/m",w:o=>o.last||null}];
-  const zicht=tsSorteer("cmp",rows.filter(o=>TS.cmp.status==="alle"||o.st.t===TS.cmp.status),kols);
+  const zicht=tsSorteer("cmp",tsFilter("cmp","cmpFilter",rows,stOrde,o=>o.st.t),kols);
   const sv=zicht.reduce((a,o)=>a+o.views,0),sp=zicht.reduce((a,o)=>a+o.paid,0),so=zicht.reduce((a,o)=>a+o.other,0),su=zicht.reduce((a,o)=>a+o.usd,0);
   $("cmpTable").innerHTML=tsKop("cmp",kols)+"<tbody>"+
     zicht.map(o=>{const st=o.st;return `<tr><td><b>${esc(o.title)}</b>${o.nv>1?` <span class="sub" style="font-size:12px">(${o.nv} video's)</span>`:""}</td>
@@ -597,11 +603,10 @@ function renderYtCompare(y){
       <td class="n">${o.views&&o.paid?pct(o.paid/o.views):"—"}</td>
       <td class="n">${o.usd?eur(ex(o.usd)):"—"}</td><td class="n">${o.paid>=25?eur(ex(o.usd)/o.paid*1000):"—"}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${o.last?mLabel(o.last):"—"}</td></tr>`}).join("")+
-    `</tbody><tfoot><tr><td>Totaal (${zicht.length===rows.length?rows.length:zicht.length+" van "+rows.length})</td><td></td><td class="n">${nf0.format(sv)}</td><td class="n">${nf0.format(sp)}</td><td class="n">${nf0.format(so)}</td><td class="n">${sv?pct(sp/sv):""}</td><td class="n">${eur(ex(su))}</td><td class="n">${sp?eur(ex(su)/sp*1000):""}</td><td></td></tr></tfoot>`;
+    `</tbody><tfoot><tr><td>${tsTot(zicht,rows)}</td><td></td><td class="n">${nf0.format(sv)}</td><td class="n">${nf0.format(sp)}</td><td class="n">${nf0.format(so)}</td><td class="n">${sv?pct(sp/sv):""}</td><td class="n">${eur(ex(su))}</td><td class="n">${sp?eur(ex(su)/sp*1000):""}</td><td></td></tr></tfoot>`;
   plakKop("cmpTable");
 }
-document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-cmpst]");if(!b)return;
-  TS.cmp.status=b.dataset.cmpst;renderYtCompare(ytCompute(MUZIEK_DAGEN))});
+
 
 /* ---------- SoundCloud live ---------- */
 let SCL={tracks:[],snaps:[],err:null};
@@ -705,21 +710,31 @@ function renderSCLive(){
       <div class="ytstat"><span class="k">Betaalde plays</span><span class="v">${nf0.format(paid)}</span><span class="s">${pPlays?pct(paid/pPlays)+" van de plays bij de "+withPay.length+" nummers met geld":""}</span></div>
       <div class="ytstat"><span class="k">Verdiend op SoundCloud</span><span class="v">${eur(ex(usdT))}</span><span class="s">${lastM?"t/m "+mLabel(lastM,1):""}</span></div>
       <div class="ytstat"><span class="k">Per 1.000 plays</span><span class="v">${pPlays?eur(ex(usdT)/pPlays*1000):"—"}</span><span class="s">wat een play je gemiddeld oplevert</span></div>`;
-    $("sclMoneyTable").innerHTML=`<thead><tr><th>Nummer</th><th class="n">Plays</th><th class="n">Betaald</th><th class="n">% betaald</th><th class="n">Verdiend</th><th class="n" title="Verdiend per 1.000 openbare plays">€/1.000 plays</th><th>T/m</th></tr></thead><tbody>`+
-      mRows.map(t=>`<tr><td><b>${esc(t.title)}</b></td><td class="n">${t.plays!=null?nf0.format(t.plays):"—"}</td>
+    const mkols=[{k:"title",l:"Nummer",w:t=>t.title},{k:"plays",l:"Plays",n:1,w:t=>t.plays},{k:"paid",l:"Betaald",n:1,w:t=>t.paid||null},
+      {k:"pct",l:"% betaald",n:1,w:t=>t.paid&&t.plays?t.paid/t.plays:null},{k:"usd",l:"Verdiend",n:1,w:t=>t.usd||null},
+      {k:"p1k",l:"€/1.000 plays",n:1,t:"Verdiend per 1.000 openbare plays",w:t=>t.usd&&t.plays>=100?t.usd/t.plays:null},{k:"last",l:"T/m",w:t=>t.last||null}];
+    $("sclMoneyTable").innerHTML=tsKop("scm",mkols)+"<tbody>"+
+      tsSorteer("scm",mRows,mkols).map(t=>`<tr><td><b>${esc(t.title)}</b></td><td class="n">${t.plays!=null?nf0.format(t.plays):"—"}</td>
         <td class="n">${t.paid?nf0.format(t.paid):'<span class="chip mute" title="Geen SoundCloud-afrekening gevonden voor deze titel. Nieuw nummer (nog niet afgerekend), andere titel in het rapport, of niet via Repost gemonetiseerd.">geen</span>'}</td>
         <td class="n">${t.paid&&t.plays?pct(t.paid/t.plays):"—"}</td><td class="n">${t.usd?eur(ex(t.usd)):"—"}</td>
         <td class="n">${t.usd&&t.plays>=100?eur(ex(t.usd)/t.plays*1000):"—"}</td>
         <td class="mono" style="font-size:13px;white-space:nowrap">${t.last?mLabel(t.last):"—"}</td></tr>`).join("")+
       `</tbody><tfoot><tr><td>Totaal (${mRows.length})</td><td class="n">${nf0.format(plays)}</td><td class="n">${nf0.format(paid)}</td><td class="n">${pPlays?pct(paid/pPlays):""}</td><td class="n">${eur(ex(usdT))}</td><td class="n">${pPlays?eur(ex(usdT)/pPlays*1000):""}</td><td></td></tr></tfoot>`;
+    plakKop("sclMoneyTable");
   }
-  $("sclTable").innerHTML=`<thead><tr><th>Titel</th><th>Geüpload</th><th class="n">Plays</th>${vd?'<th class="n">Vandaag</th>':""}<th class="n">${y.multiDay?"31 dagen":"—"}</th><th class="n" title="Plays gedeeld door het aantal dagen sinds upload">Per dag</th><th class="n">Likes</th><th class="n">Reposts</th><th class="n">Reacties</th><th class="n">Downloads</th></tr></thead><tbody>`+
-    byPlays.map(t=>`<tr><td>${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a>`:`<b>${esc(t.title)}</b>`}</td>
+  const skols=[{k:"title",l:"Titel",w:t=>t.title},{k:"up",l:"Geüpload",w:t=>t.up||null},{k:"plays",l:"Plays",n:1,w:t=>t.plays},
+    ...(vd?[{k:"vandaag",l:"Vandaag",n:1,w:t=>g.per.get(t.id)||0}]:[]),{k:"grow",l:y.multiDay?"31 dagen":"—",n:1,w:t=>y.multiDay?t.grow:null},
+    {k:"perDay",l:"Per dag",n:1,t:"Plays gedeeld door het aantal dagen sinds upload",w:t=>t.perDay},{k:"likes",l:"Likes",n:1,w:t=>t.likes},
+    {k:"reposts",l:"Reposts",n:1,w:t=>t.reposts},{k:"comments",l:"Reacties",n:1,w:t=>t.comments},{k:"downloads",l:"Downloads",n:1,w:t=>t.downloads}];
+  if(!skols.some(c=>c.k===TS.sct.k)){TS.sct.k="plays";TS.sct.dir=-1}
+  $("sclTable").innerHTML=tsKop("sct",skols)+"<tbody>"+
+    tsSorteer("sct",byPlays,skols).map(t=>`<tr><td>${t.url?`<a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a>`:`<b>${esc(t.title)}</b>`}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${t.up?dLabel(t.up,1):"—"}</td>
       <td class="n"><b>${t.plays!=null?nf0.format(t.plays):"—"}</b></td>${vd?`<td class="n">${(g.per.get(t.id)||0)>0?`<span class="up">+${nf0.format(g.per.get(t.id))}</span>`:"0"}</td>`:""}<td class="n">${y.multiDay?(t.grow>0?`<span class="up">+${nf0.format(t.grow)}</span>`:"0"):"—"}</td>
       <td class="n">${t.perDay!=null?(t.perDay>=10?nf0.format(t.perDay):nf2.format(t.perDay)):"—"}</td>
       <td class="n">${nf0.format(t.likes)}</td><td class="n">${nf0.format(t.reposts)}</td><td class="n">${nf0.format(t.comments)}</td><td class="n">${nf0.format(t.downloads)}</td></tr>`).join("")+
     `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(plays)}</td>${vd?`<td class="n">+${nf0.format(g.erbe)}</td>`:""}<td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td></td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(reposts)}</td><td class="n">${nf0.format(comments)}</td><td class="n">${nf0.format(L.reduce((a,t)=>a+t.downloads,0))}</td></tr></tfoot>`;
+  plakKop("sclTable");
 }
 
 /* ---------- Spotify (CSV-export uit Spotify for Artists) ---------- */
@@ -836,24 +851,38 @@ function renderSpotify(){
     <div class="ytstat"><span class="k">Via DJ·World</span><span class="v">${nf0.format(lbSp)}</span><span class="s">Spotify-streams bij ${lb.length} label-nummers · label telt ${nf0.format(lbAll)} streams op alle platforms</span></div>`;
   const partners=[...new Set(SC.map(r=>r.partner).filter(Boolean))].sort();
   $("spMoneyNote").innerHTML=SC.length&&!SC.some(isSpotify)?`<p class="note" style="margin:14px 0 0;background:var(--warn-soft)">In je SoundCloud-rapport staat geen enkele Spotify-regel. Partners die er wel in staan: ${partners.map(p=>esc(pName(p))).join(", ")}. ${M.every(o=>o.below)?" Dat klopt: geen enkel nummer haalt de 1.000 streams in 12 maanden die Spotify minimaal vereist, dus er valt nog niets af te rekenen.":" Nummers onder de 1.000-grens leveren sowieso niets op; let vooral op nummers met \"Spotify ontbreekt\"."}</p>`:"";
-  $("spMoneyTable").innerHTML=`<thead><tr><th>Nummer</th><th>Via</th><th>Status</th><th class="n">Spotify</th><th title="Spotify betaalt alleen voor nummers met minstens 1.000 streams in de afgelopen 12 maanden">1.000-grens</th><th class="n" title="SoundCloud: afgerekende Spotify-streams · DJ·World: streams op alle platforms samen">Afgerekend</th><th class="n">% terug</th><th class="n" title="SoundCloud: alleen Spotify · DJ·World: alle platforms samen">Verdiend</th><th>T/m</th></tr></thead><tbody>`+
-    M.map(o=>{const st=spStatus(o);const via=o.via==="lb"?'<span class="chip lb">DJ·World</span>':o.via?'<span class="chip sc">SoundCloud</span>':"—";
+  M.forEach(o=>o.st=spStatus(o));
+  const spOrde=["Loopt achter","Label telt minder","Spotify ontbreekt","Geen afrekening","Klopt","Via label","Onder 1.000-grens","Nog te vroeg"];
+  const pkols=[{k:"title",l:"Nummer",w:o=>o.title},{k:"via",l:"Via",w:o=>o.via==="lb"?"DJ·World":o.via?"SoundCloud":null},{k:"st",l:"Status",w:o=>spOrde.indexOf(o.st.t)},
+    {k:"streams",l:"Spotify",n:1,w:o=>o.streams},{k:"grens",l:"1.000-grens",t:"Spotify betaalt alleen voor nummers met minstens 1.000 streams in de afgelopen 12 maanden",w:o=>o.y12},
+    {k:"af",l:"Afgerekend",n:1,t:"SoundCloud: afgerekende Spotify-streams · DJ·World: streams op alle platforms samen",w:o=>o.via==="sc"?o.paid:o.via==="lb"?o.lbS:null},
+    {k:"pct",l:"% terug",n:1,w:o=>o.via==="sc"&&o.streams?o.paid/o.streams:null},
+    {k:"vd",l:"Verdiend",n:1,t:"SoundCloud: alleen Spotify · DJ·World: alle platforms samen",w:o=>o.via==="sc"?ex(o.usd):o.via==="lb"?o.lbEur:null},{k:"last",l:"T/m",w:o=>o.last||null}];
+  const Mz=tsSorteer("spm",tsFilter("spm","spmFilter",M,spOrde,o=>o.st.t),pkols);
+  const zStreams=Mz.reduce((a,o)=>a+o.streams,0),zEur=Mz.reduce((a,o)=>a+(o.via==="sc"?ex(o.usd):o.via==="lb"?o.lbEur:0),0);
+  $("spMoneyTable").innerHTML=tsKop("spm",pkols)+"<tbody>"+
+    Mz.map(o=>{const st=o.st;const via=o.via==="lb"?'<span class="chip lb">DJ·World</span>':o.via?'<span class="chip sc">SoundCloud</span>':"—";
       const af=o.via==="sc"?nf0.format(o.paid):o.via==="lb"?`<span title="alle platforms samen">${nf0.format(o.lbS)}*</span>`:"—";
       const pc=o.via==="sc"&&o.streams?pct(o.paid/o.streams):"—";
       const vd=o.via==="sc"?eur(ex(o.usd)):o.via==="lb"?`<span title="DJ·World, alle platforms samen">${eur(o.lbEur)}*</span>`:"—";
       return `<tr><td><b>${esc(o.title)}</b></td><td>${via}</td><td><span class="chip ${st.c}" title="${esc(st.w)}">${st.t}</span></td>
       <td class="n">${nf0.format(o.streams)}</td><td style="white-space:nowrap;font-size:13px">${grensCell(o)}</td><td class="n">${af}</td><td class="n">${pc}</td><td class="n">${vd}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${o.last?mLabel(o.last):"—"}</td></tr>`}).join("")+
-    `</tbody><tfoot><tr><td>Totaal (${M.length})</td><td></td><td></td><td class="n">${nf0.format(streams)}</td><td></td><td></td><td></td><td class="n">${eur(ex(usdT)+lbEur)}</td><td></td></tr></tfoot>`+
+    `</tbody><tfoot><tr><td>${tsTot(Mz,M)}</td><td></td><td></td><td class="n">${nf0.format(zStreams)}</td><td></td><td></td><td></td><td class="n">${eur(zEur)}</td><td></td></tr></tfoot>`+
     `<caption style="caption-side:bottom;text-align:left;padding-top:8px" class="sub">* DJ·World geeft streams en geld per nummer voor alle platforms samen, niet alleen Spotify.</caption>`;
   // alle nummers
   const hasL=L.some(t=>t.listeners>0),hasS=L.some(t=>t.saves>0);
-  $("spTable").innerHTML=`<thead><tr><th>Nummer</th><th>Release</th><th class="n">Streams</th><th class="n">${y.prev?"Erbij":"—"}</th><th class="n" title="Streams gedeeld door het aantal dagen sinds release">Per dag</th>${hasL?'<th class="n">Luisteraars</th>':""}${hasS?'<th class="n">Saves</th>':""}</tr></thead><tbody>`+
-    byS.map(t=>`<tr><td><b>${esc(t.title)}</b></td><td class="mono" style="font-size:13px;white-space:nowrap">${t.rel?dLabel(t.rel,1):"—"}</td>
+  const tkols=[{k:"title",l:"Nummer",w:t=>t.title},{k:"rel",l:"Release",w:t=>t.rel||null},{k:"streams",l:"Streams",n:1,w:t=>t.streams},
+    {k:"grow",l:y.prev?"Erbij":"—",n:1,w:t=>y.prev?t.grow:null},{k:"perDay",l:"Per dag",n:1,t:"Streams gedeeld door het aantal dagen sinds release",w:t=>t.perDay},
+    ...(hasL?[{k:"listeners",l:"Luisteraars",n:1,w:t=>t.listeners}]:[]),...(hasS?[{k:"saves",l:"Saves",n:1,w:t=>t.saves}]:[])];
+  if(!tkols.some(c=>c.k===TS.spt.k)){TS.spt.k="streams";TS.spt.dir=-1}
+  $("spTable").innerHTML=tsKop("spt",tkols)+"<tbody>"+
+    tsSorteer("spt",byS,tkols).map(t=>`<tr><td><b>${esc(t.title)}</b></td><td class="mono" style="font-size:13px;white-space:nowrap">${t.rel?dLabel(t.rel,1):"—"}</td>
       <td class="n"><b>${nf0.format(t.streams)}</b></td><td class="n">${y.prev?(t.grow>0?`<span class="up">+${nf0.format(t.grow)}</span>`:"0"):"—"}</td>
       <td class="n">${t.perDay!=null?(t.perDay>=10?nf0.format(t.perDay):nf2.format(t.perDay)):"—"}</td>
       ${hasL?`<td class="n">${nf0.format(t.listeners)}</td>`:""}${hasS?`<td class="n">${nf0.format(t.saves)}</td>`:""}</tr>`).join("")+
     `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(streams)}</td><td class="n">${y.prev?"+"+nf0.format(grow):""}</td><td></td>${hasL?"<td></td>":""}${hasS?"<td></td>":""}</tr></tfoot>`;
+  ["spMoneyTable","spTable"].forEach(plakKop);
 }
 $("fSp").addEventListener("change",async e=>{
   const file=e.target.files[0];e.target.value="";if(!file)return;
