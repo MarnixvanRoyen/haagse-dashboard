@@ -42,6 +42,7 @@ function renderOvahzicht(){
     <div class="trijen">
       ${liveRij('<i class="dot sc"></i>SoundCloud-plays',"sc",sc)}
       ${liveRij('<i class="dot yt"></i>YouTube-weergaven',"yt",yt)}
+      ${likesRij()}
       ${spotifyRij('<i class="dot sp"></i>Spotify-streams')}
     </div>
     <button class="btn yellow" type="button" data-ga="muziek">Kèk bè Muziek</button>

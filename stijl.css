@@ -538,6 +538,10 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 .vnsamen b{color:var(--ink)}
 .vnleeg{margin:0!important}
 .btn.vnmeer{margin-top:10px}
+/* likes in Wat draaide d'r vandaag? + regel Likes op Ovâhzicht (06-10, chat 14) */
+.chart .vnlike{fill:var(--ink-2);font-size:12px;font-weight:800}
+.chart .vnlike .hart,.vnhart{color:#ff6b8a;fill:#ff6b8a}
+.vnhart{margin-right:6px;font-size:13px}
 /* vegen over een grafiek (basis.js): zijwaarts = getal volgt je vinger, nie de browser laten scrollen of "terug" laten gaan; omhoog/omlaag scrollt gewoon */
 .chart svg{touch-action:pan-y}
 
