@@ -499,16 +499,43 @@ function renderYouTube(){
   $("ytGrowSub").textContent=y.multiDay?"Weergaven erbij in de laatste 31 dagen"+kort:"Weergaven erbij, per track";
   $("ytGrow").innerHTML=!y.multiDay?'<p class="sub">Vanaf de tweede meting (vannacht) zie je hier welke tracks groeien.</p>':gr.length?gr.map((g,i)=>bar(g.title,[{v:g.grow,c:"yt"}],mg,"+"+nf0.format(g.grow),null,i+1)).join(""):'<p class="sub">Nog geen nieuwe weergaven in deze periode.</p>';
   // tabel
-  const list=[...y.vids].sort((a,b)=>b.views-a.views);
-  $("ytTable").innerHTML=`<thead><tr><th>Titel</th><th>Soort</th><th>Uitgebracht</th><th class="n">Weergaven</th>${vd?'<th class="n">Vandaag</th>':""}<th class="n">${y.multiDay?"31 dagen":"—"}</th><th class="n">Likes</th><th class="n">Reacties</th></tr></thead><tbody>`+
+  const ykols=[{k:"title",l:"Titel",w:v=>v.title},{k:"soort",l:"Soort",w:v=>v.own?"Eigen video":"Track"},{k:"pub",l:"Uitgebracht",w:v=>v.pub||null},
+    {k:"views",l:"Weergaven",n:1,w:v=>v.views},...(vd?[{k:"vandaag",l:"Vandaag",n:1,w:v=>g.per.get(v.id)||0}]:[]),
+    {k:"grow",l:y.multiDay?"31 dagen":"—",n:1,w:v=>y.multiDay?v.grow:null},{k:"likes",l:"Likes",n:1,w:v=>v.likes},{k:"comments",l:"Reacties",n:1,w:v=>v.comments}];
+  if(!ykols.some(c=>c.k===TS.ytt.k)){TS.ytt.k="views";TS.ytt.dir=-1}
+  const list=tsSorteer("ytt",[...y.vids].sort((a,b)=>b.views-a.views),ykols);
+  $("ytTable").innerHTML=tsKop("ytt",ykols)+"<tbody>"+
     list.map(v=>`<tr><td><a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener"><b>${esc(v.title)}</b></a></td>
       <td>${v.own?'<span class="chip mute">Eigen video</span>':'<span class="chip yt">Track</span>'}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${v.pub?dLabel(v.pub,1):"—"}</td>
       <td class="n"><b>${nf0.format(v.views)}</b></td>${vd?`<td class="n">${(g.per.get(v.id)||0)>0?`<span class="up">+${nf0.format(g.per.get(v.id))}</span>`:"0"}</td>`:""}<td class="n">${y.multiDay?(v.grow>0?`<span class="up">+${nf0.format(v.grow)}</span>`:"0"):"—"}</td>
       <td class="n">${nf0.format(v.likes)}</td><td class="n">${nf0.format(v.comments)}</td></tr>`).join("")+
     `</tbody><tfoot><tr><td>Totaal (${list.length})</td><td></td><td></td><td class="n">${nf0.format(views)}</td>${vd?`<td class="n">+${nf0.format(g.erbe)}</td>`:""}<td class="n">${y.multiDay?"+"+nf0.format(grow):""}</td><td class="n">${nf0.format(likes)}</td><td class="n">${nf0.format(list.reduce((a,v)=>a+v.comments,0))}</td></tr></tfoot>`;
+  plakKop("ytTable");
   renderYtCompare(y);
 }
+/* ---------- Sorteerbare tabel + vaste kolomkoppen (06-10, chat 14) ----------
+   kolommen: [{k,l,n(getal),w(waarde-functie),t(title)}]. Tik/klik op een kop = sorteren, nog een keer = andersom.
+   Lege waarden (null/"") staan altijd onderaan. Stand per tabel in TS (alleen tot herladen). */
+const TS={cmp:{k:"views",dir:-1,status:"alle"},ytt:{k:"views",dir:-1}};
+function tsKop(naam,kols){const st=TS[naam];
+  return "<thead><tr>"+kols.map(c=>`<th class="${c.n?"n ":""}sortable" data-tabel="${naam}" data-k="${c.k}" tabindex="0"${c.t?` title="${esc(c.t)}"`:""}${st.k===c.k?` aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}</th>`).join("")+"</tr></thead>"}
+function tsSorteer(naam,rijen,kols){const st=TS[naam],c=kols.find(x=>x.k===st.k)||kols[0];
+  const leeg=v=>v==null||v==="";
+  return [...rijen].sort((a,b)=>{const x=c.w(a),y=c.w(b);if(leeg(x)||leeg(y))return leeg(x)-leeg(y);
+    return (typeof x==="string"?x.localeCompare(y,"nl"):x-y)*st.dir})}
+const TS_TEKEN={cmp:()=>renderYtCompare(ytCompute(MUZIEK_DAGEN)),ytt:()=>renderYouTube()};
+function tsKlik(th){const naam=th.dataset.tabel,k=th.dataset.k,st=TS[naam];
+  if(st.k===k)st.dir*=-1;else{st.k=k;st.dir=th.classList.contains("n")?-1:1}   // getallen: hoogste eerst; tekst: A-Z
+  TS_TEKEN[naam]()}
+document.addEventListener("click",e=>{const th=e.target.closest&&e.target.closest("th[data-tabel]");if(th)tsKlik(th)});
+document.addEventListener("keydown",e=>{const th=(e.key==="Enter"||e.key===" ")&&e.target.closest&&e.target.closest("th[data-tabel]");if(th){e.preventDefault();tsKlik(th)}});
+// vaste kolomkoppen: past de tabel in de breedte → koppen plakken bovenaan het scherm terwijl je de pagina scrolt.
+// Te breed (smal venster) → de tabel krijgt een eigen scrollvak (max. ± 3/4 scherm) en de koppen plakken daarin.
+function plakKop(id){const t=$(id),w=t&&t.closest(".tablewrap");if(!w||!w.offsetWidth)return;
+  w.classList.remove("plak","scrollkop");w.classList.add(t.scrollWidth<=w.clientWidth+1?"plak":"scrollkop")}
+addEventListener("resize",()=>{["cmpTable","ytTable"].forEach(plakKop)});
+
 /* ---------- YouTube vs. SoundCloud-afrekening ---------- */
 // Titel -> sleutel: kleine letters, zonder (Original Mix)/[..], zonder leestekens. Spaties eromheen = hele woorden matchen.
 function tKey(s){return " "+String(s||"").toLowerCase().replace(/\(.*?\)|\[.*?\]/g," ").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim()+" "}
@@ -538,6 +565,7 @@ function cmpStatus(o){
 }
 function renderYtCompare(y){
   const rows=ytCompare(y).filter(o=>o.views||o.paid).sort((a,b)=>b.views-a.views||b.paid-a.paid);
+  rows.forEach(o=>o.st=cmpStatus(o));
   const views=rows.reduce((a,o)=>a+o.views,0),paid=rows.reduce((a,o)=>a+o.paid,0),other=rows.reduce((a,o)=>a+o.other,0),usdT=rows.reduce((a,o)=>a+o.usd,0);
   const last=rows.reduce((a,o)=>o.last>a?o.last:a,"");
   const both=rows.filter(o=>o.views&&o.paid),bV=both.reduce((a,o)=>a+o.views,0),bP=both.reduce((a,o)=>a+o.paid,0);
@@ -548,16 +576,32 @@ function renderYtCompare(y){
     <div class="ytstat"><span class="k">Afgerekend</span><span class="v">${nf0.format(paid)}</span><span class="s">${bV?pct(bP/bV)+" terug bij de "+both.length+" nummers die in beide staan":""}${other?` · ${nf0.format(other)} via anderen`:""}</span></div>
     <div class="ytstat"><span class="k">Verdiend via YouTube</span><span class="v">${eur(ex(usdT))}</span><span class="s">t/m ${mLabel(last,1)}</span></div>
     <div class="ytstat"><span class="k">Per 1.000 weergaven</span><span class="v">${views?eur(ex(usdT)/views*1000):"—"}</span><span class="s">wat een weergave je ongeveer oplevert</span></div>`;
-  $("cmpTable").innerHTML=`<thead><tr><th>Nummer</th><th>Status</th><th class="n">YouTube</th><th class="n">Afgerekend</th><th class="n" title="Afgerekend via video's van anderen (Content ID)">Via anderen</th><th class="n">% terug</th><th class="n">Verdiend</th><th class="n" title="Verdiend per 1.000 afgerekende weergaven">€/1.000</th><th>T/m</th></tr></thead><tbody>`+
-    rows.map(o=>{const st=cmpStatus(o);return `<tr><td><b>${esc(o.title)}</b>${o.nv>1?` <span class="sub" style="font-size:12px">(${o.nv} video's)</span>`:""}</td>
+  // status-filter (knopjes boven de tabel): alleen statussen die voorkomen, met aantal
+  const stOrde=["Loopt achter","Niet via SoundCloud","Klopt","Meer dan je kanaal","Via label","Geen video gevonden"];
+  const telSt=new Map();rows.forEach(o=>telSt.set(o.st.t,(telSt.get(o.st.t)||0)+1));
+  if(TS.cmp.status!=="alle"&&!telSt.has(TS.cmp.status))TS.cmp.status="alle";
+  $("cmpFilter").innerHTML=[["alle",`Allâh <span class="seg-n">${rows.length}</span>`],...stOrde.filter(t=>telSt.has(t)).map(t=>[t,`${t} <span class="seg-n">${telSt.get(t)}</span>`])]
+    .map(([v,l])=>`<button type="button" data-cmpst="${esc(v)}" aria-pressed="${TS.cmp.status===v}">${l}</button>`).join("");
+  const kols=[{k:"title",l:"Nummer",w:o=>o.title},{k:"st",l:"Status",w:o=>stOrde.indexOf(o.st.t)},
+    {k:"views",l:"YouTube",n:1,w:o=>o.views||null},{k:"paid",l:"Afgerekend",n:1,w:o=>o.paid||null},
+    {k:"other",l:"Via anderen",n:1,t:"Afgerekend via video's van anderen (Content ID)",w:o=>o.other||null},
+    {k:"pct",l:"% terug",n:1,w:o=>o.views&&o.paid?o.paid/o.views:null},{k:"usd",l:"Verdiend",n:1,w:o=>o.usd||null},
+    {k:"p1k",l:"€/1.000",n:1,t:"Verdiend per 1.000 afgerekende weergaven",w:o=>o.paid>=25?o.usd/o.paid:null},{k:"last",l:"T/m",w:o=>o.last||null}];
+  const zicht=tsSorteer("cmp",rows.filter(o=>TS.cmp.status==="alle"||o.st.t===TS.cmp.status),kols);
+  const sv=zicht.reduce((a,o)=>a+o.views,0),sp=zicht.reduce((a,o)=>a+o.paid,0),so=zicht.reduce((a,o)=>a+o.other,0),su=zicht.reduce((a,o)=>a+o.usd,0);
+  $("cmpTable").innerHTML=tsKop("cmp",kols)+"<tbody>"+
+    zicht.map(o=>{const st=o.st;return `<tr><td><b>${esc(o.title)}</b>${o.nv>1?` <span class="sub" style="font-size:12px">(${o.nv} video's)</span>`:""}</td>
       <td><span class="chip ${st.c}" title="${esc(st.w)}">${st.t}</span></td>
       <td class="n">${o.views?nf0.format(o.views):"—"}</td><td class="n">${o.paid?nf0.format(o.paid):"—"}</td>
       <td class="n">${o.other?nf0.format(o.other):"—"}</td>
       <td class="n">${o.views&&o.paid?pct(o.paid/o.views):"—"}</td>
       <td class="n">${o.usd?eur(ex(o.usd)):"—"}</td><td class="n">${o.paid>=25?eur(ex(o.usd)/o.paid*1000):"—"}</td>
       <td class="mono" style="font-size:13px;white-space:nowrap">${o.last?mLabel(o.last):"—"}</td></tr>`}).join("")+
-    `</tbody><tfoot><tr><td>Totaal (${rows.length})</td><td></td><td class="n">${nf0.format(views)}</td><td class="n">${nf0.format(paid)}</td><td class="n">${nf0.format(other)}</td><td class="n">${views?pct(paid/views):""}</td><td class="n">${eur(ex(usdT))}</td><td class="n">${paid?eur(ex(usdT)/paid*1000):""}</td><td></td></tr></tfoot>`;
+    `</tbody><tfoot><tr><td>Totaal (${zicht.length===rows.length?rows.length:zicht.length+" van "+rows.length})</td><td></td><td class="n">${nf0.format(sv)}</td><td class="n">${nf0.format(sp)}</td><td class="n">${nf0.format(so)}</td><td class="n">${sv?pct(sp/sv):""}</td><td class="n">${eur(ex(su))}</td><td class="n">${sp?eur(ex(su)/sp*1000):""}</td><td></td></tr></tfoot>`;
+  plakKop("cmpTable");
 }
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-cmpst]");if(!b)return;
+  TS.cmp.status=b.dataset.cmpst;renderYtCompare(ytCompute(MUZIEK_DAGEN))});
 
 /* ---------- SoundCloud live ---------- */
 let SCL={tracks:[],snaps:[],err:null};
