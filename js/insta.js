@@ -28,12 +28,79 @@ async function loadIG(){
     for(const r of [a,p,d,s])if(r.error)throw r.error;
     IG={acc:a.data[0]||null,profiel:p.data,dag:d.data.map(x=>({dag:String(x.dag).slice(0,10),c:x.cijfers||{}})),posts:m,stories:s.data,err:null};
   }catch(e){IG={acc:null,profiel:[],dag:[],posts:[],stories:[],err:e.message||String(e)}}
+  IG.weg=await igWegLaden();IG_WEG_IDS=new Set(IG.weg.map(x=>x.media_id));
+  (IG.stories||[]).forEach(s=>s.groep="story");   // stories horen nooit bij foto of reel (ook nie een video-story)
+  IG.posts=IG.posts.filter(igActief);   // het ene filter: vanaf hier ziet elke kaart alleen actieve posts
   IG.uur=await igUurLaden();   // momentopnamen bereik van vandaag en de 7 dagen ervoor (18_bereik_uur.sql)
   IG.status=await igStatusLaden();
   await igStoryLabels();
   await igStoryMinis();
   if(typeof igSamenLaden==="function")await igSamenLaden();   // samenwerkingen + Facebook-sleutel (samenwerking.js)
   igBadge();
+}
+/* ---------- Eén filter voor alle kaarten (22_verwijderde_posts.sql) ----------
+   Actief = nie verwijderd en nie gearchiveerd. De database-view ig_post_stats laat alleen actieve posts zien;
+   hier nog een keer (vlak na het laden), zodat het ook klopt als de view nog nie is bijgewerkt.
+   Alle kaarten (tegels, grafieken, toppâhs, Top 5, Wat werkt, Kansâh, samenwerkinge, bedankkaart, Threads vs Insta)
+   lezen IG.posts, dus geen enkele kaart kan eromheen. IG.weg = de posts die nie meâh meetellen (alleen om te tonen). */
+let IG_WEG_IDS=new Set();
+function igActief(p){return !!p&&!p.verwijderd_op&&!IG_WEG_IDS.has(p.media_id)}
+/* ---------- Eén indeling per soort post (deel B, 06-10; 23_soort_groep.sql) ----------
+   'foto' = foto's én carrousels, 'reel' = reels (en oude video's), 'story' = stories (eigen tabel ig_story).
+   Dezelfde regel als public.ig_groep() in de database; ig_post_stats geeft hem mee als kolom 'groep'.
+   Reels doen het heel anders (half zoveel bereik, minder likes/kwaliteit) en Meta geeft er geen volgâhs/profielbezoek
+   per post voor: daarom vergelijkt het dashboard een post ALTIJD binnen z'n eigen groep.
+   Gebruik voor elke (nieuwe) kaart: soortGroep(p), igPostsVan(groep) en igNormaal(groep, maat). */
+const IG_GROEPEN={
+  foto:{naam:"Foto's & carrousels",kort:"foto's & carrousels",een:"foto/carrousel",veel:"foto's en carrousels"},
+  reel:{naam:"Reels",kort:"reels",een:"reel",veel:"reels"},
+  story:{naam:"Stories",kort:"stories",een:"story",veel:"stories"}};
+function soortGroep(p){
+  if(!p)return null;
+  if(p.groep)return p.groep;
+  const pr=String(p.product||"").toUpperCase(),so=String(p.soort||"").toUpperCase();
+  return pr==="STORY"?"story":pr==="REELS"||so==="VIDEO"?"reel":"foto";
+}
+let igGroep="foto";   // schakelaar bovenaan de Insta-tab (nie onthouden: bij openen altijd foto's & carrousels)
+function igPostsVan(g){return IG.posts.filter(p=>soortGroep(p)===g)}
+// "normaal" (middelste waarde) van een groep: eerst de laatste 120 dagen, te weinig → 365 dagen → allâh tijde.
+// Geeft ook terug op hoeveel posts en sinds wanneer, zodat een kaart eerlijk kan zeggen waar het op rust.
+// opties: voor = alleen posts van vóór dit tijdstip (Kansâh: vóór de start), min = minimaal aantal posts (standaard 5).
+const IG_NORMAAL_MIN=5;
+function igNormaal(g,f,{voor=Infinity,min=IG_NORMAAL_MIN,posts=null}={}){
+  const bron=(posts||igPostsVan(g)).filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<voor);
+  const t0=Math.min(voor,Date.now());let n=0;
+  for(const d of [120,365,null]){
+    const l=bron.filter(p=>!d||Date.parse(p.gepost_om)>t0-d*864e5).map(p=>({p,v:f(p)})).filter(x=>x.v!=null&&!isNaN(x.v));
+    n=l.length;
+    if(l.length>=min){const oudste=l.reduce((m,x)=>!m||x.p.gepost_om<m?x.p.gepost_om:m,null);
+      return {waarde:med(l.map(x=>+x.v)),n:l.length,dagen:d,sinds:oudste,genoeg:true}}
+  }
+  return {waarde:null,n,dagen:null,sinds:null,genoeg:false};
+}
+// "te weinig"-tekst voor een groep: "Te weinig reels: 3 met cijfâhs (minstens 5 nodig)"
+const igTeWeinig=(g,n,nodig)=>`te weinig ${IG_GROEPEN[g].kort} om iets te zeggen: ${n} met cijfâhs (minstens ${nodig} nodig)`;
+// schakelaar-knoppen (aantal posts per groep in de laatste 90 dagen erbij, zodat je ziet waarop het rust)
+function igGroepKnoppenHTML(){
+  const n=g=>igPostsVan(g).filter(p=>p.gepost_om&&Date.parse(p.gepost_om)>Date.now()-90*864e5).length;
+  return ["foto","reel"].map(g=>`<button type="button" data-v="${g}" aria-pressed="${igGroep===g}">${IG_GROEPEN[g].naam} <span class="seg-n">${n(g)}</span></button>`).join("");
+}
+const IG_WEG_REDEN={nie_in_lijst:"verwijderd of gearchiveerd op Insta",bestaat_nie:"verwijderd op Insta"};
+const igWegReden=x=>IG_WEG_REDEN[x&&x.verwijderd_reden]||"nie meâh op Insta";
+async function igWegLaden(){   // kolom bestaat pas na 22_verwijderde_posts.sql → anders gewoon een lege lijst
+  try{const r=await sb.from("ig_media").select("media_id,soort,product,gepost_om,bijschrift,permalink,plaatje,verwijderd_op,verwijderd_reden")
+      .not("verwijderd_op","is",null).order("gepost_om",{ascending:false}).range(0,999);
+    return r.error?[]:(r.data||[])}catch(e){return []}
+}
+// uitklapper op de Insta-tab: welke posts tellen nie meâh mee, met knop Zet terug
+function igWegHTML(){
+  const w=IG.weg||[];if(!w.length)return "";
+  return `<details class="igweg"><summary>${w.length} post${w.length>1?"s":""} nie meâh op Insta · tellen nergens mee</summary>
+    <ul>${w.map(x=>`<li><a href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${x.gepost_om?dKort(dagNL(x.gepost_om))+" "+tijdAms(x.gepost_om):"?"} · ${esc(soortNaam(x))}</a>
+      <span class="sub">${esc(igEersteRegel(x.bijschrift).slice(0,60))}</span> <span class="chip mute">${esc(igWegReden(x))}</span>
+      <button class="lnk" type="button" data-igterug="${esc(x.media_id)}">Zet terug</button></li>`).join("")}</ul>
+    <p class="sub">Verwijderd of gearchiveerd op Insta: de cijfâhs blijven bewaard, maar tellen nergens mee (nie in tegels, grafieken, toppâhs, Wat werkt, Kansâh of samenwerkinge).
+    Zet je hem op Insta terug (uit "Onlangs verwijderd" of het archief), dan telt hij vanzelf weer mee. <b>Zet terug</b> is alleen voor als het dashboard zich vergist; staat hij echt nie meâh op Insta, dan gaat hij vannacht weer weg.</p></details>`;
 }
 // stories mét bijschrift (14_story_bijschrift.sql). Is die kolom er nog nie, dan zonder (dan is alles "onbekend").
 async function igStoriesLaden(){
@@ -149,19 +216,22 @@ function igVsPct(a,b){if(a==null||b==null)return "";const d=Math.round((a-b)*100
    Vergelijken per 10 posts i.p.v. per week: je post ± 2x per week, dan is een week te weinig om iets te zeggen. */
 const IG_LIKE_DAGEN=2, IG_LIKE_N=10;
 const igPct1=v=>igNf1.format(v*100)+"%";
-function igLikes(){
+function igLikes(g=igGroep){
   const grens=Date.now()-IG_LIKE_DAGEN*864e5;
-  const ps=IG.posts.filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>0&&p.likes!=null)
+  const ps=igPostsVan(g).filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>0&&p.likes!=null)
     .map(p=>({...p,likePct:(+p.likes)/(+p.bereik)})).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));   // nieuwste eerst
   const nu=ps.slice(0,IG_LIKE_N),voor=ps.slice(IG_LIKE_N,2*IG_LIKE_N);
-  return {ps,n:nu.length,nu:nu.length>=3?med(nu.map(p=>p.likePct)):null,
+  return {g,ps,n:nu.length,sinds:nu.length?nu[nu.length-1].gepost_om:null,nu:nu.length>=3?med(nu.map(p=>p.likePct)):null,
     voor:voor.length>=IG_LIKE_N?med(voor.map(p=>p.likePct)):null};   // vorige 10 alleen als het er echt 10 zijn
 }
+// "je laatste 10 reels (sinds 12 mrt 2025)": de datum alleen als die verder dan 90 dagen terug ligt (anders vanzelfsprekend)
+function igLaatsteTxt(x){const G=IG_GROEPEN[x.g||"foto"];
+  return `je laatste ${x.n} ${x.n===1?G.een:G.kort}`+(x.sinds&&Date.parse(x.sinds)<Date.now()-90*864e5?` (sinds ${dLabel(dagNL(x.sinds),1)})`:"")}
 // vergelijking met de 10 posts daarvoor: verschil in procentpunten, pijltje vanaf een halve punt
 function igVsLikes(a,b){if(a==null||b==null)return "";const d=(a-b)*100,t=igNf1.format(Math.abs(d))+(Math.abs(d)<1.05?" punt":" punten");
-  return ` · 10 posts daarvoor ${igPct1(b)}${d>=0.5?` <span class="up">↑ ${t}</span>`:d<=-0.5?` <span class="down">↓ ${t}</span>`:""}`}
-function igLikesUitleg(l){return l.nu==null?"komt zodra er 3 posts van minstens 2 dagen oud met cijfâhs zijn":
-  `van wie je post zag, gaf een like · middelste van je laatste ${l.n} posts`+igVsLikes(l.nu,l.voor)}
+  return ` · 10 daarvoor ${igPct1(b)}${d>=0.5?` <span class="up">↑ ${t}</span>`:d<=-0.5?` <span class="down">↓ ${t}</span>`:""}`}
+function igLikesUitleg(l){return l.nu==null?(l.ps.length?igTeWeinig(l.g,l.ps.length,3):`komt zodra er 3 ${IG_GROEPEN[l.g].kort} van minstens 2 dagen oud met cijfâhs zijn`):
+  `van wie je post zag, gaf een like · middelste van ${igLaatsteTxt(l)}`+igVsLikes(l.nu,l.voor)}
 /* ---------- kwaliteit per post: (gedeeld + bewaard) per 1.000 kijkâhs ----------
    Zelfde rekensom als "Kwaliteit" bij Wat werkt en Toppâhs, maar dan als trend: middelste van je laatste 10 posts vs de 10 daarvoor.
    Delen en bewaren wegen bij Insta zwaarder dan likes: delen brengt je post bij nieuwe mensen, bewaren = "wil ik terugzien".
@@ -169,34 +239,34 @@ function igLikesUitleg(l){return l.nu==null?"komt zodra er 3 posts van minstens 
    Pijltje pas vanaf 15% verschil: het zijn kleine getallen, dan zegt een klein verschil nog niks. */
 const IG_KWAL_MIN_BEREIK=100, IG_KWAL_PIJL=0.15;
 const igKwalF=v=>v<10?igNf1.format(v):nf0.format(v);
-function igKwal(){
+function igKwal(g=igGroep){
   const grens=Date.now()-IG_LIKE_DAGEN*864e5;
-  const ps=IG.posts.filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>=IG_KWAL_MIN_BEREIK&&(p.gedeeld!=null||p.bewaard!=null))
+  const ps=igPostsVan(g).filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<=grens&&+p.bereik>=IG_KWAL_MIN_BEREIK&&(p.gedeeld!=null||p.bewaard!=null))
     .map(p=>({...p,kw:((+p.gedeeld||0)+(+p.bewaard||0))*1000/(+p.bereik)})).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));   // nieuwste eerst
   const nu=ps.slice(0,IG_LIKE_N),voor=ps.slice(IG_LIKE_N,2*IG_LIKE_N);
-  return {ps,n:nu.length,nu:nu.length>=3?med(nu.map(p=>p.kw)):null,
+  return {g,ps,n:nu.length,sinds:nu.length?nu[nu.length-1].gepost_om:null,nu:nu.length>=3?med(nu.map(p=>p.kw)):null,
     voor:voor.length>=IG_LIKE_N?med(voor.map(p=>p.kw)):null};
 }
 function igVsKwal(a,b){if(a==null||b==null)return "";
-  if(!b)return ` · 10 posts daarvoor 0${a>0?' <span class="up">↑</span>':""}`;
+  if(!b)return ` · 10 daarvoor 0${a>0?' <span class="up">↑</span>':""}`;
   const d=a/b-1;
-  return ` · 10 posts daarvoor ${igKwalF(b)}${d>=IG_KWAL_PIJL?' <span class="up">↑ '+pct(d)+"</span>":d<=-IG_KWAL_PIJL?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
-function igKwalUitleg(k){return k.nu==null?"komt zodra er 3 posts van minstens 2 dagen oud (en 100+ bereik) met cijfâhs zijn":
-  `gedeeld + bewaard per 1.000 kijkâhs · middelste van je laatste ${k.n} posts`+igVsKwal(k.nu,k.voor)}
+  return ` · 10 daarvoor ${igKwalF(b)}${d>=IG_KWAL_PIJL?' <span class="up">↑ '+pct(d)+"</span>":d<=-IG_KWAL_PIJL?' <span class="down">↓ '+pct(-d)+"</span>":""}`}
+function igKwalUitleg(k){return k.nu==null?(k.ps.length?igTeWeinig(k.g,k.ps.length,3)+" (met 100+ bereik)":`komt zodra er 3 ${IG_GROEPEN[k.g].kort} van minstens 2 dagen oud (en 100+ bereik) met cijfâhs zijn`):
+  `gedeeld + bewaard per 1.000 kijkâhs · middelste van ${igLaatsteTxt(k)}`+igVsKwal(k.nu,k.voor)}
 
 // de twee maten voor de grafiek per post (knop Likes / Kwaliteit op de Insta-tab)
 let igPostMaat="likes";
 const IG_MATEN={
   likes:{kop:"Likes per kijkâh",aria:"Likes per kijkâh per post",v:p=>p.likePct*100,as:t=>nf0.format(t)+"%",lbl:p=>igPct1(p.likePct),
     tip:p=>`${nf0.format(+p.likes)} likes ÷ ${nf0.format(+p.bereik)} bereik = ${igPct1(p.likePct)}`,
-    sub:n=>`Je laatste ${n} posts van minstens 2 dagen oud. <b>Likes ÷ bereik</b>: welk deel van de mensen die de post zagen, gaf een like.`},
+    sub:(n,g)=>`Je laatste ${n} ${IG_GROEPEN[g].kort} van minstens 2 dagen oud. <b>Likes ÷ bereik</b>: welk deel van de mensen die de post zagen, gaf een like.`},
   kwal:{kop:"Kwaliteit per post",aria:"Kwaliteit per post: gedeeld + bewaard per 1.000 kijkâhs",v:p=>p.kw,as:t=>nf0.format(t),lbl:p=>igKwalF(p.kw),
     tip:p=>`${nf0.format(+p.gedeeld||0)} gedeeld + ${nf0.format(+p.bewaard||0)} bewaard per ${nf0.format(+p.bereik)} bereik = ${igKwalF(p.kw)} per 1.000`,
-    sub:n=>`Je laatste ${n} posts van minstens 2 dagen oud en met 100+ bereik. <b>Gedeeld + bewaard per 1.000 kijkâhs</b>: hoeveel mensen je post zo goed vonden dat ze hem doorstuurden of bewaarden. Dit weegt bij Insta zwaarder dan likes.`}};
+    sub:(n,g)=>`Je laatste ${n} ${IG_GROEPEN[g].kort} van minstens 2 dagen oud en met 100+ bereik. <b>Gedeeld + bewaard per 1.000 kijkâhs</b>: hoeveel mensen je post zo goed vonden dat ze hem doorstuurden of bewaarden. Dit weegt bij Insta zwaarder dan likes.`}};
 // grafiek: per post een staaf, met een trendlijn = middelste van de laatste 5 posts.
 // Eén uitschietâh (virale post) zou de rest plat drukken: dan loopt de schaal tot 3x de middelste post en krijgt die staaf een pijltje ▲ (echte waarde in het getal).
 function igPostGrafiek(el,posts,m){   // posts: oud → nieuw; m = IG_MATEN.likes of .kwal
-  if(!posts.length){el.innerHTML='<p class="sub">Nog geen posts van minstens 2 dagen oud met cijfâhs.</p>';return}
+  if(!posts.length){el.innerHTML=`<p class="sub">Nog geen ${m.leeg||"posts"} van minstens 2 dagen oud met cijfâhs.</p>`;return}
   const W=Math.max(300,Math.round(el.clientWidth||1000)),ml=40,mr=6,mt=16,mb=26,iw=W-ml-mr,ih=(W<600?170:210)-mt-mb,H=mt+ih+mb;
   const vs=posts.map(m.v),mx=Math.max(...vs),md=med(vs)||0,kap=md>0&&mx>3*md?3*md:mx;
   const sch=schaal(kap,3),top=sch.top,bw=iw/posts.length;
@@ -264,9 +334,9 @@ function igNieuweLink(soort){
 }
 
 /* ---------- Wat werkt ---------- */
-function igWatWerkt(kies){
+function igWatWerkt(kies,g="foto"){   // g = groep ("foto"/"reel"), of "alle" (alleen Kansâh: reels vs de rest)
   const jaarGeleden=Date.now()-365*864e5;
-  const posts=IG.posts.filter(p=>p.bereik!=null&&p.gepost_om&&Date.parse(p.gepost_om)>jaarGeleden);
+  const posts=(g==="alle"?IG.posts:igPostsVan(g)).filter(p=>p.bereik!=null&&p.gepost_om&&Date.parse(p.gepost_om)>jaarGeleden);
   const alleMed=med(posts.map(p=>p.bereik));
   const groepen=new Map();const voeg=(g,p)=>{if(!groepen.has(g))groepen.set(g,[]);groepen.get(g).push(p)};
   let volgorde=null,nietGelabeld=0;
@@ -281,11 +351,11 @@ function igWatWerkt(kies){
   if(kies==="dag")volgorde=DAGEN_LANG;if(kies==="tijd")volgorde=DAGDELEN;
   let rijen=[...groepen].map(([naam,ps])=>({naam,n:ps.length,med:med(ps.map(p=>p.bereik)),
     kw:med(ps.filter(p=>p.kwaliteit!=null).map(p=>+p.kwaliteit)),
-    nv:ps.reduce((a,p)=>a+(p.nieuwe_volgers||0),0)}));
+    nv:ps.some(p=>p.nieuwe_volgers!=null)?ps.reduce((a,p)=>a+(p.nieuwe_volgers||0),0):null}));   // reels: Meta geeft geen volgâhs per post → "—" (nie 0)
   rijen.forEach(r=>r.idx=alleMed?r.med/alleMed:null);
   if(volgorde)rijen.sort((a,b)=>volgorde.indexOf(a.naam)-volgorde.indexOf(b.naam));
   else rijen.sort((a,b)=>(b.n>=5)-(a.n>=5)||b.med-a.med);
-  return {rijen,n:posts.length,alleMed,nietGelabeld,alleKw:med(posts.filter(p=>p.kwaliteit!=null).map(p=>+p.kwaliteit))};
+  return {g,rijen,n:posts.length,alleMed,nietGelabeld,alleKw:med(posts.filter(p=>p.kwaliteit!=null).map(p=>+p.kwaliteit))};
 }
 
 /* ---------- Muziek: plays van dat nummer na de post ---------- */
@@ -497,7 +567,8 @@ function renderInsta(){
 
   // 1. tegels
   $("igSub").innerHTML=`@${esc(IG.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt, en als je het dashboard opent (hooguit 1x per 10 min) of bovenaan op Ververse tikt (hooguit 1x per 5 min). Dagen zijn Meta-dagen (Amerikaanse tijd).`;
-  if($("igStatus"))$("igStatus").innerHTML=igStatusHTML();
+  if($("igStatus"))$("igStatus").innerHTML=igStatusHTML()+igWegHTML();
+  if($("igGroep"))$("igGroep").innerHTML=igGroepKnoppenHTML();
   $("igStats").innerHTML=[
     igStat("Volgâhs",nf0.format(IG.acc.volgers||0),igNieuwWeg(c)),
     ...igVasteRijen(c).map(([k,v,u,extra])=>igStat(k,v,u+(extra||""))),
@@ -529,16 +600,17 @@ function renderInsta(){
 
   // 3. wat werkt
   document.querySelectorAll("#igKies button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igKies));
-  const ww=igWatWerkt(igKies);
+  const ww=igWatWerkt(igKies,igGroep),G=IG_GROEPEN[igGroep];
   const maxIdx=Math.max(1,...ww.rijen.map(r=>r.idx||0));
-  $("igWwSub").innerHTML=`${nf0.format(ww.n)} posts van het laatste jaar met cijfâhs. <b>Bereik</b> = mediaan (de middelste post, dus één uitschietâh telt niet te zwaar). <b>vs normaal</b> = t.o.v. je middelste post (${ww.alleMed==null?"—":nf0.format(ww.alleMed)}). <b>Kwaliteit</b> = gedeeld + bewaard per 1.000 bereik (normaal ${ww.alleKw==null?"—":nf0.format(ww.alleKw)}).`
+  $("igWwSub").innerHTML=`${nf0.format(ww.n)} ${G.kort} van het laatste jaar met cijfâhs (alleen ${G.veel}: ${igGroep==="reel"?"reels doen het heel anders dan foto's, dus die vergelijken we alleen met elkaar":"reels staan onder de knop Reels"}). <b>Bereik</b> = mediaan (de middelste post, dus één uitschietâh telt niet te zwaar). <b>vs normaal</b> = t.o.v. je middelste ${G.een} (${ww.alleMed==null?"—":nf0.format(ww.alleMed)}).`
+    +(ww.n<IG_NORMAAL_MIN?` <b>Let op:</b> ${igTeWeinig(igGroep,ww.n,IG_NORMAAL_MIN)}.`:"")+` <b>Kwaliteit</b> = gedeeld + bewaard per 1.000 bereik (normaal ${ww.alleKw==null?"—":nf0.format(ww.alleKw)}).`
     +(igKies==="muziek"?` Nog ${nf0.format(ww.nietGelabeld)} posts zonder muziek-label: label ze hieronder.`:"")
     +(igKies==="onderwerp"?" Onderwerpen komen uit je hashtags; een post kan in meer groepen zitten.":"");
   $("igWw").innerHTML=ww.rijen.length?`<thead><tr><th>Groep</th><th class="n">Posts</th><th class="n">Bereik</th><th>vs normaal</th><th class="n">Kwaliteit</th><th class="n">Volgâhs erbè</th><th>Zekerheid</th></tr></thead><tbody>`+
     ww.rijen.map(r=>{const idx=r.idx==null?"—":(r.idx>=1?"+":"−")+nf0.format(Math.abs(r.idx-1)*100)+"%";
       return `<tr><td>${esc(r.naam)}</td><td class="n">${nf0.format(r.n)}</td><td class="n">${r.med==null?"—":nf0.format(r.med)}</td>
       <td><span class="igidx"><span class="igidxbar"><i style="width:${Math.min(100,(r.idx||0)/maxIdx*100)}%;background:var(--${(r.idx||0)>=1?"groen":"muted"})"></i></span>${idx}</span></td>
-      <td class="n">${r.kw==null?"—":nf0.format(r.kw)}</td><td class="n">${nf0.format(r.nv)}</td><td>${zeker(r.n)}</td></tr>`}).join("")+"</tbody>"
+      <td class="n">${r.kw==null?"—":nf0.format(r.kw)}</td><td class="n">${r.nv==null?"—":nf0.format(r.nv)}</td><td>${zeker(r.n)}</td></tr>`}).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${igKies==="muziek"?"Nog geen posts met een muziek-label. Kies hieronder per post welk nummâh eronder zat.":"Nog geen posts met cijfâhs."}</td></tr></tbody>`;
 
   // 4. toppâhs (laatste 90 dagen of allâh tijde)
@@ -556,8 +628,8 @@ function renderIgPostGrafiek(){
   const m=IG_MATEN[igPostMaat],l=igPostMaat==="kwal"?igKwal():igLikes(),laatste=l.ps.slice(0,30).reverse();
   document.querySelectorAll("#igPostMaat button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igPostMaat));
   $("igLikeKop").textContent=m.kop;
-  $("igLikeSub").innerHTML=m.sub(laatste.length)+" De groene lijn is de middelste van steeds 5 posts, zo zie je de trend zonder dat één uitschietâh alles bepaalt. Alleen je eigen posts: waar je bijdrager bent telt nie mee.";
-  igPostGrafiek($("igLikeChart"),laatste,m);
+  $("igLikeSub").innerHTML=m.sub(laatste.length,l.g)+(l.ps.length&&l.ps.length<3?` <b>Let op:</b> ${igTeWeinig(l.g,l.ps.length,3)}.`:"")+" De groene lijn is de middelste van steeds 5 posts, zo zie je de trend zonder dat één uitschietâh alles bepaalt. Alleen je eigen posts: waar je bijdrager bent telt nie mee.";
+  igPostGrafiek($("igLikeChart"),laatste,{...m,leeg:IG_GROEPEN[l.g].kort});
 }
 
 /* ---------- toppâhs: top 10 op bereik, laatste 90 dagen of allâh tijde ---------- */
@@ -571,9 +643,12 @@ const IG_TOP_OP={
   weergaven:{kop:"Weergaven",v:p=>p.weergaven,txt:"op weergaven (ook herhaald kijken telt mee)",f:nf0}};
 function renderIgTop(){
   if(!$("igTop"))return;
-  if(!IG_TOP_OP[igTopOp])igTopOp="bereik";
+  // reels: Meta geeft geen volgâhs/profielbezoek per post → die knoppen en kolommen weg (anders een lege ranglijst)
+  const reel=igGroep==="reel",G=IG_GROEPEN[igGroep],nieVoorReel=k=>reel&&(k==="volgers"||k==="profiel");
+  if(!IG_TOP_OP[igTopOp]||nieVoorReel(igTopOp))igTopOp="bereik";
+  document.querySelectorAll("#igTopOp button").forEach(b=>b.hidden=nieVoorReel(b.dataset.v));
   const alles=igTopPeriode==="alles",op=IG_TOP_OP[igTopOp],opKw=igTopOp==="kwaliteit";
-  const metCijfers=IG.posts.filter(p=>p.bereik!=null);
+  const metCijfers=igPostsVan(igGroep).filter(p=>p.bereik!=null);
   const periode=alles?metCijfers:metCijfers.filter(p=>Date.parse(p.gepost_om)>Date.now()-90*864e5);
   // op kwaliteit: posts met heel weinig bereik tellen niet mee (1x bewaard bij 40 bereik = al 25, dat zegt niks)
   const drempel=opKw?Math.max(100,Math.round((med(periode.map(p=>p.bereik))||0)/2)):0;
@@ -584,22 +659,22 @@ function renderIgTop(){
   document.querySelectorAll("#igTopOp button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===igTopOp));
   if($("igTopSub")){
     const oudste=metCijfers.reduce((m,p)=>!m||p.gepost_om<m?p.gepost_om:m,null);
-    const zonder=IG.posts.length-metCijfers.length;
+    const zonder=igPostsVan(igGroep).length-metCijfers.length;
     const optxt=op.txt+(opKw?`. Alleen posts met minstens ${nf0.format(drempel)} bereik tellen mee, anders kan een post die bijna niemand zag bovenaan komen`:"")
       +(zonderCijfer?`. ${nf0.format(zonderCijfer)} post${zonderCijfer===1?"":"s"} zonder dit cijfâh (Meta geeft het nie voor elke soort, bijv. reels) tellen hier nie mee`:"");
     $("igTopSub").innerHTML=alles
-      ?`Je 10 beste posts ooit, ${optxt}. Gekeken naâh ${nf0.format(metCijfers.length)} posts met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
+      ?`Je 10 beste ${G.kort} ooit, ${optxt}. Gekeken naâh ${nf0.format(metCijfers.length)} ${G.kort} met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
         +(zonder?(zonder===1?" 1 post heb (nog) geen cijfâhs en telt nie mee.":` ${nf0.format(zonder)} posts hebbe (nog) geen cijfâhs en telle nie mee.`):"")
         +" Het archief vult zich elke nacht verder aan, dus oude toppâhs kunne d'r nog bij komme."
-      :`Beste posts van de laatste 90 dagen, ${optxt}. Klik op een post om hem te openen, of op een kolomkop om daarop te sorteren.`;
+      :`Beste ${G.kort} van de laatste 90 dagen, ${optxt}.${periode.length<3?` <b>Let op:</b> maar ${periode.length} ${periode.length===1?G.een:G.kort} in deze periode, kijk ook bij Allâh tijde.`:""} Klik op een post om hem te openen, of op een kolomkop om daarop te sorteren.`;
   }
   const kop=k=>`<th class="n${igTopOp===k?" gesorteerd":""}"><button type="button" class="igtopkop" data-igtop="${k}">${IG_TOP_OP[k].kop}${igTopOp===k?" ↓":""}</button></th>`;
   const cel=(p,k)=>{const v=IG_TOP_OP[k].v(p);return `<td class="n${igTopOp===k?" gesorteerd":""}">${v==null?"—":IG_TOP_OP[k].f.format(v)}</td>`};
-  const kols=Object.keys(IG_TOP_OP);
+  const kols=Object.keys(IG_TOP_OP).filter(k=>!nieVoorReel(k));
   $("igTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th>${kols.map(kop).join("")}</tr></thead><tbody>`+
     lijst.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span></div></div></td>
       ${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
-    :`<tbody><tr><td class="sub">${periode.length?`Nog geen posts met een cijfâh voor ${op.kop.toLowerCase()}${alles?"":" in de laatste 90 dagen"}.`:alles?"Nog geen posts met cijfâhs.":"Nog geen posts met cijfâhs in de laatste 90 dagen."}</td></tr></tbody>`;
+    :`<tbody><tr><td class="sub">${periode.length?`Nog geen ${G.kort} met een cijfâh voor ${op.kop.toLowerCase()}${alles?"":" in de laatste 90 dagen"}.`:alles?`Nog geen ${G.kort} met cijfâhs.`:`Geen ${G.kort} met cijfâhs in de laatste 90 dagen.`}</td></tr></tbody>`;
 }
 
 /* ---------- Top 5 op de telefoon (01-10): posts óf stories, 7/30/90 dagen, op bereik, likes of kwaliteit ----------
@@ -615,7 +690,7 @@ const IG_T5_OP={
   kwaliteit:{naam:"kwaliteit",post:p=>IG_TOP_OP.kwaliteit.v(p),story:s=>igStoryKwal(s),f:v=>igKwalF(v)}};
 function igT5Lijst(){   // {lijst:[{x,v,bereik,likes}], n, zonder, drempel}
   const op=IG_T5_OP[igT5Op]||IG_T5_OP.bereik,st=igT5Wat==="stories",grens=Date.now()-(+igT5Per)*864e5;
-  const bron=st?(IG.stories||[]):IG.posts;
+  const bron=st?(IG.stories||[]):igPostsVan(igGroep);   // posts: alleen de groep van de schakelaar bovenaan
   const alle=bron.filter(x=>x.gepost_om&&Date.parse(x.gepost_om)>grens).map(x=>({x,
     v:st?op.story(x):op.post(x),bereik:st?(x.cijfers||{}).reach:x.bereik,likes:st?igStoryLikes(x):x.likes}));
   const metBereik=alle.filter(r=>r.bereik!=null);
@@ -628,13 +703,13 @@ function renderIgT5(){
   if(!$("igT5"))return;
   if(!IG_T5_OP[igT5Op])igT5Op="bereik";
   [["igT5Wat",igT5Wat],["igT5Per",igT5Per],["igT5Op",igT5Op]].forEach(([id,v])=>document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v)));
-  const {lijst,n,zonder,teKlein,drempel,st,op}=igT5Lijst(),wat=st?"stories":"posts";
+  const {lijst,n,zonder,teKlein,drempel,st,op}=igT5Lijst(),G=IG_GROEPEN[igGroep],wat=st?"stories":G.kort;
   const uitleg={bereik:"op bereik (hoeveel verschillende mensen het zagen)",likes:"op likes",
     kwaliteit:st?"op kwaliteit (gedeeld per 1.000 bereik)":"op kwaliteit (gedeeld + bewaard per 1.000 bereik)"}[igT5Op];
   const extra=[];
   if(teKlein)extra.push(`${nf0.format(teKlein)} met minder dan ${nf0.format(drempel)} bereik tellen nie mee`);
   if(zonder)extra.push(`${nf0.format(zonder)} zonder dit cijfâh`);
-  $("igT5Sub").innerHTML=`Je 5 beste ${wat} van de laatste ${igT5Per} dagen, ${uitleg}. ${nf0.format(n)} ${n===1?(st?"story":"post"):wat} in deze periode`+(extra.length?` (${extra.join(", ")})`:"")+"."
+  $("igT5Sub").innerHTML=`Je 5 beste ${wat} van de laatste ${igT5Per} dagen, ${uitleg}. ${nf0.format(n)} ${n===1?(st?"story":G.een):wat} in deze periode`+(extra.length?` (${extra.join(", ")})`:"")+"."
     +(st?" Tik op een story van de laatste 24 uur om hem te openen.":" Tik op een post om hem te openen.");
   if(!lijst.length){$("igT5").innerHTML=`<p class="sub" style="margin:0">${n?`Nog geen ${wat} met een cijfâh voor ${op.naam} in de laatste ${igT5Per} dagen.`:`Geen ${wat} in de laatste ${igT5Per} dagen.`}</p>`;return}
   $("igT5").innerHTML=lijst.map((r,i)=>{const x=r.x,d=dagNL(x.gepost_om),oud=Date.now()-Date.parse(x.gepost_om);
@@ -800,6 +875,7 @@ async function igZetMuziek(id,nieuw){
 /* ---------- knoppen ---------- */
 document.addEventListener("change",e=>{const s=e.target.closest(".igsel");if(s)igZetMuziek(s.closest("[data-id]").dataset.id,s.value)});
 document.addEventListener("click",async e=>{
+  const gr=e.target.closest("#igGroep button");if(gr){igGroep=gr.dataset.v;renderInsta();return}
   const k=e.target.closest("#igKies button");if(k){igKies=k.dataset.v;renderInsta();return}
   const tp=e.target.closest("#igTopKies button");if(tp){igTopPeriode=tp.dataset.v;renderIgTop();return}
   const pm=e.target.closest("#igPostMaat button");if(pm){igPostMaat=pm.dataset.v;renderIgPostGrafiek();return}
@@ -812,6 +888,10 @@ document.addEventListener("click",async e=>{
   const so=e.target.closest("#igSorteer button");if(so){igSorteer=so.dataset.v;igLabelAantal=20;renderIgMuziek();return}
   if(e.target.closest("#igMeer")){igLabelAantal+=20;renderIgMuziek();return}
   if(e.target.closest("#igAlleenLeeg")){igAlleenLeeg=!igAlleenLeeg;e.target.setAttribute("aria-pressed",igAlleenLeeg);igLabelAantal=20;renderIgMuziek();return}
+  const tz=e.target.closest("[data-igterug]");if(tz){tz.disabled=true;
+    const {data,error}=await sb.rpc("ig_post_terugzetten",{p_media_id:tz.dataset.igterug});
+    if(error){tz.disabled=false;showMsg("Terugzetten lukte nie: "+(error.message||error),false);return}
+    showMsg("Post telt weer mee. Effe verversen…",true);$("ververs").click();return}
   const l=e.target.closest("[data-iglink]");if(l){
     const url=igNieuweLink(l.dataset.iglink),uit=$("igLinkUit");if(uit){uit.value=url;uit.hidden=false}
     const ref=url.split("ref=")[1];if(ref!=="bio"){const r=JSON.parse(store.get("hc_ig_links")||"[]");r.push(ref);store.set("hc_ig_links",JSON.stringify(r.slice(-50)))}
@@ -968,15 +1048,15 @@ function igNieuwWeg(c){
 }
 // De vaste rij cijfâhs, in dezelfde volgorde op de Ovâhzicht-tegel én bovenaan de Insta-tab (één lijst, dus altijd gelijk).
 // Elk item: [kop, getal, uitleg, extra alleen op de Insta-tab]. Volgâhs staat apart (groot getal op de tegel).
-function igVasteRijen(c){
-  const l=igLikes(),k=igKwal();
+function igVasteRijen(c,g=igGroep){   // g: Ovâhzicht-tegel geeft "foto" mee (je hoofdsoort), de Insta-tab de schakelaar
+  const l=igLikes(g),k=igKwal(g),wie=" ("+IG_GROEPEN[g].kort+")";
   return [
     igBereikRij(c),
     ["Gemiddeld bereik per dag",c.bereikDag==null?"—":nf0.format(c.bereikDag),"laatste 7 dagen"+igVs(c.bereikDag,c.bereikDagV)],
     ["Nieuwe mensen",c.nieuwPct==null?"—":pct(c.nieuwPct),c.nieuwPct==null?"komt na de eerste nacht met 09b":"van je bereik volgt je (nog) nie, laatste 7 dagen"+igVsPct(c.nieuwPct,c.nieuwPctV),
       c.viewsNieuwPct!=null?` · ${pct(c.viewsNieuwPct)} van de weergaven`:""],
-    ["Likes per kijkâh",l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)],
-    ["Kwaliteit per post",k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)],
+    ["Likes per kijkâh"+wie,l.nu==null?"—":igPct1(l.nu),igLikesUitleg(l)],
+    ["Kwaliteit per post"+wie,k.nu==null?"—":igKwalF(k.nu),igKwalUitleg(k)],
     igTrendRij(c)];
 }
 function instaTegel(){
@@ -991,7 +1071,7 @@ function instaTegel(){
     <div class="tgroot">${nf0.format(IG.acc.volgers||0)}</div>
     <p class="s">${igNieuwWeg(c)}</p>
     <div class="trijen">
-      ${igVasteRijen(c).map(([k,v,u])=>tegelRij(k,v,u)).join("")}
+      ${igVasteRijen(c,"foto").map(([k,v,u])=>tegelRij(k,v,u)).join("")}
       ${((np,ns)=>np+ns?tegelRij("Wachtkamâh",nf0.format(np+ns),`${igWachtTekst(np,ns)} zonder muziek-keuze`):"")(igWachtend().length,igWachtStories().length)}
       ${igStatusHTML()}
     </div>

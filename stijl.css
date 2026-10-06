@@ -366,6 +366,7 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kmuit{color:var(--muted);font-size:12px}
 .kbezet{background:var(--warn-soft);border-radius:10px;padding:7px 10px}
 .kknop .btn:disabled{opacity:.45;cursor:not-allowed}.kmnie .chip{font-size:11px}
+.kmnie li,.kmnie .chip{overflow-wrap:anywhere;white-space:normal}   /* lange redenen (bijv. verwijderd op Insta) netjes afbreken op de telefoon */
 .kmleeg{margin:0}
 .alarm.meting{border-color:var(--hy);background:var(--warn-soft)}
 .alarm.meting .alarmicoon{background:var(--hy);color:var(--hy-ink)}
@@ -447,6 +448,18 @@ th.gesorteerd{color:var(--ink)}
 .igstatus.deels .igst-i,.igst-w{color:var(--warn);font-weight:700}
 .igstatus.fout .igst-i{color:var(--yt)}
 .igstatus ul{margin:6px 0 4px;padding-left:18px;display:grid;gap:3px}
+/* schakelaar foto's & carrousels · reels (deel B) */
+.iggroep{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 12px}
+.iggroep-k{font-size:12.5px;font-weight:700;color:var(--muted)}
+.iggroep-s{flex-basis:100%;font-size:12px;margin:0}
+#igGroep .seg-n{opacity:.7;font-weight:600;margin-left:2px}
+/* posts die nie meâh op Insta staan (22_verwijderde_posts.sql) */
+.igweg{font-size:12.5px;color:var(--muted);padding-top:4px}
+.igweg summary{cursor:pointer;font-weight:700}
+.igweg ul{margin:6px 0 4px;padding-left:18px;display:grid;gap:4px}
+.igweg a{color:var(--hy)}
+.igweg .chip{font-size:11px;white-space:normal}
+.igweg li{overflow-wrap:anywhere}
 .igstatus code{font-size:11.5px;overflow-wrap:anywhere;color:var(--ink-2)}
 .igstatus p{margin:0;line-height:1.4}
 

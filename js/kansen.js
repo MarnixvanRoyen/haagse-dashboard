@@ -214,7 +214,7 @@ function kansenInsta(){
     p:`${slecht.n} posts, middelste bereik ${nf0.format(slecht.med)}.`,
     a:`<b>Doe:</b> niet stoppen als je 't mooi vindt, maar combineer ${esc(slecht.naam)} met een sterker onderwerp${best?` zoals ${esc(best.naam)}`:""}, of zet het in een carrousel.`});
   // 2. soort: reels
-  const so=igWatWerkt("soort").rijen, reel=so.find(r=>r.naam==="Reel");
+  const so=igWatWerkt("soort","alle").rijen, reel=so.find(r=>r.naam==="Reel");   // hier juist reels tegen de rest (andere kansen: alleen foto's & carrousels)
   const p90=IG.posts.filter(p=>Date.parse(p.gepost_om)>Date.now()-90*864e5), reelAandeel=p90.length?p90.filter(p=>soortNaam(p)==="Reel").length/p90.length:0;
   const okR=reel&&reel.n>=5&&reel.idx>=1.2&&reelAandeel<0.3;
   if(okR||(reel&&kVolgt("insta-meer-reels")))out.push({id:"insta-meer-reels",stil:!okR,bron:"insta",impact:Math.min(70,40+((reel.idx||1)-1)*60),n:reel.n,
@@ -594,7 +594,7 @@ const KM_CURVE_STD={
   feed:[[0,0],[0.25,.3],[0.5,.5],[1,.72],[2,.85],[3,.9],[4,.93],[5,.95],[7,.97],[10,.99],[14,1]],
   reel:[[0,0],[0.25,.2],[0.5,.35],[1,.55],[2,.7],[3,.78],[4,.83],[5,.87],[7,.92],[10,.97],[14,1]]};
 const KM_KNOPEN=[0.5,1,2,3,4,5,7,10];
-const kmGroep=p=>soortNaam(p)==="Reel"?"reel":"feed";
+const kmGroep=p=>soortGroep(p)==="reel"?"reel":"feed";   // groeicurve: zelfde indeling als de rest (soortGroep in insta.js)
 const kmLeeftijd=(p,t)=>((t??Date.now())-Date.parse(p.gepost_om))/864e5;
 function kmInterp(c,a){if(a<=0)return 0;for(let i=1;i<c.length;i++)if(a<=c[i][0]){const [x0,y0]=c[i-1],[x1,y1]=c[i];return y0+(y1-y0)*(a-x0)/(x1-x0)}return 1}
 // eigen curve: posts met metingen vanaf ≤ 1,5 dag én tot ≥ 10 dagen; per knoop de middelste waarde (min. 5 posts)
@@ -667,24 +667,36 @@ function kmStand(p){
     .sort((a,b)=>a.gepost_om<b.gepost_om?-1:1)
     .map(x=>({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,
       reden:min.has(x.media_id)?"zelf weggehaald":Date.parse(x.gepost_om)>eindTs?(p.gestopt_om&&deadline&&Math.abs(Date.parse(p.gestopt_om)-Date.parse(deadline))<2000?"na de deadline":p.gestopt_om?"na je afmelding":"na de deadline"):(plan.nie||"past nie bij de taak")}));
+  // verwijderd/gearchiveerd op Insta (22_verwijderde_posts.sql): telt nooit mee, ook nie als je hem zelf had toegevoegd. Wel tonen, met de reden.
+  (IG.weg||[]).filter(x=>x.gepost_om&&(plus.has(x.media_id)||dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=Math.min(Date.now(),eindTs+7*864e5)))
+    .forEach(x=>nietMee.push({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,weg:true,
+      reden:igWegReden(x)+(plus.has(x.media_id)?" · was zelf toegevoegd":"")}));
+  nietMee.sort((a,b)=>a.ts<b.ts?-1:1);
   // basis = posts van vóór de start (120 dagen, anders 365), zonder de taak-posts
   const voor=d=>IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)<startDag&&Date.parse(x.gepost_om)>Date.parse(p.gestart_om)-d*864e5&&M.f(x)!=null);
   let basis=voor(120);if(basis.length<15)basis=voor(365);
   const medVan=l=>kMed(l.map(M.f).filter(v=>v!=null));
-  const alleMed=medVan(basis);
-  const normaalVoor=x=>{const z=basis.filter(b=>soortNaam(b)===soortNaam(x));return plan.perSoort!==false&&z.length>=5?medVan(z):alleMed};
-  // verwachting: hoeveel doet dit soort post bij jou extra (alleen data van vóór de start)
+  // normaal per groep (deel B): een post wordt alleen met z'n eigen soort vergeleken (foto/carrousel of reel),
+  // met posts van vóór de start; te weinig in 120 dagen → 365 dagen → allâh tijde (igNormaal in insta.js, min. 5 posts)
+  const normG={};
+  const normaalVan=g=>normG[g]||(normG[g]=igNormaal(g,M.f,{voor:amsMiddernacht(startDag)}));
+  const alleMed=normaalVan("foto").waarde;   // "je normaal" = je foto's & carrousels (je hoofdsoort)
+  const normaalVoor=x=>plan.perSoort===false?alleMed:normaalVan(soortGroep(x)).waarde;   // meer-reels: reels juist tegen je foto's
+  // verwachting: hoeveel doet dit soort post bij jou extra, binnen z'n eigen groep (alleen data van vóór de start)
   let factor=1,factorN=0,factorBron="";
   if(plan.groep&&alleMed){const g=basis.filter(plan.groep);factorN=g.length;
-    if(g.length>=3){factor=Math.max(0.5,Math.min(3,medVan(g)/alleMed));factorBron=`${g.length} eerdere ${plan.wat}: middelste ${M.fmt(medVan(g))} tegen ${M.fmt(alleMed)} voor al je posts`}
-    else factorBron=`nog maar ${g.length} eerdere ${plan.wat}: verwachting = je normaal`}
+    const rel=plan.perSoort===false?g.map(x=>M.f(x)/alleMed):g.map(x=>{const n=normaalVan(soortGroep(x)).waarde;return n?M.f(x)/n:null}).filter(v=>v!=null);
+    if(rel.length>=3){factor=Math.max(0.5,Math.min(3,kMed(rel)));
+      factorBron=`${rel.length} eerdere ${plan.wat}: middelste ${kX(kMed(rel))} ${plan.perSoort===false?`je normaal van foto's & carrousels (${M.fmt(alleMed)})`:"het normaal van hun eigen soort (reels met reels, foto's met foto's)"}`}
+    else factorBron=`nog maar ${rel.length} eerdere ${plan.wat}: verwachting = je normaal`}
   else if(plan.doel){factor=plan.doel;factorBron=`doel: ${pct(plan.doel-1)} betâh dan je normaal`}
   const nu=Date.now();
   const rij=taak.map(x=>{
     const a=kmLeeftijd(x,nu),normaal=normaalVoor(x),waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
     const deel=M.curve?kmDeel(x,a):1,klaar=a>=klaarNa;
     const eind=waarde==null?null:M.curve?(klaar||deel>=0.95?waarde:a>=0.5?waarde/deel:null):(a>=1?waarde:null);
-    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
+    const gr=soortGroep(x),ng=normaalVan(gr);
+    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),groep:gr,normaalN:ng.n,normaalGenoeg:plan.perSoort===false||ng.genoeg,link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
       leeftijd:a,waarde,normaal,normaalNu:normaal!=null&&M.curve?normaal*deel:normaal,verwacht:normaal!=null?normaal*factor:null,
       eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel}});
   const laatsteKlaar=rij.length?rij.map(r=>r.klaarOp).sort().pop():null;
@@ -710,16 +722,16 @@ function kmHTML(s,{rapport=false}={}){
     <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
   const knop=!rapport&&s.pid!=null;
   const kies=knop&&(s.kiesbaar||[]).length?`<label class="kmkies">Post toevoegen <select data-kmkies data-kpid="${s.pid}"><option value="">kies een post…</option>${s.kiesbaar.map(x=>`<option value="${esc(x.id)}">${dKort(dagNL(x.ts))} ${tijdAms(x.ts)} · ${esc(x.soort)} · ${esc(kEersteRegel(x.bijschrift).slice(0,40))}</option>`).join("")}</select></label>`:"";
-  const nie=((s.nietMee||[]).length?`<details class="kmnie"${knop?" open":""}><summary>Nie meegeteld (${s.nietMee.length})</summary><ul>${s.nietMee.map(x=>`<li><a href="${esc(x.link||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.ts))} · ${esc(x.soort)}</a> <span class="sub">${esc(kEersteRegel(x.bijschrift))}</span> <span class="chip mute">${esc(x.reden)}</span>${knop?` <button class="lnk" type="button" data-kmplus="${esc(x.id)}" data-kpid="${s.pid}">Tel mee</button>`:""}</li>`).join("")}</ul></details>`:"")+kies;
+  const nie=((s.nietMee||[]).length?`<details class="kmnie"${knop?" open":""}><summary>Nie meegeteld (${s.nietMee.length})</summary><ul>${s.nietMee.map(x=>`<li><a href="${esc(x.link||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.ts))} · ${esc(x.soort)}</a> <span class="sub">${esc(kEersteRegel(x.bijschrift))}</span> <span class="chip mute">${esc(x.reden)}</span>${knop&&!x.weg?` <button class="lnk" type="button" data-kmplus="${esc(x.id)}" data-kpid="${s.pid}">Tel mee</button>`:""}</li>`).join("")}</ul></details>`:"")+kies;
   if(!s.taak.length)return h+`<p class="sub kmleeg">Nog geen ${esc(s.plan.wat)} gevonden sinds ${kD(s.taakStart||new Date().toISOString())}. Label je post in de Insta-tab als hij nie herkend wordt (labels komen er ook elke nacht vanzelf bij).</p>`+nie;
   h+=`<p class="ktelkop">Telt mee in de challenge: <b>${s.taak.length} ${s.taak.length===1?"post":"posts"}</b>${s.doenAantal?` (doel ${s.doenAantal})`:""}</p>`;
   h+=`<div class="kmposts">${s.taak.map(r=>{
     const pr=r.verwacht?Math.min(1.5,(r.eind??r.waarde??0)/r.verwacht):0;
     return `<div class="kmpost">
       <a class="kmthumb" href="${esc(r.link||"#")}" target="_blank" rel="noopener">${r.plaatje?`<img src="${esc(r.plaatje)}" alt="" loading="lazy">`:""}</a>
-      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
+      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${r.groep==="reel"?` <span class="chip mute">reel · ${r.normaal!=null?`vs normaal reels ${M.fmt(r.normaal)}`:`te weinig eerdere reels (${r.normaalN||0}) om te vergelijken`}</span>`:""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
         <span class="kmcijf">${M.kort} nu <b>${r.waarde!=null?M.fmt(r.waarde):"—"}</b>${M.curve&&!r.klaar&&r.normaalNu!=null?` · normaal op deze leeftijd ${M.fmt(r.normaalNu)}`:""}</span>
-        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${r.x>=1.1?"up":r.x<=0.9?"down":""}">${kX(r.x)}</b> je normaal`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
+        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${r.x>=1.1?"up":r.x<=0.9?"down":""}">${kX(r.x)}</b> ${r.groep==="reel"&&s.plan.perSoort!==false?"normaal van je reels":"je normaal"}`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
         <div class="kbalk kmbalk" title="t.o.v. de verwachting"><i style="width:${(Math.min(1,pr/1.5)*100).toFixed(1)}%"></i><s style="left:${(100/1.5).toFixed(1)}%"></s></div></div>
     </div>`}).join("")}</div>`;
   h+=nie;
