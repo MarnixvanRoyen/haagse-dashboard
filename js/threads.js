@@ -29,6 +29,10 @@ async function loadTH(){
       dag:d.data.map(x=>({dag:String(x.dag).slice(0,10),c:x.cijfers||{}})),
       posts:m.filter(x=>x.soort!=="REPOST_FACADE").map(thPost),reposts:m.filter(x=>x.soort==="REPOST_FACADE").length,demo:[],status:{},err:null};
   }catch(e){TH={acc:null,profiel:[],dag:[],posts:[],demo:[],status:{},err:e.message||String(e)}}
+  // verwijderde Threads-posts (24_threads_verwijderd.sql): nooit meetellen. th_media_laatst filtert al; hier nog een keer
+  // (zelfde als igActief bij Insta), zodat het ook klopt als de view nog nie is bijgewerkt.
+  TH.weg=await thWegLaden();const thWegIds=new Set(TH.weg.map(x=>x.media_id));
+  TH.posts=(TH.posts||[]).filter(p=>!thWegIds.has(p.id));
   const [dm,v,t]=await Promise.all([
     sb.from("th_demografie").select("soort,dag,data,fout").order("dag",{ascending:false}).limit(40).then(r=>r,()=>({})),
     sb.from("th_ververst").select("om,fout").limit(1).then(r=>r,()=>({})),
@@ -36,6 +40,20 @@ async function loadTH(){
   TH.demo=dm.data||[];
   TH.status={ververst:(v.data&&v.data[0])||null,token:(t.data&&t.data[0])||null};
   thBadge();
+}
+async function thWegLaden(){   // kolom bestaat pas na 24_threads_verwijderd.sql → anders een lege lijst
+  try{const r=await sb.from("th_media").select("media_id,soort,gepost_om,tekst,permalink,verwijderd_op,verwijderd_reden")
+      .not("verwijderd_op","is",null).order("gepost_om",{ascending:false}).range(0,999);
+    return r.error?[]:(r.data||[])}catch(e){return []}
+}
+// uitklapper op de Threads-tab: welke posts tellen nie meâh mee, met knop Zet terug (zelfde als bij Insta)
+function thWegHTML(){
+  const w=TH.weg||[];if(!w.length)return "";
+  return `<details class="igweg"><summary>${w.length} post${w.length>1?"s":""} nie meâh op Threads · tellen nergens mee</summary>
+    <ul>${w.map(x=>`<li><a href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${x.gepost_om?dKort(dagNL(x.gepost_om))+" "+tijdAms(x.gepost_om):"?"} · ${esc(TH_SOORT[x.soort]||x.soort||"?")}</a>
+      <span class="sub">${esc(String(x.tekst||"").split(/\r?\n/)[0].slice(0,60))}</span> <span class="chip mute">${x.verwijderd_reden==="bestaat_nie"?"verwijderd op Threads":"nie meâh in je lijst op Threads"}</span>
+      <button class="lnk" type="button" data-thterug="${esc(x.media_id)}">Zet terug</button></li>`).join("")}</ul>
+    <p class="sub">Verwijderd op Threads: de cijfâhs blijven bewaard, maar tellen nergens mee. Komt de post terug, dan telt hij vanzelf weer mee. <b>Zet terug</b> is alleen voor als het dashboard zich vergist; staat hij echt nie meâh op Threads, dan gaat hij vannacht weer weg.</p></details>`;
 }
 // één post uit de database → handig object (cijfers los, soort in gewone woorden)
 function thPost(x){const c=x.cijfers||{},n=k=>c[k]!=null?+c[k]:null;
@@ -239,7 +257,7 @@ function renderThreads(){
 
   // 1. tegels
   $("thSub").innerHTML=`@${esc(TH.acc.gebruikersnaam||"the_hague_beachlife")} · elke nacht vanzelf bijgewerkt<span class="pc">, en als je het dashboard opent (hooguit 1x per 10 min) of bovenaan op Ververse tikt</span>. Meta geeft voor Threads geen bereik en geen nieuwe volgâhs per post; volgâhs per dag rekenen we zelf uit de stand.`;
-  $("thStatus").innerHTML=thStatusHTML();
+  $("thStatus").innerHTML=thStatusHTML()+thWegHTML();
   const pv=c.posts7-c.posts7V;
   $("thStats").innerHTML=[
     igStat("Volgâhs",TH.acc.volgers==null?"—":nf0.format(TH.acc.volgers),thNettoTekst(c)),
@@ -332,7 +350,12 @@ function renderThDemo(){
 }
 
 /* ---------- knoppen ---------- */
-document.addEventListener("click",e=>{
+document.addEventListener("click",async e=>{
+  const tz=e.target.closest&&e.target.closest("[data-thterug]");
+  if(tz){tz.disabled=true;
+    const {error}=await sb.rpc("th_post_terugzetten",{p_media_id:tz.dataset.thterug});
+    if(error){tz.disabled=false;showMsg("Terugzetten lukte nie: "+(error.message||error),false);return}
+    showMsg("Post telt weer mee. Effe verversen…",true);$("ververs").click();return}
   const b=e.target.closest&&e.target.closest("#thPostMaat button, #thTopOp button, #thTopPer button, #thDemoOp button, [data-thtop]");if(!b)return;
   if(b.dataset.thtop){thTopOp=b.dataset.thtop;renderThTop();return}
   const grp=b.parentElement.id;
