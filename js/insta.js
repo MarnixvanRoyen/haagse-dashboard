@@ -32,6 +32,7 @@ async function loadIG(){
   (IG.stories||[]).forEach(s=>s.groep="story");   // stories horen nooit bij foto of reel (ook nie een video-story)
   IG.posts=IG.posts.filter(igActief);   // het ene filter: vanaf hier ziet elke kaart alleen actieve posts
   IG.uur=await igUurLaden();   // momentopnamen bereik van vandaag en de 7 dagen ervoor (18_bereik_uur.sql)
+  IG.pu=await igPostUurLaden();   // metingen per nieuwe post op leeftijd → kaart "Deze gaat lekkâh!" (25_post_uur.sql)
   IG.status=await igStatusLaden();
   await igStoryLabels();
   await igStoryMinis();
@@ -1077,4 +1078,133 @@ function instaTegel(){
     </div>
     <button class="btn yellow" type="button" data-ga="insta">Kèk bè Insta</button>
   </article>`;
+}
+
+/* ---------- "Deze gaat lekkâh!" — kaart bovenaan Ovâhzicht (06-10, chat 10; 25_post_uur.sql) ----------
+   Supabase meet elke nieuwe post tot 48 uur na het posten elk uur (klusje instagram-post-uur op :10) en
+   ook bij elke ververs-ronde (ig_live → ig_media_dag → trigger). Tabel ig_post_uur: leeftijd in minuten + cijfers.
+   Twee niveaus (afspraak Marnix, geen push meer: alleen deze kaart):
+     gaat lekkâh   = bereik ≥ 500 én ≥ 2× zo snel als normaal voor die leeftijd
+     staat in de fik = dat plus ≥ 20 likes én likes per kijkâh minstens je normaal
+   Alleen posts/carrousels/reels (geen stories). Gaat alleen af als het lukte vóór 24 uur oud; de kaart blijft
+   zolang de post nog voldoet, hooguit 48 uur. "Normaal" altijd binnen de eigen groep (soortGroep/igPostsVan/igNormaal):
+     1. zolang er < 10 eerdere posts in de groep met uurmetingen zijn: je normale eindbereik (igNormaal, posts ≥ 2 dagen oud)
+        × de gewone groei (IG_LEKKER.curve: welk deel van het eindbereik een post na X uur meestal heeft);
+     2. daarna: de middelste van je eigen eerdere posts op precies dezelfde leeftijd (bereik én likes per kijkâh).
+   Reels: weinig data → altijd "voorzichtig" erbij (ook foto's als het normaal op < 10 posts rust).
+   Rekent alles in de browser; geen extra vraag aan Supabase behalve het ophalen van ig_post_uur. */
+const IG_LEKKER={
+  bereik:500,            // minimaal bereik
+  snelheid:2,            // minstens zoveel keer zo snel als normaal (foto's & carrousels)
+  snelheidReel:2,        // idem voor reels (strenger maken? bijv. 3)
+  fikLikes:20,           // "in de fik": minimaal aantal likes
+  startUur:24,           // moet afgaan vóór de post zo oud is
+  kaartUur:48,           // kaart blijft hooguit zo lang
+  minMinuut:60,          // jonger dan een uur: nog nie beoordelen (Meta loopt in het begin achter)
+  curvePosts:10,         // vanaf zoveel eerdere posts mét uurmetingen: normaal op dezelfde leeftijd
+  zeker:10,              // normaal rust op minder posts → "voorzichtig"
+  // gewone groei: [uur, deel van het eindbereik]. Schatting; past bij de eerste metingen (check 06-10: 79% na 12-24 u, 89% na 24-48 u)
+  curve:[[0,0],[1,.10],[2,.18],[3,.26],[6,.42],[12,.62],[24,.80],[48,.90]]
+};
+async function igPostUurLaden(){   // Map media_id → metingen [{m, r, l, om}] op leeftijd; tabel er nog nie (25 nie gedraaid)? → leeg
+  const uit=new Map();
+  try{
+    const since=new Date(Date.now()-130*864e5).toISOString();
+    const rij=await igAlles(()=>sb.from("ig_post_uur").select("media_id,om,minuut,bereik:cijfers->reach,likes:cijfers->likes")
+      .gte("om",since).lte("minuut",IG_LEKKER.kaartUur*60).is("fout",null).order("om"));
+    rij.forEach(x=>{if(x.bereik==null||isNaN(+x.bereik))return;
+      const a=uit.get(x.media_id)||[];a.push({m:+x.minuut,r:+x.bereik,l:x.likes==null?null:+x.likes,om:x.om});uit.set(x.media_id,a)});
+    uit.forEach(a=>a.sort((p,q)=>p.m-q.m));
+  }catch(e){}
+  return uit;
+}
+function igCurveDeel(u){const c=IG_LEKKER.curve;
+  if(u<=0)return 0;if(u>=c[c.length-1][0])return c[c.length-1][1];
+  for(let i=1;i<c.length;i++)if(u<=c[i][0]){const [u0,d0]=c[i-1],[u1,d1]=c[i];return d0+(d1-d0)*(u-u0)/(u1-u0)}
+}
+// stand van een eerdere post na m minuten: meting binnen 10 min, anders ingevuld tussen 2 metingen die ≤ 3 uur uit elkaar liggen
+// (het moment van posten telt als 0), anders null (dan telt die post nie mee)
+function igPuStand(rij,m){
+  let lo={m:0,r:0,l:0},hi=null;
+  for(const x of rij){if(x.m<=m)lo=x;else{hi=x;break}}
+  if(lo.m>0&&m-lo.m<=10)return lo;
+  if(hi&&hi.m-m<=10)return hi;
+  if(!hi||hi.m-lo.m>180)return null;
+  const f=(m-lo.m)/(hi.m-lo.m);
+  return {m,r:lo.r+(hi.r-lo.r)*f,l:lo.l==null||hi.l==null?null:lo.l+(hi.l-lo.l)*f};
+}
+// wat is normaal voor post p op leeftijd m (minuten)?
+function igLekkerNormaal(p,m){
+  const g=soortGroep(p),t0=Date.parse(p.gepost_om);
+  const eerder=igPostsVan(g).filter(q=>q.media_id!==p.media_id&&q.gepost_om&&Date.parse(q.gepost_om)<t0);
+  const st=eerder.map(q=>(IG.pu||new Map()).get(q.media_id)).filter(Boolean).map(r=>igPuStand(r,m)).filter(Boolean);
+  if(st.length>=IG_LEKKER.curvePosts){
+    const lk=st.filter(s=>s.r>0&&s.l!=null).map(s=>s.l/s.r);
+    return {g,verwacht:med(st.map(s=>s.r)),likesPk:lk.length>=IG_LEKKER.curvePosts?med(lk):null,manier:"leeftijd",n:st.length,
+            voorzichtig:g==="reel"||st.length<IG_LEKKER.zeker};
+  }
+  const oud=eerder.filter(q=>Date.parse(q.gepost_om)<Date.now()-2*864e5);   // eindbereik: alleen posts die uitgegroeid zijn
+  const nb=igNormaal(g,q=>q.bereik==null?null:+q.bereik,{posts:oud});
+  if(!nb.genoeg||!(nb.waarde>0))return null;
+  const nl=igNormaal(g,q=>+q.bereik>0&&q.likes!=null?(+q.likes)/(+q.bereik):null,{posts:oud});
+  return {g,verwacht:nb.waarde*igCurveDeel(m/60),eind:nb.waarde,likesPk:nl.genoeg?nl.waarde:null,manier:"eind",n:nb.n,dagen:nb.dagen,
+          voorzichtig:g==="reel"||nb.n<IG_LEKKER.zeker};
+}
+function igLekkerOordeel(p,x){   // x = meting {m, r, l}
+  const N=igLekkerNormaal(p,x.m);if(!N||!(N.verwacht>0))return null;
+  const snel=x.r/N.verwacht,lpk=x.l!=null&&x.r>0?x.l/x.r:null,drempel=N.g==="reel"?IG_LEKKER.snelheidReel:IG_LEKKER.snelheid;
+  const lekker=x.r>=IG_LEKKER.bereik&&snel>=drempel;
+  const likesOk=x.l!=null&&x.l>=IG_LEKKER.fikLikes, pkOk=lpk!=null&&N.likesPk!=null&&lpk>=N.likesPk;
+  return {N,snel,lpk,lekker,fik:lekker&&likesOk&&pkOk,likesOk,pkOk};
+}
+function igLekkerLijst(){
+  const uit=[],nu=Date.now();
+  (IG.posts||[]).forEach(p=>{
+    if(!p.gepost_om||soortGroep(p)==="story")return;
+    const t0=Date.parse(p.gepost_om);if(nu-t0>IG_LEKKER.kaartUur*36e5)return;
+    const rij=(IG.pu||new Map()).get(p.media_id);if(!rij||!rij.length)return;
+    const laatst=rij[rij.length-1];if(laatst.m<IG_LEKKER.minMinuut)return;
+    const o=igLekkerOordeel(p,laatst);if(!o||!o.lekker)return;   // nu nie (meer) lekkâh → geen kaart
+    const af=rij.find(x=>x.m>=IG_LEKKER.minMinuut&&x.m<IG_LEKKER.startUur*60&&(z=>z&&z.lekker)(igLekkerOordeel(p,x)));
+    if(!af)return;   // pas na 24 uur lekkâh geworden: telt nie
+    uit.push({p,x:laatst,o,af});
+  });
+  return uit.sort((a,b)=>(b.o.fik-a.o.fik)||(Date.parse(b.p.gepost_om)-Date.parse(a.p.gepost_om)));   // fik eerst, dan de jongste
+}
+function igLeeftijd(m){return m<120?`${Math.round(m)} min oud`:`${Math.floor(m/60)} uur oud`}
+function igLekkerHTML(){
+  const l=igLekkerLijst();if(!l.length)return "";
+  const nf=v=>nf1i.format(v);   // 2 / 2,5 (geen "2,0")
+  return l.map(({p,x,o,af})=>{
+    const N=o.N,G=IG_GROEPEN[N.g],uur=x.m/60;
+    const kop=o.fik?"Deze staat in de fik!":"Deze gaat lekkâh!";
+    const normTxt=N.manier==="leeftijd"?`normaal ± ${nf0.format(Math.round(N.verwacht))} na ${igLeeftijd(x.m).replace(" oud","")} (middelste van ${N.n} eerdere ${G.kort} op dezelfde leeftijd)`
+      :`normaal ± ${nf0.format(Math.round(N.verwacht))} na ${igLeeftijd(x.m).replace(" oud","")}`;
+    const likesTxt=o.lpk==null?"likes nog nie bekend":
+      `likes per kijkâh <b>${igPct1(o.lpk)}</b>${N.likesPk!=null?` · normaal ${igPct1(N.likesPk)}`:""} · ${nf0.format(Math.round(x.l))} likes`;
+    const waaromNie=o.fik?"":!o.likesOk?` · nog geen ${IG_LEKKER.fikLikes} likes`:N.likesPk==null?"":!o.pkOk?" · likes per kijkâh nog onder je normaal":"";
+    const voorz=N.voorzichtig?`<p class="lksub"><span class="chip">voorzichtig</span> Je normaal rust op maar ${N.n} ${N.n===1?G.een:G.kort}${N.manier==="eind"&&N.dagen!==120?(N.dagen?` (laatste ${N.dagen} dagen)`:" (allâh tijde)"):""}, dus neem 't met een korreltje zout.</p>`:"";
+    const tip=o.fik?"Mensen vinde 'm ook nog goed: deel 'm nâh in je story en reageer op de reacties!":"Tip: deel 'm nâh in je story, nâh 't loopt!";
+    return `<div class="alarm lekker${o.fik?" fik":""}" role="status">
+      <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${o.fik?"🔥":"↗"}</span><h2>${kop}</h2></div>
+      <div class="lkrij">
+        <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
+        <div class="lktekst">
+          <p><b>${soortNaam(p)} · ${igLeeftijd(x.m)}</b><span class="pc"> · ${esc(igEersteRegel(p.bijschrift)).slice(0,90)}</span></p>
+          <p><b class="lkx">${igNf1.format(o.snel)}×</b> zo snel as normaal · ${nf0.format(Math.round(x.r))} kijkâhs, ${normTxt}</p>
+          <p>${likesTxt}${waaromNie}</p>
+          ${voorz}
+          <p class="lksub">${tip} · gemeten ${x.om?tijdAms(x.om):""}${af.m<x.m-30?` · lekkâh sinds ${Math.max(1,Math.floor(af.m/60))} uur na posten`:""}</p>
+        </div>
+      </div>
+      <details class="lkuitleg"><summary>Hoe werkt dit?</summary>
+        <p>Supabase meet je nieuwe posts elk uur (en als je het dashboard opent), tot 48 uur na het posten.
+        <b>Gaat lekker</b> = minstens ${nf0.format(IG_LEKKER.bereik)} bereik én minstens ${nf(N.g==="reel"?IG_LEKKER.snelheidReel:IG_LEKKER.snelheid)}× zo snel als normaal voor een ${G.een} van die leeftijd.
+        <b>In de fik</b> = dat plus minstens ${IG_LEKKER.fikLikes} likes én likes per kijker minstens je normaal. Het moet lukken vóór de post ${IG_LEKKER.startUur} uur oud is; de kaart blijft zolang het nog klopt, hooguit ${IG_LEKKER.kaartUur} uur.</p>
+        <p>${N.manier==="leeftijd"?`Normaal = de middelste van je eerdere ${G.kort} op precies dezelfde leeftijd.`
+          :`Normaal = je normale eindbereik (${nf0.format(Math.round(N.eind))}, middelste van ${N.n} ${G.kort}) × hoeveel een post na ${nf(uur)} uur meestal al heeft (± ${pct(igCurveDeel(uur))}). Zodra er ${IG_LEKKER.curvePosts} ${G.kort} met uurmetingen zijn, vergelijkt hij met je eigen posts op dezelfde leeftijd.`}
+        Meta loopt in de eerste uren soms wat achter, dus het kan een uur later afgaan dan het echt gebeurt.</p>
+        <p><b>Kijk niet steeds zelf naar je nieuwe post.</b> Je eigen kijken telt hooguit 1× mee en maakt hem niet sneller; dit dashboard houdt het voor je bij.</p>
+      </details>
+    </div>`}).join("");
 }

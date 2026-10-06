@@ -588,3 +588,18 @@ body.popopen{overflow:hidden}
 .bkstatus details{margin-top:6px}.bkstatus summary{cursor:pointer;font-weight:800;color:var(--ink)}.bkstatus ol{margin:6px 0 0;padding-left:20px}
 /* menu Partnâhs (samenwerking.js, renderPartners): tabjes per kanaal; tabel mag nooit de pagina breder maken */
 #s-partners>div{min-width:0}
+
+/* "Deze gaat lekkâh!" bovenaan Ovâhzicht (25_post_uur.sql, insta.js igLekkerHTML) */
+.alarm.lekker{border-color:var(--groen);background:color-mix(in srgb,var(--groen) 16%,var(--surface))}
+.alarm.lekker .alarmicoon{background:var(--groen);color:#fff}
+.alarm.lekker.fik{border-color:var(--sc);background:color-mix(in srgb,var(--sc) 16%,var(--surface))}
+.alarm.lekker.fik .alarmicoon{background:var(--sc);font-size:14px}
+.lkrij{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:start}
+.lktekst{display:grid;gap:3px;min-width:0}
+.lktekst p{overflow-wrap:anywhere}
+.lkx{font-family:var(--display);font-weight:400;font-size:20px;color:var(--hy)}
+.lksub{font-size:13px;color:var(--muted)}
+.lksub .chip{vertical-align:1px}
+.lkuitleg summary{cursor:pointer;font-size:13px;font-weight:700}
+.lkuitleg p{font-size:13px;margin-top:6px}
+@media (max-width:620px){.lkrij{grid-template-columns:52px minmax(0,1fr);gap:10px}}
