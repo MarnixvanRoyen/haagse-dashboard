@@ -260,7 +260,7 @@ function kansenInsta(){
     a:'<b>Doe:</b> label in de tab Insta je laatste 20 posts (2 minuten werk, één keuze per post). <button class="btn" type="button" data-ga="insta">Naâh Insta</button>',
     meet:{naam:"gelabelde posts",waarde:gelabeld,beter:"hoger"}});
   // 7. wat doet een Insta-post voor je plays?
-  const eff=IG.posts.map(p=>{const m=labelsVan(p,"muziek")[0];return m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null}).filter(e=>e&&e.x7!=null);
+  const eff=IG.posts.map(p=>{const m=labelsVan(p,"muziek")[0];return igIsNummer(m)?igPlaysEffect(m,dagNL(p.gepost_om)):null}).filter(e=>e&&e.x7!=null);
   if(eff.length>=3){const x=kMed(eff.map(e=>e.x7)),na=kMed(eff.map(e=>e.na7));
     out.push({id:"insta-naar-plays",bron:"insta",impact:x>=1.3?40:x>=1?25:20,n:eff.length*2,big:"×"+nf1k.format(x),h:"zoveel plays per dag krijgt een nummâh in de week na een Insta-post ermee, vergeleken met de 2 weken ervoor",
       p:`Middelste post: ${kPlus(na)} plays in 7 dagen (${eff.length} posts gemeten). Metingen per dag bestaan sinds eind september, dus dit wordt elke week preciezer.`,
@@ -641,7 +641,7 @@ function kmPlan(sleutel){
   if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"},nie:`nie over ${mooi(m[1])}`};
   if(sl==="insta-meer-reels")return {maat:"bereik",wat:"reels",hoort:p=>soortNaam(p)==="Reel",groep:p=>soortNaam(p)==="Reel",perSoort:false,doen:{aantal:1,termijn:"week"},nie:"geen reel"};
   if((m=/^insta-tijd-(.+)$/.exec(sl)))return {maat:"bereik",wat:"posts in dat dagdeel",hoort:p=>kSlug(dagdeel(p.uur??12))===m[1],groep:p=>kSlug(dagdeel(p.uur??12))===m[1],doen:{aantal:3,termijn:14},nie:"ander dagdeel"};
-  if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&l[0]!=="(geen)"};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"},nie:"geen eigen muziek gekozen"}}
+  if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&!igGeenEigen(l[0])};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"},nie:"geen eigen muziek gekozen"}}
   if(sl==="insta-nieuw-naar-volger")return {maat:"volgers",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:7,tekst:"elke post eindigen met een volg-zin + 3 toppâhs vastzetten"}};
   if(sl==="insta-bewaren")return {maat:"bewaard",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:14,tekst:"een bewaar-post maken (tips, plekken, tijden)"}};
   return null;
@@ -775,9 +775,9 @@ function kTeltMeeHTML(p){
     return blok(`Telt mee: alle nummâhs uit ${bron}`,[],"Deze cijfers veranderen alleen als je een nieuwe afrekening inlaadt.")}
   if(sl==="insta-label-muziek"){const x=IG.posts.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van);
     return blok(`Telt mee: posts die je een muziek-keuze gaf (${IG.posts.filter(q=>labelsVan(q,"muziek").length).length} in totaal)`,
-      x.slice(0,8).map(q=>`${dKort(dagNL(q.gepost_om))} · ${esc(soortNaam(q))} ${labelsVan(q,"muziek").length?`<span class="chip good">${esc(labelsVan(q,"muziek")[0])}</span>`:'<span class="chip mute">nog geen keuze</span>'}`),
+      x.slice(0,8).map(q=>`${dKort(dagNL(q.gepost_om))} · ${esc(soortNaam(q))} ${labelsVan(q,"muziek").length?`<span class="chip good">${esc(igMuziekNaam(labelsVan(q,"muziek")[0]))}</span>`:'<span class="chip mute">nog geen keuze</span>'}`),
       x.length?"Posts sinds de start; oudere posts labelen telt ook mee.":"Nog geen posts sinds de start; oudere posts labelen telt ook mee.")}
-  if(sl==="insta-naar-plays"){const x=IG.posts.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van&&labelsVan(q,"muziek").some(l=>l!=="(geen)"&&l!=="(eigen muziek)"));
+  if(sl==="insta-naar-plays"){const x=IG.posts.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van&&labelsVan(q,"muziek").some(igIsNummer));
     return blok(`Telt mee: posts sinds ${dKort(van)} met een nummâh eronder`,x.map(q=>`<a href="${esc(q.permalink||"#")}" target="_blank" rel="noopener">${dKort(dagNL(q.gepost_om))} · ${esc(soortNaam(q))}</a> · ♪ ${esc(labelsVan(q,"muziek")[0])}`),x.length?"":"Nog geen. Kies in de Insta-tab welk nummâh eronder zat.")}
   if(sl==="insta-stories-afhaken"){const x=IG.stories.filter(q=>q.gepost_om&&dagNL(q.gepost_om)>=van);
     return blok(`Telt mee: je stories sinds ${dKort(van)} (${x.length})`,[],x.length?`Verdeeld over ${new Set(x.map(q=>dagNL(q.gepost_om))).size} dagen; dagen met 3 of meer stories tellen voor het afhaken.`:"Nog geen stories sinds de start.")}

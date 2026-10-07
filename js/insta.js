@@ -347,7 +347,7 @@ function igWatWerkt(kies,g="foto"){   // g = groep ("foto"/"reel"), of "alle" (a
     else if(kies==="dag")voeg(DAGEN_LANG[(p.weekdag||1)-1],p);
     else if(kies==="tijd")voeg(dagdeel(p.uur??12),p);
     else if(kies==="muziek"){const l=labelsVan(p,"muziek");if(!l.length){nietGelabeld++;return}
-      voeg(l[0]==="(geen)"?"Zonder eigen muziek":"Met eigen muziek",p);if(l[0]!=="(geen)")voeg("♪ "+l[0],p)}
+      voeg(igGeenEigen(l[0])?"Zonder eigen muziek":"Met eigen muziek",p);if(l[0]==="(omgeving)")voeg("🌊 Omgevingsgeluid",p);else if(l[0]!=="(geen)")voeg("♪ "+l[0],p)}
   });
   if(kies==="dag")volgorde=DAGEN_LANG;if(kies==="tijd")volgorde=DAGDELEN;
   let rijen=[...groepen].map(([naam,ps])=>({naam,n:ps.length,med:med(ps.map(p=>p.bereik)),
@@ -371,7 +371,7 @@ function igYtTitel(t){return String(t||"").replace(/^\s*(marreman( rojas)?|beuk)
 // (al gebruikte labels eerst, zodat bestaande keuzes precies blijven kloppen).
 function igTrackBronnen(){
   const lijst=[];const zet=(titel,bron)=>{titel=String(titel||"").trim();if(titel)lijst.push({titel,bron})};
-  (IG.posts||[]).forEach(p=>labelsVan(p,"muziek").forEach(l=>{if(l!=="(geen)"&&l!=="(eigen muziek)")zet(l,"label")}));
+  (IG.posts||[]).forEach(p=>labelsVan(p,"muziek").forEach(l=>{if(igIsNummer(l))zet(l,"label")}));
   (SCL.tracks||[]).forEach(x=>zet(x.title,"SoundCloud"));
   (SP.snaps||[]).forEach(x=>zet(x.song,"Spotify"));
   (LABEL.tracks||[]).forEach(x=>zet(x.t+(/^((original|extended|radio|club)\s*)?(mix|edit|version)?$/i.test(String(x.v||"").trim())?"":" ("+String(x.v).trim()+")"),"DJ·World"));
@@ -763,7 +763,7 @@ function renderIgStories(){
       <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td>
       <td>${igMuziekSelect(labelsVan(s,"muziek")[0]||"",opties,titels,"Muziek onder deze story")}</td></tr>`})});
   const leeg=st.filter(s=>!labelsVan(s,"muziek").length).length;
-  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes</b>: de koppeling geeft voor stories geen likes, dus rekenen we ze uit: interacties − gedeeld − reacties (gecontroleerd met Meta Business Suite op 1 okt: klopt precies). Bij stories uit de export (juli t/m 30 sep) staan de echte likes. <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Met of zonder tekst</b>: tot en met 30 sep uit de export, daarna via de koppeling. Stories uit de export hebben geen <b>Tikte weg</b> (staat nie in de export). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" telt ook mee.</p>`+igStoryMuziekHTML();
+  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes</b>: de koppeling geeft voor stories geen likes, dus rekenen we ze uit: interacties − gedeeld − reacties (gecontroleerd met Meta Business Suite op 1 okt: klopt precies). Bij stories uit de export (juli t/m 30 sep) staan de echte likes. <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Met of zonder tekst</b>: tot en met 30 sep uit de export, daarna via de koppeling. Stories uit de export hebben geen <b>Tikte weg</b> (staat nie in de export). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" en "Omgevingsgeluid" tellen ook mee (als zonder eigen muziek).</p>`+igStoryMuziekHTML();
 }
 /* ---------- stories: soort, likes en kwaliteit ----------
    Likes gevalideerd 01-10 (Meta Business Suite); herkomst = alleen tekst ja/nee:
@@ -781,7 +781,7 @@ function igStoryWeg(s){const x=s.cijfers||{};return x.nav_weg!=null&&(x.views||x
 // eigen muziek onder stories: houdt het mensen vast? (alle bewaarde stories met cijfers en een keuze)
 function igStoryMuziekHTML(){
   const g=IG.stories.filter(s=>s.cijfers&&s.cijfers.reach!=null&&labelsVan(s,"muziek").length);
-  const met=g.filter(s=>labelsVan(s,"muziek")[0]!=="(geen)"),zonder=g.filter(s=>labelsVan(s,"muziek")[0]==="(geen)");
+  const met=g.filter(s=>!igGeenEigen(labelsVan(s,"muziek")[0])),zonder=g.filter(s=>igGeenEigen(labelsVan(s,"muziek")[0]));
   const blok=(naam,a)=>{const w=med(a.map(igStoryWeg).filter(v=>v!=null));
     return `<b>${naam}</b>: ${a.length} ${a.length===1?"story":"stories"}, middelste bereik ${nf0.format(med(a.map(s=>s.cijfers.reach))||0)}${w==null?"":`, tikte weg ${pct(w)}`}`};
   if(met.length<3||zonder.length<3)return `<p class="sub" style="margin:6px 0 0">♪ Vanaf 3 stories mét en 3 zonder eigen muziek zie je hier of je eigen muziek mensen langer vasthoudt (nu ${met.length} mét, ${zonder.length} zonder).</p>`;
@@ -806,27 +806,32 @@ function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="
   if(!s){s=document.createElement("span");s.className="badge";b.appendChild(s)}
   if(k&&k.nivo==="kapot"){s.textContent="!";s.title="Insta-koppeling is stuk: maak een nieuwe sleutel";return}   // gaat voor de wachtkamer
   s.textContent=n;s.title=igWachtTekst(igWachtend().length,igWachtStories().length)+" zonder muziek-keuze";}
+// Speciale muziek-keuzes (geen nummâh): "(geen)" = er zat iets anders onder, "(omgeving)" = geen muziek, alleen omgevingsgeluid (chat 25).
+// Beide tellen als "zonder eigen muziek"; "(eigen muziek)" = automatisch label (wél eigen muziek, nummâh onbekend).
+function igGeenEigen(l){return l==="(geen)"||l==="(omgeving)"}
+function igIsNummer(l){return !!l&&l!=="(geen)"&&l!=="(omgeving)"&&l!=="(eigen muziek)"}
+function igMuziekNaam(l){return l==="(geen)"?"Geen eigen muziek":l==="(omgeving)"?"Omgevingsgeluid":l}
 function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
-  return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option>`+
+  return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option><option value="(omgeving)">Geen muziek, alleen omgevingsgeluid</option>`+
     (recent.length?`<optgroup label="Laatst gekozen">${recent.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`:"")+
     `<optgroup label="Alle nummâhs (SoundCloud, Spotify, DJ·World, YouTube)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
 }
 function igMuziekSelect(m,opties,titels,aria){
-  return `<select class="igsel" aria-label="${aria}">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&m!=="(geen)"&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>`}
+  return `<select class="igsel" aria-label="${aria}">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&!igGeenEigen(m)&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>`}
 // eerste regel van een post-bijschrift (afgesproken 01-10): de eerste nie-lege regel, mét "Oh oh #thehague" erbij.
 // Te lang? Dan kapt de CSS hem af met "…". Zweef je erover (Mac), dan zie je het hele bijschrift (title).
 function igEersteRegel(t){return String(t||"").split(/\r?\n/).map(x=>x.trim()).find(x=>x)||""}
 function igPostRij(p,opties,titels){
   const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
-  const eff=m&&m!=="(geen)"&&m!=="(eigen muziek)"?igPlaysEffect(m,dagNL(p.gepost_om)):null;
+  const eff=igIsNummer(m)?igPlaysEffect(m,dagNL(p.gepost_om)):null;
   const effTxt=eff?igEffectHTML(eff):"";
   return `<div class="igpost" data-id="${esc(p.media_id)}">
       <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
       <div class="iginfo"><span><b>${dLabel(dagNL(p.gepost_om),1)}</b> · ${p.bereik==null?"nog geen cijfâhs":"bereik "+nf0.format(p.bereik)+(p.kwaliteit!=null?" · kwaliteit "+nf0.format(p.kwaliteit):"")}</span>
         <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span>
         <span class="igchips">${ond.map(o=>`<span class="chip mute">${esc(o)}</span>`).join("")}${effTxt}</span></div>
-      <select class="igsel" aria-label="Muziek onder deze post">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&m!=="(geen)"&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>
+      <select class="igsel" aria-label="Muziek onder deze post">${opties.replace(`value="${esc(m)}"`,`value="${esc(m)}" selected`)}${m&&!igGeenEigen(m)&&!titels.includes(m)?`<option value="${esc(m)}" selected>${esc(m)}</option>`:""}</select>
     </div>`;
 }
 function igStoryWachtRij(x,opties,titels){   // zelfde opmaak als een post in de wachtkamâh
@@ -844,7 +849,7 @@ function renderIgMuziek(){
   const wacht=igWachtend(),wachtSt=igWachtStories();
   $("igWacht").hidden=!wacht.length&&!wachtSt.length;
   if(wacht.length||wachtSt.length){
-    $("igWachtSub").innerHTML=`${igWachtTekst(wacht.length,wachtSt.length)} ${wacht.length+wachtSt.length>1?"wachten":"wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat; dan telt hij mee bij de vergelijking.`
+    $("igWachtSub").innerHTML=`${igWachtTekst(wacht.length,wachtSt.length)} ${wacht.length+wachtSt.length>1?"wachten":"wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat, of "Geen muziek, alleen omgevingsgeluid" als je alleen het geluid van buiten hoort; dan telt hij mee bij de vergelijking.`
       +(wachtSt.length?` Stories staan hier ${IG_WACHT_STORY_DAGEN} dagen.`:"");
     $("igWachtLijst").innerHTML=wacht.map(p=>igPostRij(p,opties,titels)).join("")+wachtSt.map(x=>igStoryWachtRij(x,opties,titels)).join("");
   }
@@ -869,7 +874,7 @@ async function igZetMuziek(id,nieuw){
                            :await sb.rpc("ig_label_zet",{p_media_id:id,p_soort:"muziek",p_label:oud,p_aan:false});
   if(error){showMsg("Opslaan lukte nie: "+error.message);renderIgMuziek();return}
   p.labels=data||[];
-  if(nieuw&&nieuw!=="(geen)"){const r=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>t!==nieuw);r.unshift(nieuw);store.set("hc_ig_nummers",JSON.stringify(r.slice(0,5)))}
+  if(nieuw&&!igGeenEigen(nieuw)){const r=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>t!==nieuw);r.unshift(nieuw);store.set("hc_ig_nummers",JSON.stringify(r.slice(0,5)))}
   renderInsta();
 }
 
