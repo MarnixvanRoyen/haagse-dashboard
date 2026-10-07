@@ -667,8 +667,9 @@ function kmStand(p){
     .sort((a,b)=>a.gepost_om<b.gepost_om?-1:1)
     .map(x=>({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,
       reden:min.has(x.media_id)?"zelf weggehaald":Date.parse(x.gepost_om)>eindTs?(p.gestopt_om&&deadline&&Math.abs(Date.parse(p.gestopt_om)-Date.parse(deadline))<2000?"na de deadline":p.gestopt_om?"na je afmelding":"na de deadline"):(plan.nie||"past nie bij de taak")}));
-  // verwijderd/gearchiveerd op Insta (22_verwijderde_posts.sql): telt nooit mee, ook nie als je hem zelf had toegevoegd. Wel tonen, met de reden.
-  (IG.weg||[]).filter(x=>x.gepost_om&&(plus.has(x.media_id)||dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=Math.min(Date.now(),eindTs+7*864e5)))
+  // verwijderd/gearchiveerd op Insta (22_verwijderde_posts.sql): telt nooit mee en staat ook nie in "Nie meegeteld" (chat 24).
+  // Uitzondering: had je hem zelf toegevoegd, dan blijft hij zichtbaar, zodat je ziet waarom je teller lager is.
+  (IG.weg||[]).filter(x=>x.gepost_om&&plus.has(x.media_id))
     .forEach(x=>nietMee.push({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,weg:true,
       reden:igWegReden(x)+(plus.has(x.media_id)?" · was zelf toegevoegd":"")}));
   nietMee.sort((a,b)=>a.ts<b.ts?-1:1);
