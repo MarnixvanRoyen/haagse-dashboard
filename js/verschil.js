@@ -137,7 +137,10 @@ async function scBlok(sc){
   const gelijk=vsGelijkHTML("sc");
   if(sc.length<2)return `<div class="card">${kop}${gelijk}<p class="note">Nulmeting staat klaar: <b>${esc(vsNaam(sc[0]))}</b> (${vsEur(+sc[0].samenvatting.usd||0)}, t/m ${sc[0].samenvatting.laatste_maand?mLabel(sc[0].samenvatting.laatste_maand,1):"—"}). Upload nu je nieuwe CSV met de knop <b>SoundCloud-CSV</b> bovenaan; dan zie je hier meteen wat er veranderd is.</p></div>`;
   const iN=sc[sc.length-1],iO=sc[sc.length-2];   // lijst staat op volgorde van uploaden (oud → nieuw)
-  const [dN,dO]=await Promise.all([impData(iN.id),impData(iO.id)]);
+  let [dN,dO]=await Promise.all([impData(iN.id),impData(iO.id)]);
+  // artiestfilter (10-10, chat 05.2): elke regel heeft de artiest (r[2]) → alleen die artiest vergelijken
+  const A=state.artist&&state.artist!=="all"?state.artist:null;
+  if(A){const f=r=>normArtist(r[2])===A;dN=dN.filter(f);dO=dO.filter(f)}
   const v=scVergelijk(dO,dN),dUsd=v.nu.usd-v.was.usd,dU=v.nu.u-v.was.u;
   const nieuwM=v.nieuweMaanden,corr=v.correcties.reduce((a,m)=>a+m.dUsd,0);
   const tegels=[
@@ -166,7 +169,8 @@ async function scBlok(sc){
     `</tbody><tfoot><tr><td>Totaal</td><td class="n">${nf0.format(v.was.u)}</td><td class="n">${nf0.format(v.nu.u)}</td><td class="n">${vsPlusN(dU)}</td><td class="n">${vsEur(v.was.usd)}</td><td class="n">${vsEur(v.nu.usd)}</td><td class="n">${vsPlusEur(dUsd)}</td></tr></tfoot>`;
   const nNr=v.nummer.filter(r=>Math.abs(r.dUsd)>=0.005||r.dU!==0).length,nMd=v.maanden.filter(m=>Math.abs(m.dUsd)>=0.005||m.dU!==0).length;
   const check=vsCheckHTML(iN,iO,nNr+nMd,`${nNr} nummâh${nNr===1?"":"s"} en ${nMd} maand${nMd===1?"":"en"} veranderd`);
-  return `<div class="card">${kop}${gelijk}${check}<div class="ytstats">${tegels}</div></div>
+  const alleen=A?`<p class="note">Alleen <b>${esc(A)}</b> (filter Artiest hierboven). Zet het filter op Alle artiesten voor alles samen.</p>`:"";
+  return `<div class="card">${kop}${alleen}${gelijk}${check}<div class="ytstats">${tegels}</div></div>
   <div class="grid2">
     <div class="card"><h2>Wat valt op?</h2><p class="sub">Automatisch uitgerekend uit de twee uploads</p><ul class="vslijst">${ins}</ul></div>
     <div class="card"><div class="cardhead"><div><h2>Per maand</h2><p class="sub">Luistermaanden, laatste 12. Geel = erbè gekomen in de nieuwe upload.</p></div>
@@ -203,7 +207,8 @@ async function lbBlok(lb){
       <td class="n ${vsKlasse(n.dS)}">${vsPlusN(n.dS)}</td><td class="n ${vsKlasse(n.dD)}">${vsPlusN(n.dD)}</td><td class="n ${vsKlasse(n.dN)}">${pm(n.dN)}</td></tr>`}).join("")+"</tbody>":`<tbody><tr><td class="sub">Geen nummers veranderd.</td></tr></tbody>`;
   const check=vsCheckHTML(iN,iO,per.length+nrs.length+(uN!==uO||sN!==sO?1:0),
     `${per.length} periode${per.length===1?"":"s"} en ${nrs.length} nummâh${nrs.length===1?"":"s"} veranderd${uN!==uO||sN!==sO?", saldo ook":""}`);
-  return `<div class="card">${kop}${vsGelijkHTML("label")}${check}<div class="ytstats">${tegels}</div></div>
+  const nietPer=state.artist&&state.artist!=="all"?`<p class="note" style="background:var(--warn-soft)"><b>Let op:</b> DJ·World geeft het geld alleen per periode voor al je nummers samen, dus hier staat <b>alles</b>, nie alleen ${esc(state.artist)}.</p>`:"";
+  return `<div class="card">${kop}${nietPer}${vsGelijkHTML("label")}${check}<div class="ytstats">${tegels}</div></div>
   <div class="grid2 pc"><div class="card"><h2>Periodes</h2><p class="sub">Nieuw of veranderd (bedrag of status)</p><div class="tablewrap"><table>${perT}</table></div></div>
   <div class="card"><h2>Nummâhs</h2><p class="sub">Streams, downloads en netto erbè per nummer</p><div class="tablewrap"><table>${nrT}</table></div></div></div>`;
 }
