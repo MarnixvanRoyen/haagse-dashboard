@@ -760,18 +760,19 @@ function renderSCLive(){
 /* ---------- Artiestfilter op YouTube, SoundCloud live en Spotify (10-10, chat 05.2) ----------
    Is bij "Artiest" iemand gekozen, dan tekenen deze tabbladen met alleen de nummers van die artiest.
    Dat gebeurt hier op één plek: tijdens het tekenen staan YT/SCL/SP tijdelijk op de gefilterde lijst
-   (dezelfde vorm), daarna meteen weer terug. Ovâhzicht en de andere onderdelen zien altijd alles. */
+   (dezelfde vorm), net als de SoundCloud-afrekening SC, daarna meteen weer terug. Ovâhzicht en de andere onderdelen zien altijd alles. */
 function metArtiest(fn){return function(...args){
   const A=state.artist;if(!A||A==="all")return fn.apply(this,args);
-  const oud={YT,SCL,SP};
+  const oud={YT,SCL,SP,SC};
   try{
+    SC=SC.filter(r=>r.artist===A);   // SoundCloud-afrekening (o.a. kaart YouTube vs. SoundCloud-afrekening) ook alleen deze artiest (10-10)
     const vid=new Set(YT.videos.filter(v=>ytArtiest(v.channel_id)===A).map(v=>v.video_id));
     YT={...YT,videos:YT.videos.filter(v=>vid.has(v.video_id)),snaps:YT.snaps.filter(s=>vid.has(s.video_id))};
     const tid=new Set(SCL.tracks.filter(x=>scArtiest(x)===A).map(x=>x.track_id));
     SCL={...SCL,tracks:SCL.tracks.filter(x=>tid.has(x.track_id)),snaps:SCL.snaps.filter(s=>tid.has(s.track_id))};
     const raw=(SP.raw||[]).filter(r=>r.artist===A);SP={...SP,raw,snaps:spBouw(raw)};
     return fn.apply(this,args);
-  }finally{YT=oud.YT;SCL=oud.SCL;SP=oud.SP}
+  }finally{YT=oud.YT;SCL=oud.SCL;SP=oud.SP;SC=oud.SC}
 }}
 
 /* ---------- Spotify (CSV-export uit Spotify for Artists) ---------- */
