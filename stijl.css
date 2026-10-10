@@ -372,6 +372,13 @@ footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
 .kmkies select{flex:1 1 200px;width:100%;min-width:0;max-width:100%;text-overflow:ellipsis;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:13px;font-weight:500}
 .kmuit{color:var(--muted);font-size:12px}
 .kbezet{background:var(--warn-soft);border-radius:10px;padding:7px 10px}
+/* Kansâh: zuiver meten (chat 30) — cijfers per challenge-post, volgâhs-regel, tip-kaarten */
+.kmcijf-tab .ktab td.n{vertical-align:top;line-height:1.3}
+.kmcijf-tab .ktab td.n .sub{font-size:11px;font-weight:400}
+.kmcijf-tab .ktab tr.hoofd td{background:var(--warn-soft)}
+.kmvolg{margin:0;font-size:14px}
+.kmpartner{font-size:13px}
+.ktip{background:var(--warn-soft);border-radius:10px;padding:7px 10px}
 .kknop .btn:disabled{opacity:.45;cursor:not-allowed}.kmnie .chip{font-size:11px}
 .kmnie li,.kmnie .chip{overflow-wrap:anywhere;white-space:normal}   /* lange redenen (bijv. verwijderd op Insta) netjes afbreken op de telefoon */
 .kmleeg{margin:0}

@@ -9,6 +9,8 @@
 //   Bij elk openen bewaart de app per lopende poging de meetwaarde van vandaag (kans_meting).
 //   Is rapport_op voorbij, dan rekent de app het rapport uit (kansRapportMaak) en bewaart het in kans_poging.rapport.
 //   Nieuw rapport = pop-up bij openen + melding op Ovâhzicht + badge op Kansâh, tot je het gelezen hebt (gelezen_om).
+// Sinds 10-10 (chat 30): het rapport meet ALLEEN wat de challenge zelf deed (zie "het rapport (v3)" hieronder); geen account-totalen.
+//   Kansen die nie zuiver te meten zijn, zijn een tip zonder Mee bezig. Oude rapporten (v1/v2) worden 1x opnieuw uitgerekend.
 // kans_status (10_kansen.sql) wordt alleen nog gebruikt voor "Nie voor mij" (verborgen).
 // Zonder de tabellen (SQL nog nie gedraaid) bewaart de app alles tijdelijk in deze browser (localStorage).
 
@@ -206,7 +208,7 @@ function kansenInsta(){
     out.push({id:"insta-onderwerp-"+best.naam,stil:best.naam!==topNaam,bron:"insta",impact:Math.min(70,35+((best.idx||1)-1)*100),n:best.n,
       big:best.idx?(best.idx>=1?"+":"−")+nf0.format(Math.abs(best.idx-1)*100)+"%":"?",h:`bereik bij posts over <b>${esc(best.naam)}</b>`,
       p:`${best.n} posts, middelste bereik ${nf0.format(best.med||0)}. De laatste 30 dagen postte je er ${recent} over.`,
-      a:`<b>Doe:</b> plan deze week 2 posts over ${esc(best.naam)}${best.kw!=null?` (ze worden ook ${best.kw>=(igWatWerkt("soort").alleKw||0)?"vaak":"soms"} gedeeld/bewaard)`:""}.`,
+      a:`<b>Doe:</b> plan deze week 2 posts over ${esc(best.naam)}${best.kw!=null?` (ze worden ook ${best.kw>=(igWatWerkt("soort").alleKw||0)?"vaak":"soms"} gedeeld/bewaard)`:""}. Doe er minstens 1 <b>zónder partner</b>: dan zie je wat het onderwerp zelf doet (met partner haal je sowieso meer bereik).`,
       meet:{naam:`posts over ${best.naam} in 30 dagen`,waarde:recent,beter:"hoger"}})});
   const slecht=[...on].sort((a,b)=>a.idx-b.idx)[0];
   if(slecht&&slecht!==best&&slecht.idx<=0.8&&slecht.n>=10)out.push({id:"insta-onderwerp-minder-"+slecht.naam,bron:"insta",impact:20,n:slecht.n,
@@ -270,9 +272,16 @@ function kansenInsta(){
   // 8. stories: waar haken ze af?
   const perDag=new Map();IG.stories.forEach(s=>{if(!s.cijfers||s.cijfers.reach==null)return;const d=dagNL(s.gepost_om);if(!perDag.has(d))perDag.set(d,[]);perDag.get(d).push(s)});
   const reeks=[...perDag.values()].filter(r=>r.length>=3);
-  if(reeks.length>=2){const behoud=reeks.map(r=>{r.sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);return r[r.length-1].cijfers.reach/r[0].cijfers.reach});const b=kMed(behoud);
-    if(b<0.6)out.push({id:"insta-stories-afhaken",bron:"insta",impact:25,n:reeks.length*3,big:pct(1-b),h:"van de kijkers is weg voor je laatste story van de dag",
-      p:`Gemeten over ${reeks.length} dagen met 3 of meer stories.`,a:"<b>Doe:</b> zet je belangrijkste story (bijvoorbeeld de Sneek-link) als eerste of tweede, niet als laatste."})}
+  // chat 30: eigen meetcijfer = % kijkers vastgehouden (laatste ÷ eerste story van de dag), alleen dagen met 3+ stories van de laatste 7 dagen;
+  // een challenge alleen als er de laatste 30 dagen genoeg van zulke dagen waren (anders valt er in 7 dagen nix te meten → tip)
+  const behoudVan=r=>{r.sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);return r[0].cijfers.reach?r[r.length-1].cijfers.reach/r[0].cijfers.reach:null};
+  if(reeks.length>=2){const behoud=reeks.map(behoudVan).filter(v=>v!=null);const b=kMed(behoud);
+    const recent=d=>reeks.filter(r=>Date.parse(r[0].gepost_om)>Date.now()-d*864e5);
+    const week=recent(7).map(behoudVan).filter(v=>v!=null),genoeg=recent(30).length>=4;
+    if(b!=null&&(b<0.6||kVolgt("insta-stories-afhaken")))out.push({id:"insta-stories-afhaken",stil:!(b<0.6),bron:"insta",impact:25,n:reeks.length*3,big:pct(1-b),h:"van de kijkers is weg voor je laatste story van de dag",
+      p:`Gemeten over ${reeks.length} dagen met 3 of meer stories.`,a:"<b>Doe:</b> zet je belangrijkste story (bijvoorbeeld de Sneek-link) als eerste of tweede, niet als laatste.",
+      tip:!genoeg,tipReden:`maar ${recent(30).length} dagen met 3 of meer stories in de laatste 30 dagen; minstens 4 nodig om het te meten`,
+      meet:week.length?{naam:"% kijkers vastgehouden (dagen met 3+ stories, 7 d)",waarde:Math.round(kMed(week)*100),beter:"hoger"}:null})}
   return out;
 }
 
@@ -329,6 +338,7 @@ function kansenAlle(d){
   const gezien=new Set();
   return lijst.filter(k=>{k.id=kSlug(k.id);if(gezien.has(k.id))return false;gezien.add(k.id);return true}).map(k=>{
     k.zeker=k.n>=10?1:k.n>=5?0.7:0.4;k.score=k.impact*k.zeker;k.dagen=kansDagen(k.id);
+    k.soort=kSoort(k.id);if(k.soort==="tip"){k.tip=true;k.tipReden=k.tipReden||"gaat over je hele account of de cijfâhs komen maanden later"}   // chat 30: nie zuiver te meten → geen challenge
     k.bezig=kBezig(k.id);k.wacht=kWacht(k.id);k.vorige=kVorige(k.id);k.verborgen=kVerborgen(k.id);
     if(k.meet&&!isFinite(k.meet.waarde))k.meet=null;
     return k}).sort((a,b)=>b.score-a.score);
@@ -385,13 +395,14 @@ function kVorigeRegel(p){const O=KANS_OORDEEL[p.rapport.oordeel]||KANS_OORDEEL.o
 function kansKaart(k){
   const rap=dKort(kDag(vandaagAms(),k.dagen));
   return `<article class="ins kans${k.verborgen?" k-verborgen":""}" data-kans="${esc(k.id)}">
-    <div class="kkop">${bronChip(k.bron)}${kansGrootte(k)}${kansZeker(k)}</div>
+    <div class="kkop">${bronChip(k.bron)}${k.tip?'<span class="chip mute">tip</span>':kansGrootte(k)+kansZeker(k)}</div>
     <span class="big">${k.big}</span><h3>${k.h}</h3><p>${k.p}</p><div class="act">${k.a}</div>
     ${k.trend?`<div class="kvoort">Trend: ${k.trend}</div>`:""}${k.vorige?kVorigeRegel(k.vorige):""}
-    ${kmPlan(k.id)?kmOpenRegel(k):`<div class="kloopt">Looptijd <b>${k.dagen} dagen</b>: begin je nu, dan krijg je op ${rap} een rapport.</div>`}
-    ${(b=>b?`<div class="kloopt kbezet">Je bent al bezig met een ${BRON[k.bron][0]}-challenge: <b>${esc(kTekst(b.kop)).slice(0,70)}</b>. Meld die eerst af (Gedaan of Gestopt), dan kun je deze starten. Waarom: 1 challenge per onderdeel tegelijk, zodat je weet waar een effect vandaan komt.</div>`:"")(kBezigBron(k.bron))}
+    ${k.tip?`<div class="kloopt ktip"><b>Tip</b>, geen challenge: nie apart te meten (${esc(k.tipReden)}). Goed om te weten, maar het dashboard kan nie zuiver laten zien wat het oplevert.</div>`
+      :kmPlan(k.id)?kmOpenRegel(k):`<div class="kloopt">Looptijd <b>${k.dagen} dagen</b>: begin je nu, dan krijg je op ${rap} een rapport.</div>`}
+    ${(b=>b&&!k.tip?`<div class="kloopt kbezet">Je bent al bezig met een ${BRON[k.bron][0]}-challenge: <b>${esc(kTekst(b.kop)).slice(0,70)}</b>. Meld die eerst af (Gedaan of Gestopt), dan kun je deze starten. Waarom: 1 challenge per onderdeel tegelijk, zodat je weet waar een effect vandaan komt.</div>`:"")(kBezigBron(k.bron))}
     <div class="kknop">
-      <button class="btn" type="button" data-kz="start"${kBezigBron(k.bron)?" disabled":""}>Mee bezig</button>
+      ${k.tip?"":`<button class="btn" type="button" data-kz="start"${kBezigBron(k.bron)?" disabled":""}>Mee bezig</button>`}
       <button class="btn kweg" type="button" data-kz="verborgen">${k.verborgen?"Toch tonen":"Nie voor mij"}</button></div>
   </article>`;
 }
@@ -431,57 +442,71 @@ function kansNuHTML(alle,bron){
   return h;
 }
 
-/* ---------- het rapport ----------
-   Periode "mee bezig" = de looptijd vanaf de dag van "Mee bezig"; vergeleken met even veel dagen ervóór.
-   Oordeel: eerst het doel-cijfer van de kans (start → einde looptijd); heeft de kans er geen, dan het eerste
-   uitkomst-cijfer van dat onderdeel (Insta: netto volgâhs per dag, Muziek: SoundCloud-plays per dag, Sneek: bezoekâhs per dag).
-   Minder dan 10% verschil = geen duidelijk effect. */
+/* ---------- het rapport (v3, chat 30: zuiver meten) ----------
+   Afspraak 10-10 (chat 30): het rapport laat ALLEEN zien wat de challenge zelf deed. Geen account-totalen meer
+   (die lopen door alle andere posts/bronnen heen), geen vergelijking "even lang ervóór" van je hele account.
+   Per soort kans (kSoort):
+   - "plan"     taak met meetplan (Insta-posts): elke taak-post tegen je normaal van dezelfde soort post én dezelfde
+                situatie (met/zonder partner), op een vaste set cijfers; oordeel alleen op het hoofdcijfer van de kans.
+   - "inricht"  meting instellen (Sneek bio-link, story-links): gelukt als er sinds de start iets binnenkomt via die link.
+   - "storylink" Sneek-story's: je nieuwe story-links tegen je normale story-link van vóór de start.
+   - "site"     iets aan het spel zelf (speelratio, delen): dat geldt voor élke bezoekâh, dus de hele site in de
+                looptijd tegen even lang ervóór is hier wél zuiver.
+   - "meet"     de rest: het doel-cijfer van de kans zelf (één nummâh, de eigen labels, ...), start → einde.
+   - "tip"      nie zuiver te meten (account-breed of maanden vertraagd): geen Mee bezig, alleen een tip. */
 const KANS_OORDEEL={
-  werkte:{t:"Werkte ✓",c:"good"},deels:{t:"Deels",c:"warn"},geen:{t:"Geen duidelijk effect",c:"mute"},
-  slechter:{t:"Ging achteruit",c:"niks"},onbekend:{t:"Te weinig data",c:"mute"}};
+  werkte:{t:"Werkte ✓",c:"good"},wisselend:{t:"Wisselend",c:"warn"},gelukt:{t:"Gelukt ✓",c:"good"},deels:{t:"Deels",c:"warn"},
+  geen:{t:"Geen duidelijk effect",c:"mute"},slechter:{t:"Ging achteruit",c:"niks"},onbekend:{t:"Te weinig data",c:"mute"}};
+const KANS_RAPPORT_V=3;
+const KANS_TIP=["muziek-land","muziek-label-vs-sc","muziek-downloads","muziek-spotify-ontbreekt","muziek-abonnees","muziek-top3","muziek-te-boeken"];
+const KANS_INRICHT=["sneek-bio-link","sneek-story-links"];
+const KANS_STORYLINK=["sneek-beste-story","sneek-insta-zakt"];
+const KANS_SITE=["sneek-speel-ratio","sneek-delen"];
+const kBegint=(l,id)=>l.some(t=>id===t||String(id).startsWith(t+"-"));
+function kSoort(id){return kmPlan(id)?"plan":kBegint(KANS_INRICHT,id)?"inricht":kBegint(KANS_STORYLINK,id)?"storylink":kBegint(KANS_SITE,id)?"site":kBegint(KANS_TIP,id)?"tip":"meet"}
 function kVenster(p){const L=p.looptijd_dagen,s=dagNL(p.gestart_om);return {L,van:s,tot:kDag(s,L-1),vvan:kDag(s,-L),vtot:kDag(s,-1)}}
 // stand van alle nummers/video's samen op dag d (laatste meting t/m d per nummer)
 function kStand(snaps,idv,veld,d){const per=new Map();
   (snaps||[]).forEach(s=>{if(s.snap_date>d||s[veld]==null)return;const o=per.get(s[idv]);if(!o||s.snap_date>o.d)per.set(s[idv],{d:s.snap_date,v:+s[veld]})});
   if(!per.size)return null;let t=0,dag="";per.forEach(o=>{t+=o.v;if(o.d>dag)dag=o.d});return {t,dag}}
-function kUitkomsten(bron,v){
-  const min=Math.max(2,Math.ceil(v.L/2)),u=[];
-  const per=(naam,f,beter="hoger",fmt="1")=>{let voor=null,na=null;try{voor=f(v.vvan,v.vtot);na=f(v.van,v.tot)}catch(e){}
-    u.push({naam,voor:voor!=null&&isFinite(voor)?voor:null,na:na!=null&&isFinite(na)?na:null,beter,fmt})};
-  if(bron==="insta"&&!IG.err&&IG.dag.length){
-    const rij=(a,b)=>IG.dag.filter(r=>r.dag>=a&&r.dag<=b);
-    const gem=(a,b,g)=>{const x=rij(a,b).map(g).filter(y=>y!=null&&isFinite(y));return x.length>=min?x.reduce((s,y)=>s+y,0)/x.length:null};
-    per("Netto nieuwe volgâhs per dag",(a,b)=>gem(a,b,r=>r.c.follows!=null?r.c.follows-(r.c.unfollows||0):null));
-    per("Bereik per dag",(a,b)=>gem(a,b,r=>r.c.reach),"hoger","0");
-    per("Volgâhs per 1.000 nieuwe mensen",(a,b)=>igPer1kNieuw(a,b,min));
-    per("Gedeeld + bewaard per 1.000 bereik",(a,b)=>{const x=rij(a,b).filter(r=>r.c.reach);return x.length>=min?x.reduce((s,r)=>s+(r.c.shares||0)+(r.c.saves||0),0)*1000/x.reduce((s,r)=>s+r.c.reach,0):null});
-    per("Posts gemaakt",(a,b)=>IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=a&&dagNL(p.gepost_om)<=b).length,null,"0");
-  }
-  if(bron==="muziek"){
-    // nummers die pas ná de start in de meting kwamen maar al eerder uitkwamen (bijv. Beuk-kanalen 10-10) tellen nie mee (chat 05.2)
-    const zonderLaatkomers=(snaps,idv,start)=>{const eerst=new Map();snaps.forEach(s=>{const d=eerst.get(s[idv]);if(!d||s.snap_date<d)eerst.set(s[idv],s.snap_date)});
-      return snaps.filter(s=>{const d=eerst.get(s[idv]);return d<=start||nieuwTeltMee(idv,s[idv],start)})};
-    const groei=(snaps0,idv,veld)=>(a,b)=>{const snaps=zonderLaatkomers(snaps0,idv,kDag(a,-1));const x=kStand(snaps,idv,veld,kDag(a,-1)),y=kStand(snaps,idv,veld,b);
-      if(!x||!y||x.dag<kDag(a,-4)||y.dag<kDag(b,-3)||y.dag<=x.dag)return null;return (y.t-x.t)/kDagen(x.dag,y.dag)};
-    if(!SCL.err&&SCL.snaps.length)per("SoundCloud-plays erbij per dag",groei(SCL.snaps,"track_id","plays"));
-    if(!YT.err&&YT.snaps.length)per("YouTube-weergaven erbij per dag",groei(YT.snaps,"video_id","views"));
-  }
-  if(bron==="sneek"){
-    const gc=(a,b)=>{const dagen=new Set(),s={b:0,p:0};GC.dag.forEach(r=>{const d=String(r.dag).slice(0,10);if(d<a||d>b)return;dagen.add(d);const n=+r.aantal||0;
-      if(!r.event)s.b+=n;else if(r.pad==="potje-gestart")s.p+=n});return dagen.size>=min?{...s,n:dagen.size}:null};
-    if(!GC.err&&GC.dag.length){
-      per("Bezoekâhs per dag",(a,b)=>{const s=gc(a,b);return s?s.b/s.n:null});
-      per("Bezoekâhs via Insta/Facebook per dag",(a,b)=>{const s=gc(a,b);if(!s)return null;
-        return (GC.bronnen||[]).filter(r=>{const d=String(r.dag).slice(0,10);return d>=a&&d<=b&&igBronGroep(r.bron)!=="rest"}).reduce((t,r)=>t+(+r.aantal||0),0)/s.n});
-      per("% dat een potje speelt",(a,b)=>{const s=gc(a,b);return s&&s.b?Math.min(1,s.p/s.b)*100:null},"hoger","pct");
-    }
-    if(!SNEEK.err)per("Nieuwe spelâhs per dag",(a,b)=>SNEEK.rows.filter(x=>{const d=dagNL(x.eerst);return d>=a&&d<=b}).length/(kDagen(a,b)+1));
-  }
-  return u;
+const kTot=v=>v.tot<vandaagAms()?v.tot:vandaagAms();   // nooit verder dan vandaag
+// Sneek: bezoek via je bio-link of je story-links (?ref=…) sinds de start (GoatCounter telt ?ref= als bron)
+function kInricht(p,v){
+  const tot=kTot(v),bio=p.sleutel==="sneek-bio-link",per=new Map(),dagen=new Set();
+  (GC.bronnen||[]).forEach(r=>{const d=String(r.dag).slice(0,10);if(d<v.van||d>tot)return;const k=String(r.bron).toLowerCase();
+    if(bio?k!=="bio":!/^story-/.test(k))return;per.set(k,(per.get(k)||0)+(+r.aantal||0));dagen.add(d)});
+  const n=[...per.values()].reduce((a,x)=>a+x,0),L=kDagen(v.van,tot)+1;
+  return {soort:"inricht",naam:bio?"bezoekâhs via je bio-link (?ref=bio)":"bezoekâhs via je story-links (?ref=story-…)",n,dagen:L,perDag:n/Math.max(1,L),
+    links:bio?[]:[...per].sort((a,b)=>b[1]-a[1]).map(([k,x])=>({k,n:x}))};
+}
+// Sneek: je nieuwe story-links (eerst gezien in de looptijd) tegen de middelste story-link van vóór de start
+function kStoryLinks(p,v){
+  const tot=kTot(v),per=new Map();
+  (GC.bronnen||[]).forEach(r=>{const k=String(r.bron).toLowerCase();if(!/^story-/.test(k))return;const d=String(r.dag).slice(0,10);
+    const x=per.get(k)||{k,n:0,eerst:d};x.n+=+r.aantal||0;if(d<x.eerst)x.eerst=d;per.set(k,x)});
+  const alle=[...per.values()],nieuw=alle.filter(x=>x.eerst>=v.van&&x.eerst<=tot).sort((a,b)=>b.n-a.n),oud=alle.filter(x=>x.eerst<v.van);
+  const normaal=oud.length>=3?kMed(oud.map(x=>x.n)):null,E=nieuw.length&&normaal?kMed(nieuw.map(x=>x.n/normaal)):null;
+  return {soort:"storylink",nieuw:nieuw.map(x=>({...x,x:normaal?x.n/normaal:null})),normaal,normaalN:oud.length,E};
+}
+// Sneek: verandering in het spel zelf → de hele site in de looptijd vs even lang ervóór
+function kSitePeriode(p,v){
+  const min=Math.max(2,Math.ceil(v.L/2)),tot=kTot(v);
+  const tel=(a,b)=>{const dagen=new Set(),s={b:0,p:0,g:0};(GC.dag||[]).forEach(r=>{const d=String(r.dag).slice(0,10);if(d<a||d>b)return;dagen.add(d);const n=+r.aantal||0;
+    if(!r.event)s.b+=n;else if(r.pad==="potje-gestart")s.p+=n;else if(r.pad==="score-gedeeld")s.g+=n});return dagen.size>=min?{...s,n:dagen.size}:null};
+  const delen=p.sleutel.startsWith("sneek-delen");
+  const maat=s=>!s?null:delen?(s.p?Math.min(1,s.g/s.p)*100:null):(s.b?Math.min(1,s.p/s.b)*100:null);
+  const voor=tel(v.vvan,v.vtot),na=tel(v.van,tot);
+  return {soort:"site",naam:delen?"% van de spelâhs dat z'n scoâh deelt":"% van de bezoekâhs dat een potje speelt",voor:maat(voor),na:maat(na),
+    nVoor:voor&&(delen?voor.p:voor.b),nNa:na&&(delen?na.p:na.b)};
+}
+// overlap die er wél toe doet: twee challenges die hetzelfde meten (Insta → plays en een muziek-challenge)
+function kOverlap(p,v){
+  const raakt=(a,b)=>(a==="insta-naar-plays"&&/^muziek-(sc|spotify)/.test(b))||(b==="insta-naar-plays"&&/^muziek-(sc|spotify)/.test(a));
+  return KP.rijen.filter(q=>q!==p&&q.id!==p.id&&raakt(p.sleutel,q.sleutel)&&dagNL(q.gestart_om)<=v.tot&&dagNL(q.rapport_op)>=v.van).map(q=>kTekst(q.kop).slice(0,70));
 }
 function kansRapportMaak(p){
   if(kmPlan(p.sleutel)){const st=kmStand(p);if(st)return kmRapportMaak(p,st)}
-  const v=kVenster(p),rapDag=dagNL(p.rapport_op),start=v.van;
+  const v=kVenster(p),rapDag=dagNL(p.rapport_op),start=v.van,soort=kSoort(p.sleutel);
   const m=[...(KP.met.get(p.id)||new Map())].sort((a,b)=>a[0]<b[0]?-1:1);
   let meet=null;
   if(p.meet_naam){
@@ -491,29 +516,29 @@ function kansRapportMaak(p){
     meet={naam:p.meet_naam,beter:p.meet_beter||"hoger",fmt:p.meet_fmt||null,start:st,eind:e?e[1]:null,eind_dag:e?e[0]:null,
       reeks:m.filter(([d])=>d<=(e?e[0]:rapDag)).slice(-60)};
   }
-  const uitkomsten=kUitkomsten(p.bron,v);
+  let oordeel="onbekend",grond=soort,extra=null;
   const rm=meet?kRicht(meet.start,meet.eind,meet.beter):null;
-  const hoofd=uitkomsten.find(x=>x.beter&&x.voor!=null&&x.na!=null)||null;
-  const ru=hoofd?kRicht(hoofd.voor,hoofd.na,hoofd.beter):null;
-  let oordeel="onbekend",grond=null;
-  if(rm!=null){grond="meet";oordeel=rm>=0.1?(ru!=null&&ru<=-0.1?"deels":"werkte"):rm<=-0.1?"slechter":"geen"}
-  else if(ru!=null){grond="uitkomst";oordeel=ru>=0.1?"werkte":ru<=-0.1?"slechter":"geen"}
+  const vanR=r=>r==null?"onbekend":r>=0.1?"werkte":r<=-0.1?"slechter":"geen";
+  if(soort==="inricht"){extra=kInricht(p,v);oordeel=extra.n>0?"gelukt":"onbekend"}
+  else if(soort==="storylink"){extra=kStoryLinks(p,v);oordeel=extra.E==null?"onbekend":extra.E>=1.1?"werkte":extra.E<=0.9?"slechter":"geen"}
+  else if(soort==="site"){extra=kSitePeriode(p,v);oordeel=vanR(kRicht(extra.voor,extra.na,"hoger"))}
+  else if(soort==="meet"||soort==="plan"){grond="meet";oordeel=vanR(rm)}
+  else grond="tip";
   let nummers=null;const ms=/^muziek-sc-(momentum|nieuw)-(.+)$/.exec(p.sleutel);
   if(ms){const ids=[(SCL.tracks.find(x=>kSlug(String(x.track_id))===ms[2])||{}).track_id,...(kpExtra(p).nummers||[])].filter(Boolean);
     nummers=ids.map(id=>{const t=SCL.tracks.find(x=>x.track_id===id),a=kStand(SCL.snaps.filter(x=>x.track_id===id),"track_id","plays",kDag(v.van,-1)),b=kStand(SCL.snaps.filter(x=>x.track_id===id),"track_id","plays",v.tot);
       return {titel:t?t.title:id,erbij:a&&b?b.t-a.t:null,handmatig:id!==ids[0]}})}
-  return {v:1,oordeel,grond,hoofd:hoofd?hoofd.naam:null,nummers,
-    periode:{van:v.van,tot:v.tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:v.L},meet,uitkomsten,gemaakt:new Date().toISOString()};
+  return {v:KANS_RAPPORT_V,oordeel,grond,soort,extra,nummers,overlap:kOverlap(p,v),
+    periode:{van:v.van,tot:v.tot,dagen:v.L},meet,gemaakt:new Date().toISOString()};
 }
-// rapport voor een taak met meetplan: de taak-posts t.o.v. je normaal en t.o.v. de verwachting, plus je account in die periode
+// rapport voor een taak met meetplan: alleen de taak-posts, elk tegen het normaal van z'n eigen soort + situatie
 function kmRapportMaak(p,st){
   const o=kmOordeel(st),van=dagNL(p.gestart_om),tot=dagNL(p.rapport_op),L=Math.max(1,kDagen(van,tot)+1);
-  const v={L,van,tot,vvan:kDag(van,-L),vtot:kDag(van,-1)};
-  const uitkomsten=kUitkomsten(p.bron,v);
-  return {v:2,oordeel:o.oordeel,verw:o.verw,grond:"plan",hoofd:null,
-    plan:{maat:st.maat,wat:st.plan.wat,deadline:st.deadline,doenAantal:st.doenAantal||null,factor:st.factor,factorBron:st.factorBron,alleMed:st.alleMed,E:st.E,curveBron:st.curveBron,klaarNaFeed:st.klaarNaFeed,klaarNaReel:st.klaarNaReel,taakStart:p.gestart_om,
+  return {v:KANS_RAPPORT_V,oordeel:o.oordeel,verw:o.verw,grond:"plan",soort:"plan",
+    plan:{maat:st.maat,wat:st.plan.wat,deadline:st.deadline,doenAantal:st.doenAantal||null,factor:st.factor,factorBron:st.factorBron,alleMed:st.alleMed,E:st.E,
+      curveBron:st.curveBron,klaarNaFeed:st.klaarNaFeed,klaarNaReel:st.klaarNaReel,taakStart:p.gestart_om,volg:st.volg,partnerSamen:st.partnerSamen,boven:st.boven,
       taak:st.taak.map(r=>({...r,plaatje:null,bijschrift:kEersteRegel(r.bijschrift)})),nietMee:(st.nietMee||[]).map(x=>({...x,bijschrift:kEersteRegel(x.bijschrift)}))},
-    periode:{van,tot,voor_van:v.vvan,voor_tot:v.vtot,dagen:L},meet:null,uitkomsten,gemaakt:new Date().toISOString()};
+    periode:{van,tot,dagen:L},meet:null,overlap:kOverlap(p,{van,tot}),gemaakt:new Date().toISOString()};
 }
 // bewaard rapport weer als "stand" tekenen (zelfde HTML als tijdens de meting)
 function kmUitRapport(r){const P=r.plan;return {...P,M:KM_MAAT[P.maat],plan:{wat:P.wat},taak:P.taak.map(t=>({...t,plaatje:(IG.posts.find(x=>x.media_id===t.id)||{}).plaatje||null}))}}
@@ -535,53 +560,67 @@ function kSpark(reeks){
 function kOordeelUitleg(r,p){
   if(r.plan){const P=r.plan,M=KM_MAAT[P.maat],n=P.taak.length,w=esc(P.wat);
     if(!n)return `Geen ${w} gevonden tussen de start en het afmelden, dus nix te meten. Werd je post nie herkend? Label hem in de Insta-tab.`;
-    const xs=`${n===1?"Je post deed":`Je ${n} ${w} deden (middelste)`} <b>${kX(P.E||0)}</b> je normaal (${M.naam})`;
+    const xs=`${n===1?"Je post deed":`Je ${n} ${w} deden (middelste)`} <b>${kX(P.E||0)}</b> het normaal van dezelfde soort post (${M.naam})`;
     const vw=r.verw==="boven"?"Dat is méér dan verwacht":r.verw==="onder"?"Dat is minder dan verwacht":"Dat is zoals verwacht";
-    const vt=`${vw} (${kX(P.factor)}).`;
-    return r.oordeel==="werkte"?`${xs}. ${vt} Blijven doen, âhwe!`:r.oordeel==="slechter"?`${xs}: onder je normaal. ${vt}`:r.oordeel==="geen"?`${xs}: ongeveer je normaal. ${vt}`:`${xs}. Te weinig data voor een oordeel.`+(n<3?"":"")}
-  const L=r.periode.dagen,m=r.meet,h=r.uitkomsten.find(x=>x.naam===r.hoofd);
-  const mt=m&&m.eind!=null?`${esc(m.naam)} ging van ${kFmt(p)(m.start)} naâh ${kFmt(p)(m.eind)}`:"";
-  const ht=h?`${h.naam.toLowerCase()} ${kWaarde(h.voor,h.fmt)} → ${kWaarde(h.na,h.fmt)} (${L} dagen ervóór vs ${L} dagen mee bezig)`:"";
+    const vt=r.verw?` ${vw} (${kX(P.factor)}).`:"";
+    const bo=P.boven&&n>1?` ${P.boven.n} van de ${P.boven.van} posts zaten boven hun normaal.`:"";
+    return r.oordeel==="werkte"?`${xs}.${bo}${vt} Blijven doen, âhwe!`:r.oordeel==="wisselend"?`${xs}, maar nie elke post deed het:${bo} Eén uitschietâh bepaalt hier het midden, dus nog geen conclusie.${vt}`
+      :r.oordeel==="slechter"?`${xs}: onder je normaal.${bo}${vt}`:r.oordeel==="geen"?`${xs}: ongeveer je normaal.${vt}`:`${xs}. Te weinig data voor een oordeel.`}
+  const m=r.meet,x=r.extra,f=kFmt(p);
+  const mt=m&&m.eind!=null?`${esc(m.naam)} ging van ${f(m.start)} naâh ${f(m.eind)}`:"";
+  if(r.soort==="tip"||r.grond==="tip")return "Deze kans is nie apart te meten (hij gaat over je hele account, of de cijfâhs komen maanden later). Daarom geen oordeel.";
+  if(x&&x.soort==="inricht")return x.n>0?`Gelukt: de meting staat. Sinds ${kD(p.gestart_om)} kwamen er <b>${nf0.format(x.n)}</b> ${esc(x.naam)} binnen (${x.dagen} dag${x.dagen>1?"en":""}, ≈ ${nf1k.format(x.perDag)} per dag).`
+    :`Nog niks binnengekomen via deze link sinds ${kD(p.gestart_om)}. Staat de link goed (precies zo, met ?ref=…)?`;
+  if(x&&x.soort==="storylink")return !x.nieuw.length?"Geen nieuwe story-link gezien sinds de start: zet bij je volgende Sneek-story een eigen link in de link-sticker."
+    :x.normaal==null?`${x.nieuw.length} nieuwe story-link${x.nieuw.length>1?"s":""}, maar te weinig eerdere story-links (${x.normaalN}) om mee te vergelijken.`
+    :`Je nieuwe story-link${x.nieuw.length>1?"s brachten (middelste)":" bracht"} <b>${kX(x.E)}</b> zoveel bezoekâhs als je normale story-link (${nf0.format(x.normaal)}).`;
+  if(x&&x.soort==="site")return x.voor==null||x.na==null?"Te weinig dagen met GoatCounter-cijfâhs om te vergelijken."
+    :`${esc(x.naam)}: ${nf0.format(x.voor)}% in de ${r.periode.dagen} dagen ervóór, ${nf0.format(x.na)}% sinds de start. Dit is een verandering aan het spel zelf, dus elke bezoekâh telt mee.`;
   switch(r.oordeel){
-    case "werkte":return r.grond==="meet"?`Je doel-cijfâh ging de goeie kant op: ${mt}. Blijven doen, âhwe!`:`Geen eigen doel-cijfâh bij deze kans, maar je ${ht} ging vooruit.`;
-    case "deels":return `Je doel-cijfâh ging vooruit (${mt}), maar je ${ht} ging achteruit. Kèk of het een het ander kost.`;
-    case "geen":return r.grond==="meet"?`${mt}: minder dan 10% verschil. Probeer het langer, of pak het anders aan.`:`Je ${ht}: minder dan 10% verschil.`;
-    case "slechter":return r.grond==="meet"?`${mt}: de verkeerde kant op. Misschien lag het aan iets anders, maar dit was geen succes.`:`Je ${ht} ging achteruit.`;
-    default:return "Te weinig metingen om iets te zeggen (bijvoorbeeld omdat je het dashboard in die tijd weinig opende, of omdat de cijfâhs van vóór je start nog nie bijgehouden werden).";
+    case "werkte":return `Je doel-cijfâh ging de goeie kant op: ${mt}. Blijven doen, âhwe!`;
+    case "geen":return `${mt}: minder dan 10% verschil. Probeer het langer, of pak het anders aan.`;
+    case "slechter":return `${mt}: de verkeerde kant op.`;
+    default:return "Te weinig metingen om iets te zeggen (bijvoorbeeld omdat je het dashboard in die tijd weinig opende).";
   }
 }
 function kansRapportHTML(p){
   const r=p.rapport;if(!r)return "";
   const O=KANS_OORDEEL[r.oordeel]||KANS_OORDEEL.onbekend,f=kFmt(p),L=r.periode.dagen;
   const af=p.gestopt_om?`${p.afloop==="gestopt"?"gestopt":"gedaan"} op <b>${kD(p.gestopt_om)}</b> (na ${Math.max(1,kDagen(dagNL(p.gestart_om),dagNL(p.gestopt_om)))} dag${kDagen(dagNL(p.gestart_om),dagNL(p.gestopt_om))>1?"en":""})`:"nog nie afgemeld";
+  const P=r.plan,weinig=P&&P.taak.length&&P.taak.length<3?`<span class="chip mute">op ${P.taak.length} post${P.taak.length>1?"s":""}</span>`:"";
   let h=`<div class="krap">
-    <div class="kkop">${bronChip(p.bron)}<span class="chip ${O.c}">${O.t}</span>${r.verw?`<span class="chip mute">${KM_VERW[r.verw]}</span>`:""}${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':p.afloop?'<span class="chip good">gedaan ✓</span>':'<span class="chip warn">nog mee bezig</span>'}</div>
+    <div class="kkop">${bronChip(p.bron)}<span class="chip ${O.c}">${O.t}</span>${weinig}${r.verw?`<span class="chip mute">${KM_VERW[r.verw]}</span>`:""}${P&&P.partnerSamen?'<span class="chip warn">partner speelt mee</span>':""}${p.afloop==="gestopt"?'<span class="chip mute">gestopt</span>':p.afloop?'<span class="chip good">gedaan ✓</span>':'<span class="chip warn">nog mee bezig</span>'}</div>
     <h3>${p.kop||esc(p.sleutel)}</h3>
-    <p class="kwanneer">Mee bezig vanaf <b>${kD(p.gestart_om)}</b> · ${af} · ${r.plan?`rapport op ${kD(p.rapport_op)}`:`rapport na ${L} dagen`}</p>
+    <p class="kwanneer">Mee bezig vanaf <b>${kD(p.gestart_om)}</b> · ${af} · ${P?`rapport op ${kD(p.rapport_op)}`:`rapport na ${L} dagen`}</p>
     <p class="kuitleg">${kOordeelUitleg(r,p)}</p>`;
-  if(r.plan&&r.plan.doenAantal){const n=r.plan.taak.length,a=r.plan.doenAantal;h+=`<p class="kwanneer"><b>Taak:</b> ${n} van ${a} ${esc(r.plan.wat)} ${n>=a?"gedaan ✓":"gedaan"}${r.plan.deadline?` (deadline ${kD(r.plan.deadline)})`:""}</p>`}
-  if(r.plan)h+=kmHTML(kmUitRapport(r),{rapport:true})+(r.plan.taak.length&&r.plan.taak.length<3?'<p class="sub">Let op: gemeten op maar '+r.plan.taak.length+' post'+(r.plan.taak.length>1?"s":"")+', dus voorzichtig met conclusies.</p>':"");
+  if(P&&P.doenAantal){const n=P.taak.length,a=P.doenAantal;h+=`<p class="kwanneer"><b>Taak:</b> ${n} van ${a} ${esc(P.wat)} ${n>=a?"gedaan ✓":"gedaan"}${P.deadline?` (deadline ${kD(P.deadline)})`:""}</p>`}
+  if(P)h+=kmHTML(kmUitRapport(r),{rapport:true});
   const m=r.meet;
-  if(m)h+=`<div class="kmeet"><div><span class="k">Doel-cijfâh: ${esc(m.naam)}</span>
+  if(m&&!P&&!r.extra)h+=`<div class="kmeet"><div><span class="k">Doel-cijfâh: ${esc(m.naam)}</span>
       <span class="v">${m.start!=null?f(m.start):"—"} → ${m.eind!=null?f(m.eind):"—"}</span>
       <span class="s">${m.eind!=null&&m.start!=null?kVerschil(m.start,m.eind,m.beter)+" · ":""}${m.eind_dag?"gemeten op "+dKort(m.eind_dag):"geen meting aan het eind"} · ${m.beter==="lager"?"lagâh":"hogâh"} is betâh</span></div>${kSpark(m.reeks)}</div>`;
-  if(r.uitkomsten.length)h+=`<div class="tablewrap"><table class="ktab"><thead><tr><th>Cijfâh</th><th class="n"><span class="pc">${L} d </span>ervóór</th><th class="n"><span class="pc">${L} d ${r.plan?"":"mee "}</span>${r.plan?"sinds start":"bezig"}</th><th class="n">Verschil</th></tr></thead><tbody>
-    ${r.uitkomsten.map(x=>`<tr${x.naam===r.hoofd?' class="hoofd"':""}><td>${esc(x.naam)}</td><td class="n">${kWaarde(x.voor,x.fmt)}</td><td class="n">${kWaarde(x.na,x.fmt)}</td><td class="n">${kVerschil(x.voor,x.na,x.beter)}</td></tr>`).join("")}
-    </tbody></table></div><p class="sub kdata">${r.plan?"Je hele account, ter vergelijking. ":""}Ervóór: ${dKort(r.periode.voor_van)} t/m ${dKort(r.periode.voor_tot)} · ${r.plan?"sinds start":"mee bezig"}: ${dKort(r.periode.van)} t/m ${dKort(r.periode.tot)}</p>`;
+  const x=r.extra;
+  if(x&&x.soort==="inricht"&&x.links.length)h+=`<div class="ktelt"><p class="ktelkop">Per link sinds de start</p><ul>${x.links.map(l=>`<li><code>${esc(l.k)}</code> · <b>${nf0.format(l.n)}</b> bezoekâhs</li>`).join("")}</ul></div>`;
+  if(x&&x.soort==="inricht")h+=`<p class="sub">GoatCounter weet per bron hoeveel bezoekâhs er kwamen, maar nie wie daarvan een potje speelde (dat telt hij voor de hele site).</p>`;
+  if(x&&x.soort==="storylink"&&x.nieuw.length)h+=`<div class="ktelt"><p class="ktelkop">Nieuwe story-links sinds de start</p><ul>${x.nieuw.map(l=>`<li><code>${esc(l.k)}</code> (${dKort(l.eerst)}) · <b>${nf0.format(l.n)}</b> bezoekâhs${l.x!=null?` = <b class="${l.x>=1.1?"up":l.x<=0.9?"down":""}">${kX(l.x)}</b> je normale story-link`:""}</li>`).join("")}</ul></div>`;
+  if(x&&x.soort==="site")h+=`<div class="kmeet"><div><span class="k">${esc(x.naam)}</span><span class="v">${x.voor!=null?nf0.format(x.voor)+"%":"—"} → ${x.na!=null?nf0.format(x.na)+"%":"—"}</span><span class="s">${kVerschil(x.voor,x.na,"hoger")} · ${L} dagen ervóór vs sinds de start${x.nNa!=null?` · ${nf0.format(x.nNa)} ${p.sleutel.startsWith("sneek-delen")?"spelâhs":"bezoekâhs"} sinds de start`:""}</span></div></div>`;
   if(r.nummers&&r.nummers.length)h+=`<div class="ktelt"><p class="ktelkop">Nummâhs in de challenge (plays erbij in de periode)</p><ul>${r.nummers.map(n=>`<li><b>${esc(n.titel)}</b>${n.handmatig?" (zelf toegevoegd)":""} · ${n.erbij!=null?kPlus(n.erbij):"nog geen meting"}</li>`).join("")}</ul></div>`;
+  if(r.overlap&&r.overlap.length)h+=`<p class="sub kbezet">Let op: tegelijk liep ${r.overlap.map(t=>`<b>${esc(t)}</b>`).join(" en ")}. Die meet deels hetzelfde, dus een deel van het effect kan daarvandaan komen.</p>`;
   if(p.actie)h+=`<details class="kwat"><summary>Wat je ging doen</summary><div class="act">${p.actie}</div></details>`;
-  h+=`<p class="sub">Samenhang is geen bewijs: er gebeurt in ${L} dagen meer dan alleen deze actie.</p></div>`;
-  return h;
+  return h+"</div>";
 }
 
-/* ---------- Meetplan per taak (03-10, v2) ----------
+/* ---------- Meetplan per taak (03-10, v2; chat 30 v3) ----------
    Voor Insta-kansen die over je POSTS gaan, meet het dashboard precies de posts die bij de taak horen:
    - welke posts: geplaatst vanaf de startdag t/m het afmelden, en passend bij de taak (onderwerp, reel, dagdeel, eigen muziek, of alles).
-   - verwachting bij de start: je normaal (middelste bereik van vergelijkbare posts van vóór de start, per soort post)
-     × wat dit soort post bij jou gemiddeld extra doet (zelfde som als "Wat werkt", maar alleen met posts van vóór de start).
+   - normaal (chat 30): middelste van posts van vóór de start, van DEZELFDE SOORT (foto/carrousel of reel) én in DEZELFDE
+     SITUATIE (met of zonder partner die accepteerde: posts met partner halen bij jou ± 2,5× zoveel bereik). Posts van
+     andere challenges tellen nie mee in het normaal (anders trekken je eigen kansen het normaal omhoog).
+     Te weinig posts in die situatie (< 5) → normaal van die soort, met en zonder partner samen.
+   - verwachting bij de start: je normaal × wat dit soort post bij jou gemiddeld extra doet (alleen posts van vóór de start).
    - wanneer zie je het: de groeicurve van je posts (uit ig_media_dag: hoeveel % van de eindstand een post na X dagen heeft).
      Rapport = als de laatste taak-post ± 95% van z'n eindstand heeft (feed ± 5 dagen, reel ± 10; met eigen data dynamisch).
-   - tussendoor: per post het bereik nu, wat normaal is op die leeftijd, en de verwachte eindstand (bereik nu ÷ % van de curve).
+   - per post ook de vaste set cijfers (KM_CIJFERS); wat Meta voor die soort nie geeft (reels: volgâhs, profielbezoek) valt weg.
    Andere kansen (muziek, Sneek, rest Insta) houden de vaste looptijd vanaf Mee bezig. */
 let KM={dag:[],err:null},KM_LAADT=null;                      // ig_media_dag: {media_id, dag, reach, om}
 function kmLaden(){KM_LAADT=kmLadenEcht();return KM_LAADT}
@@ -639,29 +678,65 @@ function kmPlan(sleutel){
   const sl=String(sleutel);let m;
   const mooi=naam=>{for(const x of IG.posts)for(const l of (x.labels||[]))if(kSlug(l.label)===naam)return l.label;return naam.replace(/-/g," ")};
   const metLabel=(soort,naam)=>p=>labelsVan(p,soort).some(l=>kSlug(l)===naam)||(soort==="onderwerp"&&String(p.bijschrift||"").toLowerCase().includes(naam.replace(/-/g," ")));
+  const geenReel=p=>soortGroep(p)!=="reel";   // Meta geeft voor reels geen volgâhs per post: die kunnen bij "volgâhs"-kansen nie meetellen
   // doen: {aantal, termijn} = wat de kaart vraagt ("plan deze week 2 posts" → 2 posts, deadline zondag 23:59 van de startweek)
   if((m=/^insta-onderwerp-minder-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:null,termijn:"week",tekst:`${mooi(m[1])} combineren met een sterker onderwerp`},nie:`nie over ${mooi(m[1])}`};
-  if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"},nie:`nie over ${mooi(m[1])}`};
+  if((m=/^insta-onderwerp-(.+)$/.exec(sl)))return {maat:"bereik",wat:`posts over ${mooi(m[1])}`,hoort:metLabel("onderwerp",m[1]),groep:metLabel("onderwerp",m[1]),doen:{aantal:2,termijn:"week"},nie:`nie over ${mooi(m[1])}`,zonderPartnerTip:true};
   if(sl==="insta-meer-reels")return {maat:"bereik",wat:"reels",hoort:p=>soortNaam(p)==="Reel",groep:p=>soortNaam(p)==="Reel",perSoort:false,doen:{aantal:1,termijn:"week"},nie:"geen reel"};
   if((m=/^insta-tijd-(.+)$/.exec(sl)))return {maat:"bereik",wat:"posts in dat dagdeel",hoort:p=>kSlug(dagdeel(p.uur??12))===m[1],groep:p=>kSlug(dagdeel(p.uur??12))===m[1],doen:{aantal:3,termijn:14},nie:"ander dagdeel"};
   if(sl==="insta-eigen-muziek"){const mz=p=>{const l=labelsVan(p,"muziek");return l.length&&!igGeenEigen(l[0])};return {maat:"bereik",wat:"posts met je eigen muziek",hoort:mz,groep:mz,doen:{aantal:null,termijn:14,tekst:"posts met je eigen muziek eronder"},nie:"geen eigen muziek gekozen"}}
-  if(sl==="insta-nieuw-naar-volger")return {maat:"volgers",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:7,tekst:"elke post eindigen met een volg-zin + 3 toppâhs vastzetten"}};
+  if(sl==="insta-nieuw-naar-volger")return {maat:"volgers",wat:"je foto's & carrousels",hoort:geenReel,doel:1.25,doen:{aantal:null,termijn:7,tekst:"elke foto/carrousel eindigen met een volg-zin + 3 toppâhs vastzetten (reels tellen nie: daar geeft Meta geen volgâhs per post)"},nie:"reel: geen volgâhs per post"};
   if(sl==="insta-bewaren")return {maat:"bewaard",wat:"al je posts",hoort:()=>true,doel:1.25,doen:{aantal:null,termijn:14,tekst:"een bewaar-post maken (tips, plekken, tijden)"}};
   return null;
 }
 const KM_MAAT={
-  bereik:{naam:"bereik per post",kort:"bereik",f:p=>p.bereik,fmt:v=>nf0.format(v),curve:true},
-  volgers:{naam:"nieuwe volgâhs per 1.000 bereik",kort:"volgâhs/1.000",f:p=>p.bereik>=100&&p.nieuwe_volgers!=null?p.nieuwe_volgers*1000/p.bereik:null,fmt:v=>nf1k.format(v)},
-  bewaard:{naam:"bewaard per 1.000 bereik",kort:"bewaard/1.000",f:p=>p.bereik>=100&&p.bewaard!=null?p.bewaard*1000/p.bereik:null,fmt:v=>nf1k.format(v)}};
+  bereik:{naam:"bereik per post",kort:"bereik",f:p=>p.bereik,fmt:v=>nf0.format(v),curve:true,zelfde:"bereik"},
+  volgers:{naam:"nieuwe volgâhs per 1.000 bereik",kort:"volgâhs/1.000",f:p=>p.bereik>=100&&p.nieuwe_volgers!=null?p.nieuwe_volgers*1000/p.bereik:null,fmt:v=>kKlein(v),zelfde:"volg1k"},
+  bewaard:{naam:"bewaard per 1.000 bereik",kort:"bewaard/1.000",f:p=>p.bereik>=100&&p.bewaard!=null?p.bewaard*1000/p.bereik:null,fmt:v=>kKlein(v),zelfde:null}};
+// kleine getallen leesbaar: 0,26 · 4,4 · 17
+const kF2=new Intl.NumberFormat("nl-NL",{maximumFractionDigits:2});
+const kKlein=v=>v==null?"—":Math.abs(v)<1?kF2.format(v):Math.abs(v)<10?nf1k.format(v):nf0.format(v);
+// vaste set cijfers per post (chat 30); abs = telt op zolang de post groeit (pas vergelijken als hij klaar is)
+const KM_CIJFERS=[
+  {k:"bereik",naam:"Bereik",f:x=>x.bereik,fmt:v=>nf0.format(v),abs:true},
+  {k:"volgers",naam:"Nieuwe volgâhs",f:x=>x.nieuwe_volgers,fmt:v=>nf0.format(v),abs:true},
+  {k:"volg1k",naam:"Volgâhs per 1.000 bereik",f:x=>x.bereik>=100&&x.nieuwe_volgers!=null?x.nieuwe_volgers*1000/x.bereik:null,fmt:kKlein},
+  {k:"profiel1k",naam:"Profielbezoek per 1.000 bereik",f:x=>x.bereik>=100&&x.profielbezoeken!=null?x.profielbezoeken*1000/x.bereik:null,fmt:kKlein},
+  {k:"volgprofiel",naam:"Volgâhs per 100 profielbezoek",f:x=>x.profielbezoeken>0&&x.nieuwe_volgers!=null?x.nieuwe_volgers*100/x.profielbezoeken:null,fmt:kKlein},
+  {k:"kwal",naam:"Gedeeld + bewaard per 1.000 bereik",f:x=>x.bereik>=100&&(x.gedeeld!=null||x.bewaard!=null)?((x.gedeeld||0)+(x.bewaard||0))*1000/x.bereik:null,fmt:kKlein},
+  {k:"likes",naam:"Likes per 100 kijkâhs",f:x=>x.bereik>=100&&x.likes!=null?x.likes*100/x.bereik:null,fmt:kKlein}];
+// partners die de uitnodiging accepteerden (op tijd: binnen 3 dagen na de post), uit samenwerking.js (IGS.partners)
+let KM_PI=null,KM_PI_BRON=null;
+function kmPartnersVan(x){
+  const lijst=(typeof IGS!=="undefined"&&IGS&&IGS.partners)||[];
+  if(KM_PI_BRON!==lijst){KM_PI_BRON=lijst;KM_PI=new Map();
+    lijst.forEach(r=>{if(r.status!=="Accepted"||r.weg)return;if(!KM_PI.has(r.media_id))KM_PI.set(r.media_id,[]);KM_PI.get(r.media_id).push(r)})}
+  const t=Date.parse(x.gepost_om);
+  return [...new Set((KM_PI.get(x.media_id)||[]).filter(r=>!(r.aangenomen_om&&Date.parse(r.aangenomen_om)-t>3*864e5)).map(r=>r.partner))].sort();
+}
+const kmSituatie=x=>kmPartnersVan(x).length?"partner":"solo";
+// welke posts horen bij een poging (zonder normaal te rekenen; ook gebruikt om posts van andere challenges uit het normaal te houden)
+function kmTaak(p,plan){
+  plan=plan||kmPlan(p.sleutel);
+  const deadline=kmDeadline(p,plan),startDag=dagNL(p.gestart_om),eindTs=p.gestopt_om?Date.parse(p.gestopt_om):Math.min(Date.now(),deadline?Date.parse(deadline):Infinity);
+  const ex=kpExtra(p),plus=new Set(ex.plus||[]),min=new Set(ex.min||[]);
+  const auto=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=eindTs&&plan.hoort(x));
+  const taak=[...auto.filter(x=>!min.has(x.media_id)),...IG.posts.filter(x=>plus.has(x.media_id)&&!auto.includes(x))].sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);
+  return {taak,deadline,startDag,eindTs,plus,min};
+}
+function kmAndereTaakIds(p){
+  const s=new Set();
+  KP.rijen.forEach(q=>{if(q===p||(p.id!=null&&q.id===p.id)||!kmPlan(q.sleutel))return;
+    if(q.rapport&&q.rapport.plan&&q.rapport.plan.taak)q.rapport.plan.taak.forEach(t=>s.add(t.id));
+    else{try{kmTaak(q).taak.forEach(x=>s.add(x.media_id))}catch(e){}}});
+  return s;
+}
 
 // alles uitrekenen voor een poging: posts, normaal, verwachting, stand nu, wanneer klaar
 function kmStand(p){
   const plan=kmPlan(p.sleutel);if(!plan||IG.err||!IG.posts.length)return null;
   const M=KM_MAAT[plan.maat];
-  const deadline=kmDeadline(p,plan),startDag=dagNL(p.gestart_om),eindTs=p.gestopt_om?Date.parse(p.gestopt_om):Math.min(Date.now(),deadline?Date.parse(deadline):Infinity);
-  const ex=kpExtra(p),plus=new Set(ex.plus||[]),min=new Set(ex.min||[]);
-  const auto=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=startDag&&Date.parse(x.gepost_om)<=eindTs&&plan.hoort(x));
-  const taak=[...auto.filter(x=>!min.has(x.media_id)),...IG.posts.filter(x=>plus.has(x.media_id)&&!auto.includes(x))].sort((a,b)=>a.gepost_om<b.gepost_om?-1:1);
+  const {taak,deadline,startDag,eindTs,plus,min}=kmTaak(p,plan);
   // om zelf toe te voegen: posts van een week vóór de start t/m nu die er nog nie in zitten
   const kiesbaar=IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)>=kDag(startDag,-7)&&!taak.includes(x)).sort((a,b)=>a.gepost_om<b.gepost_om?1:-1).slice(0,25)
     .map(x=>({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),bijschrift:x.bijschrift}));
@@ -676,54 +751,104 @@ function kmStand(p){
     .forEach(x=>nietMee.push({id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),link:x.permalink,bijschrift:x.bijschrift,weg:true,
       reden:igWegReden(x)+(plus.has(x.media_id)?" · was zelf toegevoegd":"")}));
   nietMee.sort((a,b)=>a.ts<b.ts?-1:1);
-  // basis = posts van vóór de start (120 dagen, anders 365), zonder de taak-posts
-  const voor=d=>IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)<startDag&&Date.parse(x.gepost_om)>Date.parse(p.gestart_om)-d*864e5&&M.f(x)!=null);
-  let basis=voor(120);if(basis.length<15)basis=voor(365);
-  const medVan=l=>kMed(l.map(M.f).filter(v=>v!=null));
-  // normaal per groep (deel B): een post wordt alleen met z'n eigen soort vergeleken (foto/carrousel of reel),
-  // met posts van vóór de start; te weinig in 120 dagen → 365 dagen → allâh tijde (igNormaal in insta.js, min. 5 posts)
-  const normG={};
-  const normaalVan=g=>normG[g]||(normG[g]=igNormaal(g,M.f,{voor:amsMiddernacht(startDag)}));
-  const alleMed=normaalVan("foto").waarde;   // "je normaal" = je foto's & carrousels (je hoofdsoort)
-  const normaalVoor=x=>plan.perSoort===false?alleMed:normaalVan(soortGroep(x)).waarde;   // meer-reels: reels juist tegen je foto's
-  // verwachting: hoeveel doet dit soort post bij jou extra, binnen z'n eigen groep (alleen data van vóór de start)
+  // normaal (chat 30): zelfde soort + zelfde situatie (met/zonder partner), alleen posts van vóór de start, zonder posts van andere challenges
+  const voorTs=amsMiddernacht(startDag),andere=kmAndereTaakIds(p);
+  const pool=(g,sit)=>igPostsVan(g).filter(x=>!andere.has(x.media_id)&&(sit==null||kmSituatie(x)===sit));
+  const normC={};
+  const normVan=(g,sit,f,key)=>{const k=g+"|"+sit+"|"+key;if(normC[k])return normC[k];
+    let n=igNormaal(g,f,{voor:voorTs,posts:pool(g,sit)}),samen=false;
+    if(!n.genoeg&&sit!=null){n=igNormaal(g,f,{voor:voorTs,posts:pool(g,null)});samen=true}
+    return normC[k]={...n,sit,samen}};
+  const alleMed=normVan("foto",null,M.f,"hoofd").waarde;   // "je normaal" = je foto's & carrousels (je hoofdsoort), met en zonder partner
+  const normHoofd=x=>normVan(plan.perSoort===false?"foto":soortGroep(x),kmSituatie(x),M.f,"hoofd");   // meer-reels: reels juist tegen je foto's
+  // verwachting: hoeveel doet dit soort post bij jou extra, binnen z'n eigen soort + situatie (alleen data van vóór de start)
+  const basisVoor=d=>IG.posts.filter(x=>x.gepost_om&&dagNL(x.gepost_om)<startDag&&Date.parse(x.gepost_om)>Date.parse(p.gestart_om)-d*864e5&&M.f(x)!=null);
+  let basis=basisVoor(120);if(basis.length<15)basis=basisVoor(365);
   let factor=1,factorN=0,factorBron="";
   if(plan.groep&&alleMed){const g=basis.filter(plan.groep);factorN=g.length;
-    const rel=plan.perSoort===false?g.map(x=>M.f(x)/alleMed):g.map(x=>{const n=normaalVan(soortGroep(x)).waarde;return n?M.f(x)/n:null}).filter(v=>v!=null);
+    const rel=g.map(x=>{const n=normHoofd(x).waarde;return n?M.f(x)/n:null}).filter(v=>v!=null);
     if(rel.length>=3){factor=Math.max(0.5,Math.min(3,kMed(rel)));
-      factorBron=`${rel.length} eerdere ${plan.wat}: middelste ${kX(kMed(rel))} ${plan.perSoort===false?`je normaal van foto's & carrousels (${M.fmt(alleMed)})`:"het normaal van hun eigen soort (reels met reels, foto's met foto's)"}`}
+      factorBron=`${rel.length} eerdere ${plan.wat}: middelste ${kX(kMed(rel))} het normaal van hun eigen soort en situatie`}
     else factorBron=`nog maar ${rel.length} eerdere ${plan.wat}: verwachting = je normaal`}
   else if(plan.doel){factor=plan.doel;factorBron=`doel: ${pct(plan.doel-1)} betâh dan je normaal`}
+  // partners: normaal van eerdere posts mét die partner (vanaf 3 posts), alleen van vóór de start
+  const pnC={};
+  const partnerNorm=(naam,g)=>{const k=naam+"|"+g;if(pnC[k])return pnC[k];
+    const l=igPostsVan(g).filter(x=>x.gepost_om&&Date.parse(x.gepost_om)<voorTs&&!andere.has(x.media_id)&&kmPartnersVan(x).includes(naam)).map(M.f).filter(v=>v!=null);
+    return pnC[k]={naam,n:l.length,waarde:l.length>=3?kMed(l):null}};
   const nu=Date.now();
   const rij=taak.map(x=>{
-    const a=kmLeeftijd(x,nu),normaal=normaalVoor(x),waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
+    const a=kmLeeftijd(x,nu),nh=normHoofd(x),normaal=nh.waarde,waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
     const deel=M.curve?kmDeel(x,a):1,klaar=a>=klaarNa;
     const eind=waarde==null?null:M.curve?(klaar||deel>=0.95?waarde:a>=0.5?waarde/deel:null):(a>=1?waarde:null);
-    const gr=soortGroep(x),ng=normaalVan(gr);
-    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),groep:gr,normaalN:ng.n,normaalGenoeg:plan.perSoort===false||ng.genoeg,link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
+    const gr=soortGroep(x),sit=kmSituatie(x),partners=kmPartnersVan(x),gn=plan.perSoort===false?"foto":gr;
+    // vaste set cijfers: wat Meta voor deze post nie geeft (null) valt weg; het hoofdcijfer staat er al boven
+    const cijfers=KM_CIJFERS.filter(c=>c.k!==M.zelfde).map(c=>{const v=c.f(x);if(v==null)return null;
+      const n=normVan(c.k==="bereik"&&plan.perSoort===false?"foto":gr,sit,c.f,c.k);
+      const vergelijk=!c.abs||klaar;   // optellende cijfers pas vergelijken als de post klaar is
+      return {k:c.k,v,norm:n.waarde,x:vergelijk&&n.waarde?v/n.waarde:null,abs:!!c.abs,samen:n.samen}}).filter(Boolean);
+    const pn=partners.map(n=>partnerNorm(n,gn)),sterk=pn.filter(q=>q.waarde).sort((a,b)=>b.waarde-a.waarde)[0]||null;
+    return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),groep:gr,sit,partners,normaalSamen:nh.samen,normaalN:nh.n,normaalGenoeg:plan.perSoort===false||nh.genoeg,link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
       leeftijd:a,waarde,normaal,normaalNu:normaal!=null&&M.curve?normaal*deel:normaal,verwacht:normaal!=null?normaal*factor:null,
-      eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel}});
+      eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel,cijfers,
+      partnerX:sterk&&eind!=null?{naam:sterk.naam,n:sterk.n,norm:sterk.waarde,x:eind/sterk.waarde}:null,
+      partnerTeWeinig:pn.filter(q=>!q.waarde).map(q=>({naam:q.naam,n:q.n}))}});
   const laatsteKlaar=rij.length?rij.map(r=>r.klaarOp).sort().pop():null;
   const rapportOp=p.gestopt_om?(laatsteKlaar&&laatsteKlaar>p.gestopt_om?laatsteKlaar:new Date(Date.parse(p.gestopt_om)+(rij.length?0:864e5)).toISOString()):null;
   const xs=rij.map(r=>r.x).filter(v=>v!=null),E=xs.length?kMed(xs):null;
-  return {plan,maat:plan.maat,M,taak:rij,nietMee,kiesbaar,pid:p.id,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,rapportOp,
-    curveBron:M.curve?kmCurve(rij[0]?kmGroep(IG.posts.find(x=>x.media_id===rij[0].id)):"feed").bron:null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
+  const boven={n:xs.filter(v=>v>=1).length,onder:xs.filter(v=>v<1).length,van:xs.length};
+  // partner speelt mee: álle taak-posts delen een partner met < 3 eerdere posts samen → effect van onderwerp en partner nie te scheiden
+  let partnerSamen=null;
+  if(rij.length&&rij.every(r=>r.partners.length)){
+    const gedeeld=rij[0].partners.filter(n=>rij.every(r=>r.partners.includes(n)));
+    const zwak=gedeeld.map(n=>partnerNorm(n,plan.perSoort===false?"foto":rij[0].groep)).filter(q=>!q.waarde);
+    if(zwak.length)partnerSamen={namen:zwak.map(q=>q.naam),n:zwak.map(q=>q.n)};
+  }
+  // "X van je Y nieuwe volgâhs kwamen direct via deze posts" (Y = account, Meta-dagen van start t/m rapport/vandaag)
+  let volg=null;
+  const vx=taak.filter(x=>x.nieuwe_volgers!=null);
+  if(vx.length){const tot=rapportOp&&dagNL(rapportOp)<vandaagAms()?dagNL(rapportOp):vandaagAms();
+    const dagen=(IG.dag||[]).filter(r=>r.dag>=startDag&&r.dag<=tot&&r.c&&r.c.follows!=null);
+    const vC=KM_CIJFERS.find(q=>q.k==="volgers");
+    const normaal=vx.reduce((s,x)=>{const n=normVan(soortGroep(x),kmSituatie(x),vC.f,"volgers").waarde;return n==null?s:s+n},0);
+    volg={x:vx.reduce((s,x)=>s+x.nieuwe_volgers,0),posts:vx.length,reels:taak.length-vx.length,y:dagen.length?dagen.reduce((s,r)=>s+(+r.c.follows||0),0):null,
+      van:startDag,tot,normaal,klaar:rij.filter(r=>vx.some(x=>x.media_id===r.id)).every(r=>r.klaar)};
+  }
+  return {plan,maat:plan.maat,M,taak:rij,nietMee,kiesbaar,pid:p.id,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,boven,rapportOp,
+    volg,partnerSamen,curveBron:M.curve?kmCurve(rij[0]?kmGroep(IG.posts.find(x=>x.media_id===rij[0].id)):"feed").bron:null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
 }
+// oordeel (chat 30): alleen het hoofdcijfer; bij weinig posts moet het merendeel meedoen, anders "wisselend"
 function kmOordeel(s){
-  if(!s||!s.taak.length)return {oordeel:"onbekend",verw:null};
-  if(s.E==null)return {oordeel:"onbekend",verw:null};
-  const oordeel=s.E>=1.1?"werkte":s.E<=0.9?"slechter":"geen";
+  if(!s||!s.taak.length||s.E==null)return {oordeel:"onbekend",verw:null};
+  const xs=s.taak.map(r=>r.x).filter(v=>v!=null),n=xs.length,boven=xs.filter(v=>v>=1).length,onder=n-boven;
+  let oordeel=s.E>=1.1?"werkte":s.E<=0.9?"slechter":"geen";
+  if(n>=2&&oordeel==="werkte"&&boven/n<2/3)oordeel="wisselend";
+  if(n>=2&&oordeel==="slechter"&&onder/n<2/3)oordeel="wisselend";
   const r=s.E/s.factor,verw=r>=1.1?"boven":r<=0.9?"onder":"zoals";
   return {oordeel,verw};
 }
 const kX=v=>new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1}).format(v)+"×";
 const KM_VERW={boven:"boven verwachting",zoals:"zoals verwacht",onder:"onder verwachting"};
+const kXcls=x=>x==null?"":x>=1.1?"up":x<=0.9?"down":"";
+const kmPartnerTekst=r=>!r.partners||!r.partners.length?"zonder partner":"met "+r.partners.map(n=>"@"+esc(n)).join(", ");
+// tabel: per post de vaste set cijfers t.o.v. het normaal van dezelfde soort + situatie (chat 30)
+function kmCijfersHTML(s,M){
+  const rows=s.taak.filter(r=>r.cijfers&&r.cijfers.length);if(!rows.length)return "";
+  const keys=KM_CIJFERS.filter(c=>rows.some(r=>r.cijfers.some(q=>q.k===c.k)));
+  const cel=(r,c)=>{const q=r.cijfers.find(z=>z.k===c.k);if(!q)return `<td class="n"><span class="sub">${r.groep==="reel"?"geeft Meta nie voor reels":"—"}</span></td>`;
+    return `<td class="n"><b>${c.fmt(q.v)}</b>${q.x!=null?` <span class="${kXcls(q.x)}">${kX(q.x)}</span>`:q.abs&&!r.klaar?' <span class="sub">tot nu</span>':""}<br><span class="sub">normaal ${q.norm!=null?c.fmt(q.norm):"—"}</span></td>`};
+  const kop=r=>`${dKort(dagNL(r.ts))}<br><span class="sub">${esc(r.soort)}</span>`;
+  const hoofd=`<tr class="hoofd"><td>${esc(M.naam[0].toUpperCase()+M.naam.slice(1))} <span class="sub">(hoofdcijfâh)</span></td>${s.taak.map(r=>`<td class="n"><b>${r.eind!=null?M.fmt(r.eind):r.waarde!=null?M.fmt(r.waarde):"—"}</b>${r.x!=null?` <span class="${kXcls(r.x)}">${kX(r.x)}</span>`:""}<br><span class="sub">normaal ${r.normaal!=null?M.fmt(r.normaal):"—"}</span></td>`).join("")}</tr>`;
+  return `<div class="tablewrap kmcijf-tab"><table class="ktab"><thead><tr><th>Cijfâh</th>${s.taak.map(r=>`<th class="n">${kop(r)}</th>`).join("")}</tr></thead><tbody>${hoofd}
+    ${keys.map(c=>`<tr><td>${esc(c.naam)}</td>${s.taak.map(r=>cel(r,c)).join("")}</tr>`).join("")}</tbody></table></div>
+    <p class="sub kdata">Elk cijfâh t.o.v. je normaal van dezelfde soort post (foto/carrousel of reel) in dezelfde situatie (met of zonder partner), van vóór de start. Optellende cijfâhs (bereik, volgâhs) vergelijken we pas als de post klaar is. Alleen het hoofdcijfâh telt voor het oordeel.</p>`;
+}
 // HTML: verwachting + per post de stand (voor Mee bezig, meting loopt, pop-up en rapport)
 function kmHTML(s,{rapport=false}={}){
   if(!s)return "";const M=s.M;
   let h=`<div class="kmverw"><span class="k">Verwachting bij de start</span>
     <span class="v">${s.alleMed!=null?`${M.fmt(s.alleMed*s.factor)} <small>${M.kort}${M.curve?" per post":""}</small>`:"—"}</span>
-    <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
+    <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}, foto's & carrousels met en zonder partner; per post hieronder het normaal van z'n eigen situatie) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
   const knop=!rapport&&s.pid!=null;
   const kies=knop&&(s.kiesbaar||[]).length?`<label class="kmkies">Post toevoegen <select data-kmkies data-kpid="${s.pid}"><option value="">kies een post…</option>${s.kiesbaar.map(x=>`<option value="${esc(x.id)}">${dKort(dagNL(x.ts))} ${tijdAms(x.ts)} · ${esc(x.soort)} · ${esc(kEersteRegel(x.bijschrift).slice(0,40))}</option>`).join("")}</select></label>`:"";
   const nie=((s.nietMee||[]).length?`<details class="kmnie"${knop?" open":""}><summary>Nie meegeteld (${s.nietMee.length})</summary><ul>${s.nietMee.map(x=>`<li><a href="${esc(x.link||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.ts))} · ${esc(x.soort)}</a> <span class="sub">${esc(kEersteRegel(x.bijschrift))}</span> <span class="chip mute">${esc(x.reden)}</span>${knop&&!x.weg?` <button class="lnk" type="button" data-kmplus="${esc(x.id)}" data-kpid="${s.pid}">Tel mee</button>`:""}</li>`).join("")}</ul></details>`:"")+kies;
@@ -731,18 +856,23 @@ function kmHTML(s,{rapport=false}={}){
   h+=`<p class="ktelkop">Telt mee in de challenge: <b>${s.taak.length} ${s.taak.length===1?"post":"posts"}</b>${s.doenAantal?` (doel ${s.doenAantal})`:""}</p>`;
   h+=`<div class="kmposts">${s.taak.map(r=>{
     const pr=r.verwacht?Math.min(1.5,(r.eind??r.waarde??0)/r.verwacht):0;
+    const vgl=r.groep==="reel"&&s.plan.perSoort!==false?"het normaal van je reels":"je normaal";
+    const sit=r.sit==="partner"?" met partner":" zonder partner";
     return `<div class="kmpost">
       <a class="kmthumb" href="${esc(r.link||"#")}" target="_blank" rel="noopener">${r.plaatje?`<img src="${esc(r.plaatje)}" alt="" loading="lazy">`:""}</a>
-      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${r.groep==="reel"?` <span class="chip mute">reel · ${r.normaal!=null?`vs normaal reels ${M.fmt(r.normaal)}`:`te weinig eerdere reels (${r.normaalN||0}) om te vergelijken`}</span>`:""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
+      <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${r.groep==="reel"?` <span class="chip mute">reel · ${s.plan.perSoort===false?`vs je foto's & carrousels ${r.normaal!=null?M.fmt(r.normaal):"—"}`:r.normaal!=null?`vs normaal reels ${M.fmt(r.normaal)}`:`te weinig eerdere reels (${r.normaalN||0}) om te vergelijken`}</span>`:""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
+        <span class="kmcijf kmpartner">${r.partners?kmPartnerTekst(r):""}${r.partnerX?` · met @${esc(r.partnerX.naam)} deed je eerder ${M.fmt(r.partnerX.norm)} (${r.partnerX.n} posts) → <b class="${kXcls(r.partnerX.x)}">${kX(r.partnerX.x)}</b>`:""}${r.partnerTeWeinig&&r.partnerTeWeinig.length&&!r.partnerX?` · <span class="sub">te weinig eerdere posts samen om de partner eruit te halen</span>`:""}</span>
         <span class="kmcijf">${M.kort} nu <b>${r.waarde!=null?M.fmt(r.waarde):"—"}</b>${M.curve&&!r.klaar&&r.normaalNu!=null?` · normaal op deze leeftijd ${M.fmt(r.normaalNu)}`:""}</span>
-        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${r.x>=1.1?"up":r.x<=0.9?"down":""}">${kX(r.x)}</b> ${r.groep==="reel"&&s.plan.perSoort!==false?"normaal van je reels":"je normaal"}`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
+        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${kXcls(r.x)}">${kX(r.x)}</b> ${vgl}${r.sit?sit:""}${r.normaalSamen?" (te weinig posts in die situatie: met en zonder partner samen)":""}`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
         <div class="kbalk kmbalk" title="t.o.v. de verwachting"><i style="width:${(Math.min(1,pr/1.5)*100).toFixed(1)}%"></i><s style="left:${(100/1.5).toFixed(1)}%"></s></div></div>
     </div>`}).join("")}</div>`;
+  h+=kmCijfersHTML(s,M);
+  if(s.volg&&s.volg.y!=null)h+=`<p class="kmvolg"><b>${nf0.format(s.volg.x)} van je ${nf0.format(s.volg.y)}</b> nieuwe volgâhs ${s.volg.van===s.volg.tot?`op ${dKort(s.volg.van)}`:`van ${dKort(s.volg.van)} t/m ${dKort(s.volg.tot)}`} kwamen direct via deze ${s.volg.posts===1?"post":"posts"}${s.volg.y?` (${pct(Math.min(1,s.volg.x/s.volg.y))})`:""}${s.volg.normaal?`. Normaal brengen ${s.volg.posts===1?"zo'n post":`${s.volg.posts} posts`} er ± ${nf0.format(s.volg.normaal)}`:""}${s.volg.klaar?"":" (loopt nog)"}.${s.volg.reels?` ${s.volg.reels===1?"Je reel telt":`Je ${s.volg.reels} reels tellen`} hier nie mee: Meta geeft geen volgâhs per reel.`:""}</p>`;
+  if(s.partnerSamen)h+=`<p class="sub kbezet"><b>Partner speelt mee:</b> op ${s.taak.length===1?"deze post":"alle posts"} stond ${s.partnerSamen.namen.map(n=>"@"+esc(n)).join(", ")}, en jullie postten vóór de start maar ${s.partnerSamen.n.join("/")} keer samen. Wat het onderwerp deed en wat de partner deed is daardoor nie te scheiden. Tip: doe de volgende keer minstens 1 post zónder partner.</p>`;
   h+=nie;
-  if(s.E!=null){const o=kmOordeel(s);h+=`<p class="kmsom">${rapport?"Uitkomst":"Stand nu"}: je ${esc(s.plan.wat)} doen <b>${kX(s.E)}</b> je normaal${s.taak.length>1?" (middelste post)":""} · ${KM_VERW[o.verw]||""}</p>`}
+  if(s.E!=null){const o=kmOordeel(s);h+=`<p class="kmsom">${rapport?"Uitkomst":"Stand nu"}: je ${esc(s.plan.wat)} doen <b>${kX(s.E)}</b> je normaal${s.taak.length>1?" (middelste post)":""}${s.boven&&s.boven.van>1?` · ${s.boven.n} van ${s.boven.van} erboven`:""} · ${KM_VERW[o.verw]||""}</p>`}
   return h;
 }
-
 const kEersteRegel=t=>{const r=String(t||"").split(/\n/)[0].trim();return r.length>70?r.slice(0,68)+"…":r};
 // "Telt mee": welke posts, nummers, links of bezoekers het dashboard voor deze kans meetelt (sinds de start)
 function kTeltMeeHTML(p){
@@ -836,6 +966,12 @@ async function kansNaLaden(){
     }
     for(const p of KP.rijen.filter(p=>!p.rapport&&Date.parse(p.rapport_op)<=Date.now()&&(p.gestopt_om||!kmPlan(p.sleutel))))
       await kpWijzig(p,{rapport:kansRapportMaak(p),rapport_klaar_om:new Date().toISOString()});
+    // chat 30: rapporten van vóór de nieuwe rekenregels (v1/v2, met account-totalen) opnieuw uitrekenen; de oude versie vervalt.
+    // Daarna staat het rapport weer als "nieuw" (pop-up + melding), zodat je de nieuwe uitkomst ziet.
+    for(const p of KP.rijen.filter(p=>p.rapport&&(p.rapport.v||1)<KANS_RAPPORT_V)){
+      if(kmPlan(p.sleutel)&&!kmStand(p))continue;   // Insta-cijfâhs nog nie geladen: volgende keer
+      await kpWijzig(p,{rapport:kansRapportMaak(p),gelezen_om:null});
+    }
   }catch(e){console.warn("Kansâh na laden lukte nie",e)}
   kansBadge();
 }
@@ -844,6 +980,7 @@ async function kansNaLaden(){
 // 1 challenge per onderdeel tegelijk in de "doen"-fase (meten van een afgemelde mag doorlopen)
 const kBezigBron=bron=>KP.rijen.find(p=>p.bron===bron&&!p.gestopt_om)||null;
 async function kansStart(k){
+  if(k.tip){showMsg("Dit is een tip, geen challenge: nie apart te meten.");return}
   const al=kBezigBron(k.bron);if(al){showMsg(`Je bent al bezig met een ${BRON[k.bron][0]}-challenge. Meld die eerst af.`);return}
   const nu=new Date();
   const p=await kpNieuw({sleutel:k.id,bron:k.bron,kop:k.h,actie:k.a,big:k.big,looptijd_dagen:k.dagen,gestart_om:nu.toISOString(),
@@ -886,7 +1023,7 @@ function khStatusVan(p){return p.rapport?"rapport":p.gestopt_om?"wacht":"loopt"}
 function renderKansGeschiedenis(){
   const el=$("kansGesch");if(!el)return;
   const alle=KP.rijen.filter(p=>khBron==="alles"||p.bron===khBron);
-  const metRap=alle.filter(p=>p.rapport),bekend=metRap.filter(p=>p.rapport.oordeel!=="onbekend");
+  const metRap=alle.filter(p=>p.rapport),bekend=metRap.filter(p=>!["onbekend","gelukt"].includes(p.rapport.oordeel));   // "gelukt" = meting ingesteld, telt apart
   const n=o=>bekend.filter(p=>p.rapport.oordeel===o).length;
   const loopt=alle.filter(p=>!p.rapport),volgende=loopt.filter(kRapDatumVast).map(p=>p.rapport_op).sort()[0];
   const af=alle.filter(p=>p.gestopt_om),gem=af.length?af.reduce((s,p)=>s+Math.max(0,Date.parse(p.gestopt_om)-Date.parse(p.gestart_om)),0)/af.length/864e5:null;
@@ -896,10 +1033,10 @@ function renderKansGeschiedenis(){
     ["Gestart",nf0.format(alle.length),eerste?"sinds "+kD(eerste):"nog niks gestart"],
     ["Loopt nu",nf0.format(loopt.length),volgende?"volgende rapport "+kD(volgende):"geen lopende kansen"],
     ["Rapporten",nf0.format(metRap.length),metRap.length?(nieuw?`<b class="up">${nieuw} nieuw</b>`:"allemaal gelezen"):"nog geen"],
-    ["Werkte",bekend.length?`${n("werkte")} van ${bekend.length}`:"—",bekend.length?`${pct(n("werkte")/bekend.length)}${n("deels")?` · ${n("deels")} deels`:""}${n("slechter")?` · ${n("slechter")} achteruit`:""}`:"nog geen rapport met genoeg data"],
+    ["Werkte",bekend.length?`${n("werkte")} van ${bekend.length}`:"—",(bekend.length?`${pct(n("werkte")/bekend.length)}${n("wisselend")?` · ${n("wisselend")} wisselend`:""}${n("deels")?` · ${n("deels")} deels`:""}${n("slechter")?` · ${n("slechter")} achteruit`:""}`:"nog geen rapport met genoeg data")+(metRap.filter(p=>p.rapport.oordeel==="gelukt").length?` · ${metRap.filter(p=>p.rapport.oordeel==="gelukt").length} meting ingesteld`:"")],
     ["Afgemeld",`${alle.filter(p=>p.afloop==="gedaan").length} · ${alle.filter(p=>p.afloop==="gestopt").length}`,"gedaan · gestopt"+(gem!=null?(gem<1?" · gemiddeld binnen een dag":` · gemiddeld na ${nf1k.format(gem)} dagen`):"")]];
   // per onderdeel (alleen bij Alles)
-  const perBron=khBron!=="alles"?"":Object.keys(BRON).map(b=>{const x=KP.rijen.filter(p=>p.bron===b),r=x.filter(p=>p.rapport&&p.rapport.oordeel!=="onbekend");
+  const perBron=khBron!=="alles"?"":Object.keys(BRON).map(b=>{const x=KP.rijen.filter(p=>p.bron===b),r=x.filter(p=>p.rapport&&!["onbekend","gelukt"].includes(p.rapport.oordeel));
     return x.length?`<tr><td>${bronChip(b)}</td><td class="n">${x.length}</td><td class="n">${x.filter(p=>!p.rapport).length}</td><td class="n">${r.length?`${r.filter(p=>p.rapport.oordeel==="werkte").length} van ${r.length}`:"—"}</td></tr>`:""}).join("");
   const lijst=alle.filter(p=>khStatus==="alles"||(khStatus==="loopt"?!p.rapport:khStatus==="rapport"?!!p.rapport:false))
     .sort((a,b)=>{const ra=a.rapport&&!a.gelezen_om?0:a.rapport?2:1,rb=b.rapport&&!b.gelezen_om?0:b.rapport?2:1;
@@ -907,7 +1044,7 @@ function renderKansGeschiedenis(){
   const telS=s=>alle.filter(p=>s==="alles"||(s==="loopt"?!p.rapport:!!p.rapport)).length;
   el.innerHTML=`
   <div class="card">
-    <div class="cardhead"><div><h2>Hoe deden je kansâh het?</h2><p class="sub">Elke keer dat je op <b>Mee bezig</b> klikt, begint een poging met een vaste looptijd. Daarna krijg je een rapport: werkte het, vergeleken met even lang ervóór?</p></div>
+    <div class="cardhead"><div><h2>Hoe deden je kansâh het?</h2><p class="sub">Elke keer dat je op <b>Mee bezig</b> klikt, begint een poging. Daarna krijg je een rapport met alleen wat de challenge zelf deed (je posts tegen je normaal, of je eigen link), nie je hele account.</p></div>
       <div class="seg" id="khBron" role="group" aria-label="Onderdeel">
         ${[["alles","Alles"],["muziek",'<i class="dot sc"></i>Muziek'],["insta",'<i class="dot hy"></i>Insta'],["sneek",'<i class="dot groen"></i>Sneek']].map(([v,t])=>`<button type="button" data-v="${v}" aria-pressed="${khBron===v}">${t}</button>`).join("")}
       </div></div>
@@ -927,7 +1064,12 @@ function khRij(p){
   const s=khStatusVan(p),O=p.rapport?(KANS_OORDEEL[p.rapport.oordeel]||KANS_OORDEEL.onbekend):null;
   const chip=O?`<span class="chip ${O.c}">${O.t}</span>`:s==="wacht"?`<span class="chip mute">${p.afloop==="gestopt"?"gestopt":"gedaan ✓"} · rapport volgt</span>`:'<span class="chip warn">loopt</span>';
   const m=p.rapport&&p.rapport.meet,f=kFmt(p);
-  const meet=m&&m.start!=null&&m.eind!=null?`${esc(m.naam)}: ${f(m.start)} → <b>${f(m.eind)}</b>`:!p.rapport&&p.meet_naam&&p.waarde_start!=null&&kLaatste(p)!=null?`${esc(p.meet_naam)}: ${f(+p.waarde_start)} → <b>${f(kLaatste(p))}</b>`:"";
+  const x=p.rapport&&p.rapport.extra;
+  const meet=x&&x.soort==="inricht"?`${esc(x.naam)}: <b>${nf0.format(x.n)}</b> sinds de start`
+    :x&&x.soort==="storylink"?(x.E!=null?`nieuwe story-link: <b>${kX(x.E)}</b> je normale`:"")
+    :x&&x.soort==="site"?(x.voor!=null&&x.na!=null?`${esc(x.naam)}: ${nf0.format(x.voor)}% → <b>${nf0.format(x.na)}%</b>`:"")
+    :p.rapport&&p.rapport.plan&&p.rapport.plan.E!=null?`${esc(p.rapport.plan.wat)}: <b>${kX(p.rapport.plan.E)}</b> je normaal`
+    :m&&m.start!=null&&m.eind!=null?`${esc(m.naam)}: ${f(m.start)} → <b>${f(m.eind)}</b>`:!p.rapport&&p.meet_naam&&p.waarde_start!=null&&kLaatste(p)!=null?`${esc(p.meet_naam)}: ${f(+p.waarde_start)} → <b>${f(kLaatste(p))}</b>`:"";
   const plan=kmPlan(p.sleutel);
   const wanneer=`${kD(p.gestart_om)}${p.gestopt_om?` → ${kD(p.gestopt_om)}`:""}`+(plan?"":` · ${p.looptijd_dagen} dagen`)+(p.rapport?"":plan&&!p.gestopt_om?" · doen":` · rapport ${kD(p.rapport_op)}`);
   const lijn=p.rapport?(p.rapport.meet&&p.rapport.meet.reeks):[...(KP.met.get(p.id)||new Map())].sort((a,b)=>a[0]<b[0]?-1:1);
