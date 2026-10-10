@@ -5,12 +5,12 @@ let LABEL={periods:[],tracks:[],generated:null,paidOut:0,outside:0,toBook:0};
 const PARTNERS={SOUNDCLOUD:"SoundCloud",FACEBOOK:"Facebook & Instagram",YOUTUBE_ART_TRACK:"YouTube Music",APPLE:"Apple Music",AMAZON:"Amazon Music",PANDORA:"Pandora",NETEASE:"NetEase",SNAP:"Snapchat",TENCENT:"Tencent",KKBOX:"KKBOX",BOOMPLAY:"Boomplay",SAAVN:"JioSaavn",SPOTIFY:"Spotify",TIKTOK:"TikTok",DEEZER:"Deezer",TIDAL:"Tidal"};
 const TYPES={SUB_STREAM:"Stream door betalende abonnee",AD_STREAM:"Gratis stream (met reclame)",UNKNOWN_STREAM:"Stream, soort onbekend",VIEW:"Videoweergave",CREATE:"Gebruikt in video (Reels e.d.)",SRAV_AD_ART_TRACK:"YouTube art track, gratis",SRAV_SUB_ART_TRACK:"YouTube art track, abonnee",AD_VIDEO_STREAM:"Video, gratis",SUB_VIDEO_STREAM:"Video, abonnee",SRAV_AD_SR:"YouTube geluidsopname, gratis"};
 
-function normArtist(a){
-  const first=String(a||"").split(",")[0].trim();
-  const l=first.toLowerCase();
-  if(l==="beuk")return "Beuk";
-  if(l==="marreman"||l==="marreman rojas")return "Marreman Rojas";
-  return first||"Onbekend";
+// artiestnaam gelijktrekken (10-10, chat 05.2): "BEUK", "Beuk, Alixz", "Alixz, Beuk" → Beuk; "Marreman Rojas, LANZ" → Marreman Rojas
+function normArtist(a,leeg="Onbekend"){
+  const s=String(a||"").trim(),l=s.toLowerCase();
+  if(/\bbeuk\b/.test(l))return "Beuk";
+  if(l.includes("marreman"))return "Marreman Rojas";
+  return s.split(",")[0].trim()||leeg;
 }
 function toRows(db){return db.map(r=>({m:String(r.reporting_period).slice(0,7),artist:normArtist(r.artist),track:r.track||"",partner:r.partner||"",type:r.type||"",country:r.country||"",units:+r.units||0,usd:+r.revenue_usd||0}))}
 let SC=[];
@@ -256,7 +256,7 @@ function fillSelects(){
   if(!MONTH_LIST.length){const n=new Date();MONTH_LIST=[n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")];$("fFrom").innerHTML=$("fTo").innerHTML=`<option value="${MONTH_LIST[0]}">${mLabel(MONTH_LIST[0],1)}</option>`}
   state.from=MONTH_LIST[0];state.to=MONTH_LIST[MONTH_LIST.length-1];
   $("fFrom").value=state.from;$("fTo").value=state.to;
-  const artists=[...new Set(SC.map(r=>r.artist))].sort();
+  const artists=[...new Set([...ARTIESTEN,...SC.map(r=>r.artist)])].filter(a=>a&&a!=="Onbekend").sort((a,b)=>(ARTIESTEN.indexOf(a)+1||99)-(ARTIESTEN.indexOf(b)+1||99)||a.localeCompare(b,"nl"));   // Marreman Rojas + Beuk altijd (chat 05.2)
   if(state.artist!=="all"&&!artists.includes(state.artist))state.artist="all";
   if(isTel()){state.artist="all";state.basis="net";syncSeg("fBasis","net")}   // die keuzes staan op de telefoon nie in beeld, dus altijd alles/netto
   $("fArtist").innerHTML=`<option value="all">Alle artiesten</option>`+artists.map(a=>`<option>${esc(a)}</option>`).join("");
@@ -435,7 +435,7 @@ async function loadYT(){
     for(;;){const {data,error}=await sb.from("yt_snapshots").select("video_id,snap_date,views,likes,comments")
       .gte("snap_date",since).order("snap_date").order("video_id").range(from,from+size-1);
       if(error)throw error;snaps=snaps.concat(data);if(data.length<size)break;from+=size}
-    YT={videos:vids.data,snaps,own:(cfg.data[0]||{}).channel_ids||[],err:null};
+    YT={videos:vids.data,snaps,own:((cfg.data[0]||{}).channel_ids||[]).filter(c=>!BEUK_YT.topic.includes(c)),err:null};   // Topic-kanalen van Beuk = tracks, geen eigen video (chat 05.2)
   }catch(e){YT={videos:[],snaps:[],own:[],err:e.message}}
 }
 const MUZIEK_DAGEN=31;   // "erbè", groeiâhs en best bekeken/beluisterd: laatste 31 dagen
@@ -450,8 +450,7 @@ function ytCompute(venster=7){
     const ds=Object.keys(m).sort();const b=m[base]||m[ds.find(d=>d>=base)]||cur;
     return {id:v.video_id,title:v.title,own:YT.own.includes(v.channel_id),pub:v.published_at?String(v.published_at).slice(0,10):"",
       views:cur?+cur.views:0,likes:cur?+cur.likes:0,comments:cur?+cur.comments:0,grow:cur&&b?(+cur.views)-(+b.views):0}}).filter(v=>v.views||v.pub);
-  const daily=dates.map((d,i)=>{const tot=YT.snaps.filter(s=>s.snap_date===d).reduce((a,s)=>a+(+s.views),0);return {d,tot}});
-  daily.forEach((o,i)=>o.add=i?Math.max(0,o.tot-daily[i-1].tot):null);
+  const daily=muziekPerDag(YT.snaps,"video_id","views");   // per video t.o.v. z'n vorige meting (chat 05.2: geen piek als er kanalen bijkomen)
   const groups=new Map();vids.forEach(v=>{const k=v.title.toLowerCase().trim();let g=groups.get(k);if(!g){g={title:v.title,views:0,grow:0,n:0};groups.set(k,g)}g.views+=v.views;g.grow+=v.grow;g.n++});
   return {dates,last,base,vids,daily,groups:[...groups.values()],multiDay:dates.length>1,venster};
 }
@@ -468,7 +467,7 @@ function renderYouTube(){
   const best=[...y.groups].filter(g=>g.grow>0).sort((a,b)=>b.grow-a.grow)[0];   // meeste weergaven erbè in de laatste 31 dagen
   const kort=muziekKort(y,days);
   const g=dagGroei(YT.snaps,"video_id","views"),li=liveInfo("yt",g),vd=g&&g.vandaag;
-  $("ytSub").textContent=`Openbare cijfers, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("yt",g)}. De filters hierboven gelden hier niet.`;
+  $("ytSub").textContent=`Openbare cijfers, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("yt",g)}. Van de filters hierboven geldt hier alleen Artiest.`;
   $("ytStats").innerHTML=`
     <div class="ytstat"><span class="k">Vandaag erbè</span><span class="v">${li.v}</span><span class="s">${li.s.replace(/^vandaag erbè \((.*?)\)/,"$1")}</span></div>
     <div class="ytstat"><span class="k">Weergaven totaal</span><span class="v">${nf0.format(views)}</span><span class="s">${y.vids.length} tracks en video's</span></div>
@@ -601,7 +600,7 @@ function renderYtCompare(y){
   const last=rows.reduce((a,o)=>o.last>a?o.last:a,"");
   const both=rows.filter(o=>o.views&&o.paid),bV=both.reduce((a,o)=>a+o.views,0),bP=both.reduce((a,o)=>a+o.paid,0);
   if(!paid){$("cmpStats").innerHTML='<p class="sub">Nog geen YouTube-regels in je SoundCloud-rapport gevonden. Laad een nieuwere SoundCloud-CSV in.</p>';$("cmpTable").innerHTML="";return}
-  $("cmpSub").textContent=`YouTube-weergaven op ${dLabel(y.last,1)} naast alles wat SoundCloud t/m ${mLabel(last,1)} voor YouTube heeft afgerekend. De filters hierboven gelden hier niet.`;
+  $("cmpSub").textContent=`YouTube-weergaven op ${dLabel(y.last,1)} naast alles wat SoundCloud t/m ${mLabel(last,1)} voor YouTube heeft afgerekend. Van de filters hierboven geldt hier alleen Artiest.`;
   $("cmpStats").innerHTML=`
     <div class="ytstat"><span class="k">Weergaven nu</span><span class="v">${nf0.format(views)}</span><span class="s">openbaar, op je kanaal</span></div>
     <div class="ytstat"><span class="k">Afgerekend</span><span class="v">${nf0.format(paid)}</span><span class="s">${bV?pct(bP/bV)+" terug bij de "+both.length+" nummers die in beide staan":""}${other?` · ${nf0.format(other)} via anderen`:""}</span></div>
@@ -634,7 +633,8 @@ let SCL={tracks:[],snaps:[],err:null};
 async function loadSCL(){
   try{
     const since=new Date(Date.now()-400*864e5).toISOString().slice(0,10);
-    const tr=await sb.from("sc_tracks").select("track_id,title,permalink_url,created_at");
+    let tr=await sb.from("sc_tracks").select("track_id,title,permalink_url,created_at,artist");
+    if(tr.error&&/artist/.test(tr.error.message))tr=await sb.from("sc_tracks").select("track_id,title,permalink_url,created_at");   // SQL 28 nog nie gedraaid
     if(tr.error)throw tr.error;
     let snaps=[],from=0;const size=1000;
     for(;;){const {data,error}=await sb.from("sc_snapshots").select("track_id,snap_date,plays,likes,reposts,comments,downloads")
@@ -659,8 +659,7 @@ function sclCompute(venster=7){
     return {id:t.track_id,title:t.title,url:t.permalink_url,up,age,plays,
       likes:cur?+cur.likes||0:0,reposts:cur?+cur.reposts||0:0,comments:cur?+cur.comments||0:0,downloads:cur?+cur.downloads||0:0,
       grow:cur&&b&&plays!=null&&b.plays!=null?plays-(+b.plays):0,perDay:plays!=null&&age?plays/age:null}}).filter(t=>t.plays!=null||t.up);
-  const daily=dates.map(d=>{const tot=SCL.snaps.filter(s=>s.snap_date===d).reduce((a,s)=>a+(+s.plays||0),0);return {d,tot}});
-  daily.forEach((o,i)=>o.add=i?Math.max(0,o.tot-daily[i-1].tot):null);
+  const daily=muziekPerDag(SCL.snaps,"track_id","plays");
   return {dates,last,base,list,daily,multiDay:dates.length>1,venster};
 }
 // SoundCloud-afrekening (partner SOUNDCLOUD) per nummer koppelen aan de openbare plays
@@ -690,7 +689,7 @@ function renderSCLive(){
   const kort=muziekKort(y,days);
   const fresh=L.filter(t=>t.age!=null&&t.age<=60&&t.perDay!=null).sort((a,b)=>b.perDay-a.perDay)[0];
   const g=dagGroei(SCL.snaps,"track_id","plays"),li=liveInfo("sc",g),vd=g&&g.vandaag;
-  $("sclSub").textContent=`Openbare cijfers van je SoundCloud-profiel, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("sc",g)}. De filters hierboven gelden hier niet.`;
+  $("sclSub").textContent=`Openbare cijfers van je SoundCloud-profiel, ververst zodra je het dashboard opent (hooguit 1x per 10 min) · laatste meting ${laatsteMeting("sc",g)}. Van de filters hierboven geldt hier alleen Artiest.`;
   $("sclStats").innerHTML=`
     <div class="ytstat"><span class="k">Vandaag erbè</span><span class="v">${li.v}</span><span class="s">${li.s.replace(/^vandaag erbè \((.*?)\)/,"$1")}</span></div>
     <div class="ytstat"><span class="k">Plays totaal</span><span class="v">${nf0.format(plays)}</span><span class="s">${L.length} openbare nummers</span></div>
@@ -758,16 +757,50 @@ function renderSCLive(){
   plakKop("sclTable");
 }
 
+/* ---------- Artiestfilter op YouTube, SoundCloud live en Spotify (10-10, chat 05.2) ----------
+   Is bij "Artiest" iemand gekozen, dan tekenen deze tabbladen met alleen de nummers van die artiest.
+   Dat gebeurt hier op één plek: tijdens het tekenen staan YT/SCL/SP tijdelijk op de gefilterde lijst
+   (dezelfde vorm), daarna meteen weer terug. Ovâhzicht en de andere onderdelen zien altijd alles. */
+function metArtiest(fn){return function(...args){
+  const A=state.artist;if(!A||A==="all")return fn.apply(this,args);
+  const oud={YT,SCL,SP};
+  try{
+    const vid=new Set(YT.videos.filter(v=>ytArtiest(v.channel_id)===A).map(v=>v.video_id));
+    YT={...YT,videos:YT.videos.filter(v=>vid.has(v.video_id)),snaps:YT.snaps.filter(s=>vid.has(s.video_id))};
+    const tid=new Set(SCL.tracks.filter(x=>scArtiest(x)===A).map(x=>x.track_id));
+    SCL={...SCL,tracks:SCL.tracks.filter(x=>tid.has(x.track_id)),snaps:SCL.snaps.filter(s=>tid.has(s.track_id))};
+    const raw=(SP.raw||[]).filter(r=>r.artist===A);SP={...SP,raw,snaps:spBouw(raw)};
+    return fn.apply(this,args);
+  }finally{YT=oud.YT;SCL=oud.SCL;SP=oud.SP}
+}}
+
 /* ---------- Spotify (CSV-export uit Spotify for Artists) ---------- */
-let SP={snaps:[],err:null};
+let SP={raw:[],snaps:[],err:null};
 async function loadSP(){
-  try{let out=[],from=0;const size=1000;
-    for(;;){const {data,error}=await sb.from("sp_snapshots").select("snap_date,song,release_date,streams,listeners,saves,source_file")
-      .order("snap_date").order("song").range(from,from+size-1);
-      if(error)throw error;out=out.concat(data);if(data.length<size)break;from+=size}
-    SP={snaps:out,err:null};
-  }catch(e){SP={snaps:[],err:e.message}}
+  try{let out=[],from=0;const size=1000,kol="snap_date,song,release_date,streams,listeners,saves,source_file";
+    let metArt=true;
+    for(;;){let r=await sb.from("sp_snapshots").select(kol+(metArt?",artist":"")).order("snap_date").order("song").range(from,from+size-1);
+      if(r.error&&metArt&&/artist/.test(r.error.message)){metArt=false;continue}   // SQL 28 nog nie gedraaid: alles is Marreman Rojas
+      if(r.error)throw r.error;out=out.concat(r.data);if(r.data.length<size)break;from+=size}
+    out.forEach(r=>r.artist=normArtist(r.artist,"Marreman Rojas"));
+    SP={raw:out,snaps:spBouw(out),err:null};
+  }catch(e){SP={raw:[],snaps:[],err:e.message}}
 }
+/* Spotify per artiest (10-10, chat 05.2). Elke artiest heeft z'n eigen CSV's, soms op verschillende dagen.
+   spBouw maakt daar één reeks van: op elke importdag per artiest de stand van z'n laatste CSV t/m die dag.
+   Vóór de eerste CSV van een artiest geldt die eerste CSV ook (terug:true), zodat een artiest die erbij komt
+   nie als één grote "erbè"-sprong telt. Zo blijven tegel, pop-up, Spotify-tab en Kansâh werken zoals ze waren. */
+function spBouw(raw){
+  const dates=[...new Set(raw.map(r=>r.snap_date))].sort(),per=new Map();
+  raw.forEach(r=>{let a=per.get(r.artist);if(!a){a=new Map();per.set(r.artist,a)}let d=a.get(r.snap_date);if(!d){d=[];a.set(r.snap_date,d)}d.push(r)});
+  const out=[];
+  per.forEach(a=>{const eigen=[...a.keys()].sort();
+    dates.forEach(d=>{const echt=eigen.filter(x=>x<=d).pop()||eigen[0];
+      a.get(echt).forEach(r=>out.push({...r,snap_date:d,echt,terug:echt>d}))})});
+  return out.sort((x,y)=>x.snap_date<y.snap_date?-1:x.snap_date>y.snap_date?1:x.song<y.song?-1:1);
+}
+// per artiest de laatste echte CSV (voor de uitleg op de Spotify-tab)
+function spLaatste(snaps){const m=new Map();(snaps||[]).forEach(s=>{if(s.terug)return;const o=m.get(s.artist);if(!o||s.echt>o.d)m.set(s.artist,{d:s.echt,f:s.source_file||""})});return m}
 function spCompute(){
   const dates=[...new Set(SP.snaps.map(s=>s.snap_date))].sort();
   const last=dates[dates.length-1],prev=dates.length>1?dates[dates.length-2]:null;
@@ -776,11 +809,11 @@ function spCompute(){
   const cur=SP.snaps.filter(s=>s.snap_date===last);
   const yearAgo=last?new Date(new Date(last).getTime()-365*864e5).toISOString().slice(0,10):null;
   const old=dates.filter(d=>d<=yearAgo).pop()||null;
-  const oldBy=new Map(SP.snaps.filter(s=>s.snap_date===old).map(s=>[s.song,+s.streams||0]));
+  const oldBy=new Map(SP.snaps.filter(s=>s.snap_date===old&&!s.terug).map(s=>[s.song,+s.streams||0]));   // aangevulde stand telt nie als "een jaar geleden"
   const days=prev?Math.max(1,Math.round((new Date(last)-new Date(prev))/864e5)):null;
   const list=cur.map(s=>{const rel=s.release_date?String(s.release_date).slice(0,10):"";
     const age=rel?Math.max(1,Math.round((today-new Date(rel))/864e5)):null;const streams=+s.streams||0;
-    return {title:s.song,rel,age,streams,listeners:+s.listeners||0,saves:+s.saves||0,
+    return {title:s.song,artist:s.artist,rel,age,streams,listeners:+s.listeners||0,saves:+s.saves||0,
       grow:prev?Math.max(0,streams-(prevBy.get(s.song)||0)):0,perDay:age?streams/age:null}});
   // 1.000-grens van Spotify: telt per nummer over de afgelopen 12 maanden
   list.forEach(t=>{
@@ -846,7 +879,10 @@ function renderSpotify(){
   const L=y.list,streams=L.reduce((a,t)=>a+t.streams,0),grow=L.reduce((a,t)=>a+t.grow,0);
   const byS=[...L].sort((a,b)=>b.streams-a.streams),best=byS[0];
   const fresh=L.filter(t=>t.age!=null&&t.age>=7&&t.age<=60&&t.perDay!=null).sort((a,b)=>b.perDay-a.perDay)[0];
-  $("spSub").textContent=`Stand van ${dLabel(y.last,1)}${y.file?" · "+y.file:""}. Spotify heeft geen koppeling: je werkt dit bij door af en toe een nieuwe export in te laden. De filters hierboven gelden hier niet.`;
+  const lt=[...spLaatste(SP.snaps)].sort((a,b)=>ARTIESTEN.indexOf(a[0])-ARTIESTEN.indexOf(b[0]));
+  const csvs=lt.length>1?lt.map(([a,o])=>`${a}: CSV van ${dLabel(o.d)}`).join(" · "):`Stand van ${dLabel(y.last,1)}${y.file?" · "+y.file:""}`;
+  const scheef=lt.length>1&&new Set(lt.map(x=>x[1].d)).size>1?" Laad de CSV's van alle artiesten het liefst op dezelfde dag in (je kunt ze samen kiezen), dan klopt \"erbè\" per dag het best.":"";
+  $("spSub").textContent=`${csvs}. Spotify heeft geen koppeling: je werkt dit bij door af en toe een nieuwe export per artiest in te laden.${scheef} Van de filters hierboven geldt hier alleen Artiest.`;
   $("spStats").innerHTML=`
     <div class="ytstat"><span class="k">Streams totaal</span><span class="v">${nf0.format(streams)}</span><span class="s">${L.length} nummers, sinds release</span></div>
     <div class="ytstat"><span class="k">Erbè sinds vorige CSV</span><span class="v">${y.prev?"+"+nf0.format(grow):"—"}</span><span class="s">${y.prev?`tussen ${dLabel(y.prev)} en ${dLabel(y.last)} · ≈ ${nf0.format(grow/(y.days||1))} per dag · alleen bij een nieuwe CSV`:"zie je na je volgende CSV (Spotify heeft geen live koppeling)"}</span></div>
@@ -905,23 +941,38 @@ function renderSpotify(){
     `</tbody><tfoot><tr><td>Totaal (${L.length})</td><td></td><td class="n">${nf0.format(streams)}</td><td class="n">${y.prev?"+"+nf0.format(grow):""}</td><td></td>${hasL?"<td></td>":""}${hasS?"<td></td>":""}</tr></tfoot>`;
   ["spMoneyTable","spTable"].forEach(plakKop);
 }
+// Spotify-CSV inladen (10-10, chat 05.2): één of meer bestanden tegelijk (bijv. Marreman Rojas + Beuk).
+// De artiest komt uit de bestandsnaam zoals Spotify hem maakt: "Beuk-songs-all.csv", "Marreman Rojas-songs-all-2.csv".
+function spArtiestUitNaam(naam){const m=/^(.+?)-songs/i.exec(String(naam||""));return m?normArtist(m[1].trim(),null):null}
 $("fSp").addEventListener("change",async e=>{
-  const file=e.target.files[0];e.target.value="";if(!file)return;
-  const rows=parseCSV(await file.text());const hd=(rows[0]||[]).map(h=>h.trim().toLowerCase());
-  const ix=n=>hd.indexOf(n);
-  if(ix("song")<0||ix("streams")<0){showMsg("Dit lijkt geen Spotify-export. Kies in Spotify for Artists bij Music → Songs het download-icoontje.");return}
-  if(!/all/i.test(file.name)&&!confirm('Staat de periode van deze export op "All time"?\n\nAlleen dan kloppen de totalen en de groei tussen imports. Klik op Annuleren om eerst een nieuwe export te maken.'))return;
-  const g=(r,n)=>ix(n)<0?"":(r[ix(n)]||"").trim();
-  const num=v=>{const x=Number(String(v).replace(/[^\d.-]/g,""));return isFinite(x)?x:0};
-  const payload=rows.slice(1).filter(r=>g(r,"song")).map(r=>({song:g(r,"song"),
-    release_date:/^\d{4}-\d{2}-\d{2}/.test(g(r,"release_date"))?g(r,"release_date").slice(0,10):null,
-    streams:num(g(r,"streams")),listeners:ix("listeners")<0?null:num(g(r,"listeners")),saves:ix("saves")<0?null:num(g(r,"saves"))}));
-  if(!payload.length){showMsg("Geen nummers gevonden in dit bestand.");return}
+  const files=[...e.target.files];e.target.value="";if(!files.length)return;
   const d=new Date(),snap=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-  showMsg(`Bezig met opslaan van ${payload.length} nummers…`,true,true);
-  const {data,error}=await sb.rpc("import_spotify",{rows:payload,snap,file_name:file.name});
-  if(error){showMsg("Opslaan lukte niet: "+error.message+(/import_spotify|sp_snapshots/.test(error.message)?" — draai eerst 04_spotify.sql in Supabase.":""));return}
-  await loadSP();setTab("spotify");
-  showMsg(`${file.name} opgeslagen: ${data.inserted} nummers, stand van vandaag${data.deleted?" (eerdere import van vandaag vervangen)":""}.`,true);
+  const klaar=[];
+  for(const file of files){
+    const rows=parseCSV(await file.text());const hd=(rows[0]||[]).map(h=>h.trim().toLowerCase());
+    const ix=n=>hd.indexOf(n);
+    if(ix("song")<0||ix("streams")<0){showMsg(`${file.name} lijkt geen Spotify-export. Kies in Spotify for Artists bij Music → Songs het download-icoontje.`);return}
+    if(!/all/i.test(file.name)&&!confirm(`Staat de periode van ${file.name} op "All time"?\n\nAlleen dan kloppen de totalen en de groei tussen imports. Klik op Annuleren om eerst een nieuwe export te maken.`))return;
+    let artiest=spArtiestUitNaam(file.name);
+    if(!artiest){const k=prompt(`Van welke artiest is ${file.name}?\n(Spotify zet de artiest normaal vooraan in de bestandsnaam, bijv. "Beuk-songs-all.csv".)`,"Marreman Rojas");
+      if(k==null||!k.trim())return;artiest=normArtist(k.trim(),"Marreman Rojas")}
+    const g=(r,n)=>ix(n)<0?"":(r[ix(n)]||"").trim();
+    const num=v=>{const x=Number(String(v).replace(/[^\d.-]/g,""));return isFinite(x)?x:0};
+    const payload=rows.slice(1).filter(r=>g(r,"song")).map(r=>({song:g(r,"song"),
+      release_date:/^\d{4}-\d{2}-\d{2}/.test(g(r,"release_date"))?g(r,"release_date").slice(0,10):null,
+      streams:num(g(r,"streams")),listeners:ix("listeners")<0?null:num(g(r,"listeners")),saves:ix("saves")<0?null:num(g(r,"saves"))}));
+    if(!payload.length){showMsg(`Geen nummers gevonden in ${file.name}.`);return}
+    showMsg(`Bezig met opslaan van ${file.name} (${artiest}, ${payload.length} nummers)…`,true,true);
+    const {data,error}=await sb.rpc("import_spotify",{rows:payload,snap,file_name:file.name,artiest});
+    if(error){showMsg("Opslaan lukte niet: "+error.message+(/import_spotify|sp_snapshots|artiest/.test(error.message)?" — draai eerst 28_beuk_artiest.sql in Supabase.":""));return}
+    klaar.push(`${file.name}: ${artiest}, ${data.inserted} nummer${data.inserted===1?"":"s"}${data.deleted?" (import van vandaag vervangen)":""}`);
+  }
+  await loadSP();setTab("spotify");if(typeof renderOvahzicht==="function"&&$("ovTegels"))renderOvahzicht();
+  showMsg(`Opgeslagen, stand van vandaag. ${klaar.join(" · ")}.`,true);
 });
 
+
+
+// artiestfilter om de tabbladen heen (chat 05.2); TS_TEKEN.cmp rekent zelf ytCompute uit, dus die ook
+renderYouTube=metArtiest(renderYouTube);renderSCLive=metArtiest(renderSCLive);renderSpotify=metArtiest(renderSpotify);
+TS_TEKEN.cmp=metArtiest(TS_TEKEN.cmp);

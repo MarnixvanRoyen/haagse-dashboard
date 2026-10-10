@@ -23,7 +23,7 @@ function dagGroei(snaps,idVeld,veld){
     tot+=+cur[veld];
     if(!prevDag)return;
     const prev=rows.length>1?rows[rows.length-2]:null;
-    const d=prev?(+cur[veld])-(+prev[veld]):(+cur[veld]);   // nieuw nummer: alles telt als erbè
+    const d=prev?(+cur[veld])-(+prev[veld]):(nieuwTeltMee(idVeld,id,prevDag)?+cur[veld]:0);   // nieuw nummer: alles telt als erbè (alleen als het ook écht nieuw is, chat 05.2)
     erbe+=d;perId.set(id,d);
   });
   return {last,prevDag,tot,erbe,per:perId,vandaag:!!prevDag&&last===vandaagAms()};
@@ -95,9 +95,41 @@ function nummerNaam(bron){
   const titel=new Map((yt?YT.videos:SCL.tracks).map(x=>[x[idV],x.title]));
   return id=>{const naam=String(titel.get(id)||id).trim();return {naam,k:yt?naam.toLowerCase():id,artiest:muziekArtiest(bron,id,naam)}};
 }
-// artiest per nummer: nu nog nie bekend (geen artiestkolom in yt_videos/sc_tracks). Chat 05 (Beuk splitsen):
-// alleen deze functie aanpassen ("Marreman Rojas"/"Beuk") en in vandaagNummers op r.artiest filteren.
-function muziekArtiest(bron,id,naam){return null}
+/* ---------- Artiest per nummer (10-10, chat 05.2: Beuk splitsen) ----------
+   SoundCloud live: veld "Artist" van je upload (sc_tracks.artist, SQL 28). Leeg = Marreman Rojas (hoofdprofiel).
+   YouTube: op kanaal. Beuk = eigen kanaal @BeukOfficial + de 2 Topic-kanalen "Beuk - Onderwerp" (chat 26).
+   Komt er na de OAC-aanvraag (actie 26.1) een ander kanaal bij: alleen BEUK_YT aanpassen (+ yt_config.channel_ids).
+   Spotify: kolom artist in sp_snapshots (uit de bestandsnaam van de CSV). */
+const BEUK_YT={eigen:["UCT_ZyuoQScDbKfSt-Pky8sA"],topic:["UCmDsHjgV7COP6F7riyeAn6A","UCJ4bYhbZowfSSmzoq6Aqctw"]};
+const BEUK_YT_ALLE=[...BEUK_YT.eigen,...BEUK_YT.topic];
+const ARTIESTEN=["Marreman Rojas","Beuk"];
+function ytArtiest(channelId){return BEUK_YT_ALLE.includes(channelId)?"Beuk":"Marreman Rojas"}
+function scArtiest(t){return normArtist(t&&t.artist,"Marreman Rojas")}
+function muziekArtiest(bron,id,naam){
+  if(bron==="yt"){const v=(YT.videos||[]).find(x=>x.video_id===id);return ytArtiest(v&&v.channel_id)}
+  if(bron==="sc")return scArtiest((SCL.tracks||[]).find(x=>x.track_id===id));
+  if(bron==="sp"){const r=(SP.raw||[]).find(x=>x.song===naam);return normArtist(r&&r.artist,"Marreman Rojas")}
+  return null;
+}
+/* Nieuw in de meting ≠ nieuw uitgebracht (10-10, chat 05.2). Een video/track die voor het eerst gemeten wordt
+   maar al eerder uitkwam (bijv. de Beuk-kanalen die op 10-10 in de meting kwamen) telt nie in één keer als "erbè".
+   Alleen écht nieuwe uploads (uitgebracht op/na de vorige meetdag) tellen helemaal mee. Onbekende datum = telt mee (zoals vroeger). */
+function muziekUitgebracht(idVeld,id){
+  const x=idVeld==="video_id"?(YT.videos||[]).find(v=>v.video_id===id):idVeld==="track_id"?(SCL.tracks||[]).find(t=>t.track_id===id):null;
+  const d=x&&(x.published_at||x.created_at);return d?String(d).slice(0,10):null;
+}
+function nieuwTeltMee(idVeld,id,vorigeDag){const u=muziekUitgebracht(idVeld,id);return !u||!vorigeDag||u>=vorigeDag}
+// erbè per meetdag (grafiek "per dag"): per nummer t.o.v. zijn vorige meting, zodat een nummer dat erbij komt geen piek geeft
+function muziekPerDag(snaps,idVeld,veld){
+  const dates=[...new Set(snaps.map(s=>s.snap_date))].sort(),per=new Map();
+  snaps.forEach(s=>{if(s[veld]==null)return;let m=per.get(s[idVeld]);if(!m){m=new Map();per.set(s[idVeld],m)}m.set(s.snap_date,+s[veld])});
+  const tot=dates.map(()=>0),add=dates.map((d,i)=>i?0:null);
+  per.forEach((m,id)=>{let vorig=null;
+    dates.forEach((d,i)=>{if(!m.has(d))return;const v=m.get(d);tot[i]+=v;
+      if(i){if(vorig!=null)add[i]+=v-vorig;else if(nieuwTeltMee(idVeld,id,dates[i-1]))add[i]+=v}
+      vorig=v})});
+  return dates.map((d,i)=>({d,tot:tot[i],add:i?Math.max(0,add[i]):null}));
+}
 function vandaagNummers(bron){
   const yt=bron==="yt",snaps=yt?YT.snaps:SCL.snaps,idV=yt?"video_id":"track_id",veld=yt?"views":"plays";
   const g=dagGroei(snaps,idV,veld);
@@ -170,7 +202,7 @@ function vnGrafiek(box,rijen,kleur,eenheid,yt,tipHTML,aria){   // tipHTML/aria: 
     h.addEventListener("mouseleave",hideTip)});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-vnalles]");if(!b)return;
-  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];if(bron!=="sp")renderVandaagNummers(bron);if(VN_POP===bron)vnPopTeken()});
+  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];if(bron!=="sp")metArtiest(renderVandaagNummers)(bron);if(VN_POP===bron)vnPopTeken()});   // kaart op de Muziek-tab volgt het artiestfilter (chat 05.2)
 
 /* ---------- Pop-up op Ovâhzicht (02-10, chat 09) ----------
    Tegel Muziek: tik op de regel SoundCloud-plays of YouTube-weergaven → dezelfde grafiek "Wat draaide d'r vandaag?"

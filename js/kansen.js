@@ -458,7 +458,10 @@ function kUitkomsten(bron,v){
     per("Posts gemaakt",(a,b)=>IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=a&&dagNL(p.gepost_om)<=b).length,null,"0");
   }
   if(bron==="muziek"){
-    const groei=(snaps,idv,veld)=>(a,b)=>{const x=kStand(snaps,idv,veld,kDag(a,-1)),y=kStand(snaps,idv,veld,b);
+    // nummers die pas ná de start in de meting kwamen maar al eerder uitkwamen (bijv. Beuk-kanalen 10-10) tellen nie mee (chat 05.2)
+    const zonderLaatkomers=(snaps,idv,start)=>{const eerst=new Map();snaps.forEach(s=>{const d=eerst.get(s[idv]);if(!d||s.snap_date<d)eerst.set(s[idv],s.snap_date)});
+      return snaps.filter(s=>{const d=eerst.get(s[idv]);return d<=start||nieuwTeltMee(idv,s[idv],start)})};
+    const groei=(snaps0,idv,veld)=>(a,b)=>{const snaps=zonderLaatkomers(snaps0,idv,kDag(a,-1));const x=kStand(snaps,idv,veld,kDag(a,-1)),y=kStand(snaps,idv,veld,b);
       if(!x||!y||x.dag<kDag(a,-4)||y.dag<kDag(b,-3)||y.dag<=x.dag)return null;return (y.t-x.t)/kDagen(x.dag,y.dag)};
     if(!SCL.err&&SCL.snaps.length)per("SoundCloud-plays erbij per dag",groei(SCL.snaps,"track_id","plays"));
     if(!YT.err&&YT.snaps.length)per("YouTube-weergaven erbij per dag",groei(YT.snaps,"video_id","views"));
