@@ -84,9 +84,10 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!$("app")
    YouTube- en SoundCloud-tab: liggende staaf per nummâh met vandaag ≥ 1 erbè, meeste bovenaan.
    Vandaag = laatste meting van vandaag min de laatste meting van de dag ervoor (per nummer), dus dezelfde
    dagGroei() als de tegel "Vandaag erbè": geen extra Supabase-vraag. YouTube: zelfde titel (track + eigen video)
-   samen, net als Meest bekeke/Groeiâhs. Spotify hoort hier bewust niet bij (geen dagcijfers, alleen CSV's). */
+   samen, net als Meest bekeke/Groeiâhs. Spotify heeft geen dagcijfers: die pop-up (10-10, chat 29) toont wat erbè kwam
+   tussen de laatste twee CSV's (renderSpNummers, onderaan). */
 const VN_MAX=15;                         // eerst de top 15; knop "Toon allâh" voor de rest
-const VN_ALLES={yt:false,sc:false};      // knop aangetikt? (alleen tot herladen)
+const VN_ALLES={yt:false,sc:false,sp:false};      // knop aangetikt? (alleen tot herladen)
 // gedeelde nummerlijst (06-10, chat 14): naam + sleutel per video/track. YouTube: zelfde titel = één nummâh
 // (track + eigen video samen); SoundCloud: elk nummer apart. Gebruikt door "Wat draaide d'r vandaag?" (en de regel Likes op Ovâhzicht).
 function nummerNaam(bron){
@@ -140,22 +141,23 @@ function renderVandaagNummers(bron,el,sub){      // el/sub meegeven = ergens and
   vnGrafiek(el.querySelector(".vnchart"),toon,kleur,eenheid,yt);
 }
 // liggende staven: naam links (telefoon afgekapt, volledig bij tikken/aanwijzen), staaf, aantal aan het eind
-function vnGrafiek(box,rijen,kleur,eenheid,yt){
+function vnGrafiek(box,rijen,kleur,eenheid,yt,tipHTML,aria){   // tipHTML/aria: eigen zweeftekst en omschrijving (Spotify)
   const W=Math.max(280,Math.round(box.clientWidth||800)),tel=W<600;
   const rh=tel?26:28,bh=tel?14:16,mt=22,mb=4;                       // mt: ruimte voor het getal boven de bovenste staaf
   const naamW=tel?Math.min(130,Math.max(92,Math.round(W*.34))):Math.min(240,Math.round(W*.26));
-  const metLikes=rijen.some(r=>r.l);
+  const metLikes=rijen.some(r=>r.l||r.nieuw);
   const x0=naamW+8,valW=metLikes?(tel?84:96):48,iw=W-x0-valW,max=Math.max(1,...rijen.map(r=>r.n)),H=mt+rijen.length*rh+mb;
   const lt=r=>r.l?`♥ ${r.l>0?"+":"−"}${nf0.format(Math.abs(r.l))}`:"";   // likes vandaag achter het getal
   const rechts=(x,y,w,h,r)=>{r=Math.min(r,h/2,w);return `M${x},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h-r}Q${x+w},${y+h} ${x+w-r},${y+h}H${x}Z`};
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${yt?"YouTube-weergaven":"SoundCloud-plays"} vandaag per nummer">`;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria||(yt?"YouTube-weergaven":"SoundCloud-plays")+" vandaag per nummer"}">`;
   rijen.forEach((r,i)=>{const y=mt+i*rh,yb=y+(rh-bh)/2,w=Math.max(3,Math.max(0,r.n)/max*iw),ym=y+rh/2+4;
     s+=`<text class="vnnaam" x="${naamW}" y="${ym}" text-anchor="end">${esc(r.naam)}</text>`;
     s+=`<path fill="var(--${kleur})" d="${rechts(x0,yb,w,bh,4)}"/>`;
     s+=`<text class="vnval" x="${x0+w+6}" y="${ym}">${r.n>0?"+":""}${nf0.format(r.n)}</text>`;
     if(r.l)s+=`<text class="vnlike" data-i="${i}" x="${x0+w+44}" y="${ym}"><tspan class="hart">♥</tspan> ${r.l>0?"+":"−"}${nf0.format(Math.abs(r.l))}</text>`;
+    else if(r.nieuw)s+=`<text class="vnlike vnnieuw" data-i="${i}" x="${x0+w+44}" y="${ym}">nieuw</text>`;   // Spotify: nummâh nie in de vorige CSV
     const nm=tel&&r.naam.length>26?r.naam.slice(0,24).trimEnd()+"…":r.naam;   // telefoon: lange naam kort in het getal-label
-    s+=`<rect class="hit" data-i="${i}" x="0" y="${y}" width="${W}" height="${rh}"${staafGetal(x0+w/2,y+4,(r.n>0?"+":"")+nf0.format(r.n)+" "+eenheid+(r.l?" · "+lt(r):""),nm)}/>`});
+    s+=`<rect class="hit" data-i="${i}" x="0" y="${y}" width="${W}" height="${rh}"${staafGetal(x0+w/2,y+4,(r.n>0?"+":"")+nf0.format(r.n)+" "+eenheid+(r.l?" · "+lt(r):"")+(r.nieuw?" · nieuw":""),nm)}/>`});
   s+=`<line class="base" x1="${x0}" x2="${x0}" y1="${mt-2}" y2="${H-mb}"/>`;
   box.innerHTML=s+"</svg>";
   // likes direct achter het getal zetten (breedte van het getal gemeten)
@@ -164,11 +166,11 @@ function vnGrafiek(box,rijen,kleur,eenheid,yt){
   box.querySelectorAll("text.vnnaam").forEach(t=>{let vol=t.textContent,k=vol;
     try{while(k.length>1&&t.getComputedTextLength()>naamW-4){k=k.slice(0,-1);t.textContent=k.trimEnd()+"…"}}catch(e){}});
   box.querySelectorAll(".hit").forEach(h=>{const r=rijen[+h.dataset.i];
-    h.addEventListener("mousemove",e=>showTip(e,`<div class="t">${esc(r.naam)}</div><div class="r"><span><i class="dot ${kleur}"></i>Vandaag erbij</span><b class="num">+${nf0.format(r.n)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(r.tot)}</b></div><div class="r"><span><span class="vnhart">♥</span>Likes vandaag</span><b class="num">${r.l>0?"+":""}${nf0.format(r.l)}</b></div><div class="r"><span><span class="vnhart">♥</span>Likes totaal</span><b class="num">${nf0.format(r.lt)}</b></div>${r.versies>1?`<div class="r"><span>${r.versies} versies samen</span></div>`:""}`));
+    h.addEventListener("mousemove",e=>showTip(e,tipHTML?tipHTML(r):`<div class="t">${esc(r.naam)}</div><div class="r"><span><i class="dot ${kleur}"></i>Vandaag erbij</span><b class="num">+${nf0.format(r.n)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(r.tot)}</b></div><div class="r"><span><span class="vnhart">♥</span>Likes vandaag</span><b class="num">${r.l>0?"+":""}${nf0.format(r.l)}</b></div><div class="r"><span><span class="vnhart">♥</span>Likes totaal</span><b class="num">${nf0.format(r.lt)}</b></div>${r.versies>1?`<div class="r"><span>${r.versies} versies samen</span></div>`:""}`));
     h.addEventListener("mouseleave",hideTip)});
 }
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-vnalles]");if(!b)return;
-  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];renderVandaagNummers(bron);if(VN_POP===bron)vnPopTeken()});
+  const bron=b.dataset.vnalles;VN_ALLES[bron]=!VN_ALLES[bron];if(bron!=="sp")renderVandaagNummers(bron);if(VN_POP===bron)vnPopTeken()});
 
 /* ---------- Pop-up op Ovâhzicht (02-10, chat 09) ----------
    Tegel Muziek: tik op de regel SoundCloud-plays of YouTube-weergaven → dezelfde grafiek "Wat draaide d'r vandaag?"
@@ -182,7 +184,12 @@ function vnPopOpen(bron){
 function vnPopDicht(){if(!VN_POP)return;const bron=VN_POP;VN_POP=null;$("vnPop").hidden=true;document.body.classList.remove("popopen");hideTip();
   const r=document.querySelector(`[data-vnpop="${bron}"]`);if(r)r.focus({preventScroll:true})}
 function vnPopTeken(){
-  if(!VN_POP)return;const yt=VN_POP==="yt";
+  if(!VN_POP)return;
+  if(VN_POP==="sp"){                     // Spotify (10-10, chat 29): erbè tussen de laatste twee CSV's
+    $("vnPopTitel").innerHTML=`<i class="dot sp"></i> Spotify · wat kwam d'r bij?`;
+    $("vnPopNaar").textContent="Kèk bè Spotify";$("vnPopNaar").dataset.vntab="spotify";
+    renderSpNummers($("vnPopInhoud"),$("vnPopSub"));return}
+  const yt=VN_POP==="yt";
   $("vnPopTitel").innerHTML=`<i class="dot ${yt?"yt":"sc"}"></i> ${yt?"YouTube":"SoundCloud"} · wat draaide d'r vandaag?`;
   $("vnPopNaar").textContent=yt?"Kèk bè YouTube":"Kèk bè SoundCloud live";
   $("vnPopNaar").dataset.vntab=yt?"youtube":"sclive";
@@ -201,6 +208,45 @@ document.addEventListener("keydown",e=>{
   const rij=(e.key==="Enter"||e.key===" ")&&e.target.closest&&e.target.closest("[data-vnpop]");
   if(rij){e.preventDefault();vnPopOpen(rij.dataset.vnpop)}
 });
+
+/* ---------- Spotify: wat kwam d'r bij? (10-10, chat 29) ----------
+   Ovâhzicht-tegel Muziek, regel Spotify-streams aantikken → pop-up met per nummâh de streams erbè tussen de
+   vorige en de nieuwste CSV (zelfde staven als SoundCloud/YouTube). Nummâhs die nie in de vorige CSV stonden
+   krijgen "nieuw" (dan telt alles als erbè). Geen extra Supabase-vraag: SP.snaps is al geladen. */
+const spNf1=new Intl.NumberFormat("nl-NL",{maximumFractionDigits:1});
+function spNummers(){
+  const snaps=SP.snaps||[],dates=[...new Set(snaps.map(s=>s.snap_date))].sort();
+  const last=dates[dates.length-1]||null,prev=dates.length>1?dates[dates.length-2]:null;
+  if(!last)return {last,prev,rijen:[]};
+  const prevBy=new Map(snaps.filter(s=>s.snap_date===prev).map(s=>[s.song,+s.streams||0]));
+  const dagen=prev?Math.max(1,Math.round((new Date(last)-new Date(prev))/864e5)):null;
+  const rijen=snaps.filter(s=>s.snap_date===last).map(s=>{const tot=+s.streams||0,was=prevBy.get(s.song);
+    const rel=s.release_date?String(s.release_date).slice(0,10):"";
+    return {naam:String(s.song||"").trim(),tot,n:prev?tot-(was||0):0,l:0,nieuw:!!prev&&was==null,rel,versies:1}});
+  return {last,prev,dagen,rijen};
+}
+function renderSpNummers(el,sub){
+  const leeg=t=>{el.innerHTML=`<p class="sub vnleeg">${t}</p>`};
+  if(SP.err){sub.textContent="Per nummâh wat erbè kwam sinds de vorige CSV.";leeg("Spotify-cijfâhs ophalen lukte nie.");return}
+  const {last,prev,dagen,rijen:alle}=spNummers();
+  if(!last){sub.textContent="Per nummâh wat erbè kwam sinds de vorige CSV.";leeg("Nog geen Spotify-CSV ingeladen (Muziek → Spotify-CSV).");return}
+  if(!prev){sub.textContent=`Pas één CSV (${dLabel(last)}).`;leeg("Bij de volgende CSV zie je hier per nummâh wat erbè kwam.");return}
+  sub.textContent=`Per nummâh hoeveel streams erbè kwamen tussen je CSV van ${dKort(prev)} en die van ${dKort(last)} (${dagen} dag${dagen===1?"":"en"}). `+
+    `Spotify heeft geen dagcijfâhs: dit verandert pas als je een nieuwe \"All time\"-CSV inlaadt.`;
+  // getoond: nummâhs met ≥ 1 stream erbè, en nieuwe nummâhs (ook met 0)
+  const rijen=alle.filter(r=>r.n>=1||r.nieuw).sort((a,b)=>b.n-a.n||(b.nieuw-a.nieuw)||a.naam.localeCompare(b.naam,"nl"));
+  if(!rijen.length){leeg(`Geen streams erbè tussen ${dLabel(prev)} en ${dLabel(last)}.`);return}
+  const som=rijen.reduce((a,r)=>a+Math.max(0,r.n),0),gedraaid=rijen.filter(r=>r.n>=1).length,nw=rijen.filter(r=>r.nieuw);
+  const alles=VN_ALLES.sp||rijen.length<=VN_MAX,toon=alles?rijen:rijen.slice(0,VN_MAX);
+  const perDag=som/dagen,pd=perDag>=10?nf0.format(perDag):spNf1.format(perDag);
+  el.innerHTML=`<p class="vnsamen"><b>${gedraaid}</b> nummâh${gedraaid===1?"":"s"} gestreamd · samen <b>+${nf0.format(som)}</b> streams (≈ ${pd} per dag)${nw.length?` · <b class="vnnieuwtel">${nw.length} nieuw</b>`:""}</p>
+    <div class="chart vnchart"></div>
+    ${rijen.length>VN_MAX?`<button class="btn vnmeer" type="button" data-vnalles="sp">${alles?"Alleen de top "+VN_MAX:"Toon allâh "+rijen.length+" nummâhs"}</button>`:""}`;
+  const tip=r=>`<div class="t">${esc(r.naam)}</div><div class="r"><span><i class="dot sp"></i>${r.nieuw?"Nieuw: alles telt als erbè":"Erbè sinds vorige CSV"}</span><b class="num">+${nf0.format(Math.max(0,r.n))}</b></div>`+
+    `<div class="r"><span>≈ per dag</span><b class="num">${(x=>x>=10?nf0.format(x):spNf1.format(x))(Math.max(0,r.n)/dagen)}</b></div><div class="r"><span>Totaal</span><b class="num">${nf0.format(r.tot)}</b></div>`+
+    (r.rel?`<div class="r"><span>Uitgebracht</span><b>${dLabel(r.rel,true)}</b></div>`:"");
+  vnGrafiek(el.querySelector(".vnchart"),toon,"sp","streams",false,tip,"Spotify-streams erbij sinds de vorige CSV per nummer");
+}
 
 /* ---------- Ovâhzicht: regel Likes (06-10, chat 14) ----------
    Tegel Muziek: likes vandaag erbè (SoundCloud + YouTube samen, groot) en de totalen eronder.

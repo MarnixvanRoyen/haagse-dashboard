@@ -1,6 +1,6 @@
 // ovahzicht.js — de tegels op de startpagina, één per onderdeel
 
-// SoundCloud/YouTube-regel: tikken opent de pop-up "Wat draaide d'r vandaag?" (live.js, vnPopOpen)
+// SoundCloud/YouTube/Spotify-regel: tikken opent de pop-up "Wat draaide d'r vandaag?" (live.js, vnPopOpen)
 function liveRij(label,bron,g){
   const i=liveInfo(bron,g);
   const pop=` data-vnpop="${bron}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${bron==="yt"?"YouTube":"SoundCloud"}: per nummâh wat er vandaag bij kwam"`;
@@ -16,7 +16,8 @@ function spotifyRij(label){
   const tot=cur.reduce((a,s)=>a+(+s.streams||0),0);
   if(!prev)return streamRij(label,"—",tot,`pas één CSV (${dLabel(last)}), bij de volgende zie je wat erbè kwam`);
   const erbe=cur.reduce((a,s)=>a+(+s.streams||0)-(prevBy.get(s.song)||0),0);
-  return streamRij(label,(erbe>0?"+":"")+nf0.format(erbe),tot,`erbè tussen CSV ${dLabel(prev)} en ${dLabel(last)} (alleen bij een nieuwe CSV)`);
+  const pop=` data-vnpop="sp" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Spotify: per nummâh wat erbè kwam sinds de vorige CSV"`;   // 10-10, chat 29
+  return streamRij(label,(erbe>0?"+":"")+nf0.format(erbe),tot,`erbè tussen CSV ${dLabel(prev)} en ${dLabel(last)} (alleen bij een nieuwe CSV)`,pop);
 }
 // Sneek vandaag: bezoekâhs groot, eronder hoeveel er een potje speelden
 function bezoekRij(v){

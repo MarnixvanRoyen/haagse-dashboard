@@ -543,6 +543,8 @@ td.gesorteerd{font-weight:700;color:var(--ink)}
 .chart .vnval{fill:var(--ink-2);font-size:12px;font-weight:800}
 .vnsamen{margin:0 0 6px;font-size:14px;color:var(--ink-2)}
 .vnsamen b{color:var(--ink)}
+.chart .vnlike.vnnieuw{fill:var(--hy);font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}   /* Spotify: nummâh nie in de vorige CSV */
+.vnsamen b.vnnieuwtel{color:var(--hy)}
 .vnleeg{margin:0!important}
 .btn.vnmeer{margin-top:10px}
 /* likes in Wat draaide d'r vandaag? + regel Likes op Ovâhzicht (06-10, chat 14) */
