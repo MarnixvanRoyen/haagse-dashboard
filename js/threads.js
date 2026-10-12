@@ -112,7 +112,7 @@ function thKoppel(){
   const thGedaan=new Set(),igGedaan=new Set(),paren=[];
   kand.forEach(c=>{if(thGedaan.has(c.th.id)||igGedaan.has(c.ig.media_id))return;thGedaan.add(c.th.id);igGedaan.add(c.ig.media_id);paren.push(c)});
   paren.sort((a,b)=>Date.parse(b.th.gepost_om)-Date.parse(a.th.gepost_om));
-  TH._koppel={paren,thIds:thGedaan,igIds:igGedaan};TH._koppelVan=TH.posts;TH._koppelIg=IG.posts;
+  TH._koppel={paren,thIds:thGedaan,igIds:igGedaan,igVan:new Map(paren.map(c=>[c.th.id,c.ig]))};TH._koppelVan=TH.posts;TH._koppelIg=IG.posts;
   return TH._koppel;
 }
 // samenvatting laatste 30 dagen: hoeveel extra weergaven en likes levert Threads op bovenop Insta?
@@ -132,6 +132,15 @@ function thInsta(dagen=30){
     nieGedeeld:igNa.filter(p=>!k.igIds.has(p.media_id)).length,igN:igNa.length,
     alleenTh:thIn.filter(p=>!k.thIds.has(p.id)).length};
 }
+
+/* ---------- plaatje bij een Threads-post (chat 33, 12-10) ----------
+   Meta geeft bij Threads alleen een plaatje voor foto's (media_url) en video's (thumbnail_url); een carrousel en een
+   tekst-post hebben er geen. Daarom: 1) het eigen plaatje van Threads, 2) anders het plaatje van dezelfde post op Insta
+   (zelfde koppeling als Threads vs Insta), 3) anders een leeg vakje met de soort ("Tekst"). Links van Meta verlopen na
+   een paar dagen, maar elke nacht haalt th_refresh/ig_refresh verse links op; mislukt een plaatje toch, dan valt het weg. */
+function thBeeld(p,ig){if(p.plaatje)return p.plaatje;const x=ig||thKoppel().igVan.get(p.id);return x&&x.plaatje||""}
+function thThumbHTML(p,ig){const b=thBeeld(p,ig);
+  return `<a class="igthumb klein th" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${b?`<img src="${esc(b)}" alt="" loading="lazy" onerror="this.remove()">`:""}${b?"":`<span>${esc(p.soortNaam)}</span>`}</a>`}
 
 /* ---------- waarschuwing: werkt de Threads-koppeling nog? (zelfde regels als bij Insta) ---------- */
 function thKoppeling(){
@@ -306,7 +315,7 @@ function renderThInsta(e){
   const proc=(a,b)=>a!=null&&+b>0?pct(a/(+b)):"—";
   $("thVs").innerHTML=rijen.length?`<thead><tr><th>Post</th><th class="n">Insta<span class="pc"> weergaven</span></th><th class="n">Threads<span class="pc"> weergaven</span></th><th class="n">Erbij</th><th class="n pc">Insta likes</th><th class="n pc">Threads likes</th></tr></thead><tbody>`+
     rijen.map(({th,ig},i)=>{const loopt=Date.now()-Date.parse(th.gepost_om)<TH_MIN_DAGEN*864e5;
-      return `<tr${i>=6?' class="pc"':""}><td><a href="${esc(th.permalink||"#")}" target="_blank" rel="noopener">${dKort(dagNL(th.gepost_om))}<span class="pc"> · ${th.soortNaam}</span></a>${loopt?' <span class="chip mute">loopt nog</span>':""}<span class="igcap">${esc(igEersteRegel(th.tekst))}</span></td>
+      return `<tr${i>=6?' class="pc"':""}><td><div class="igtoprij">${thThumbHTML(th,ig)}<div style="min-width:0"><a href="${esc(th.permalink||"#")}" target="_blank" rel="noopener">${dKort(dagNL(th.gepost_om))}<span class="pc"> · ${th.soortNaam}</span></a>${loopt?' <span class="chip mute">loopt nog</span>':""}<span class="igcap">${esc(igEersteRegel(th.tekst))}</span></div></div></td>
       <td class="n">${ig.weergaven==null?"—":nf0.format(ig.weergaven)}</td><td class="n">${th.views==null?"—":nf0.format(th.views)}</td><td class="n"><b>${proc(th.views,ig.weergaven)}</b></td>
       <td class="n pc">${ig.likes==null?"—":nf0.format(ig.likes)}</td><td class="n pc">${th.likes==null?"—":nf0.format(th.likes)}</td></tr>`}).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${IG.posts&&IG.posts.length?"Nog geen gedeelde posts gevonden in de laatste 30 dagen.":"Insta-cijfâhs zijn er nog nie, dus nog niks te vergelijken."}</td></tr></tbody>`;
@@ -326,7 +335,7 @@ function renderThTop(){
   const kop=k=>`<th class="n${thTopOp===k?" gesorteerd":""}${smal(k)}"><button type="button" class="igtopkop" data-thtop="${k}">${TH_TOP_OP[k].kop}${thTopOp===k?" ↓":""}</button></th>`;
   const cel=(p,k)=>{const v=TH_TOP_OP[k].v(p);return `<td class="n${thTopOp===k?" gesorteerd":""}${smal(k)}">${v==null?"—":TH_TOP_OP[k].f.format(v)}</td>`};
   $("thTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th>${kols.map(kop).join("")}</tr></thead><tbody>`+
-    lijst.map((p,i)=>`<tr${i>=5?' class="pc"':""}><td class="n">${i+1}</td><td><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${p.soortNaam}</a><span class="igcap" title="${esc(p.tekst.trim())}">${esc(igEersteRegel(p.tekst))}</span></td>${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
+    lijst.map((p,i)=>`<tr${i>=5?' class="pc"':""}><td class="n">${i+1}</td><td><div class="igtoprij">${thThumbHTML(p)}<div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${p.soortNaam}</a><span class="igcap" title="${esc(p.tekst.trim())}">${esc(igEersteRegel(p.tekst))}</span></div></div></td>${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${periode.length?"Nog geen posts met dit cijfâh in deze periode.":"Geen posts in deze periode."}</td></tr></tbody>`;
 }
 // waar wonen je volgâhs: renderThDemo() staat sinds chat 13 in js/demografie.js (zelfde kaart als Insta "Wie kijkt d'r?")
