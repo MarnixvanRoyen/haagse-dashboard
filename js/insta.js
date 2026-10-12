@@ -767,7 +767,7 @@ function renderIgStories(){
       <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td>
       <td>${igMuziekSelect(labelsVan(s,"muziek")[0]||"",opties,titels,"Muziek onder deze story")}</td></tr>`})});
   const leeg=st.filter(s=>!labelsVan(s,"muziek").length).length;
-  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes</b>: de koppeling geeft voor stories geen likes, dus rekenen we ze uit: interacties − gedeeld − reacties (gecontroleerd met Meta Business Suite op 1 okt: klopt precies). Bij stories uit de export (juli t/m 30 sep) staan de echte likes. <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Met of zonder tekst</b>: tot en met 30 sep uit de export, daarna via de koppeling. Stories uit de export hebben geen <b>Tikte weg</b> (staat nie in de export). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Geen eigen muziek" en "Omgevingsgeluid" tellen ook mee (als zonder eigen muziek).</p>`+igStoryMuziekHTML();
+  $("igStories").innerHTML=h+`</tbody></table></div><p class="sub" style="margin:10px 0 0"><b>Likes</b>: de koppeling geeft voor stories geen likes, dus rekenen we ze uit: interacties − gedeeld − reacties (gecontroleerd met Meta Business Suite op 1 okt: klopt precies). Bij stories uit de export (juli t/m 30 sep) staan de echte likes. <b>Kwaliteit</b> = gedeeld per 1.000 bereik (stories kun je nie bewaren). <b>Tikte weg</b> = deel van de weergaven waarbij iemand de stories wegtikte (hoe lager, hoe betâh). <b>Met of zonder tekst</b>: tot en met 30 sep uit de export, daarna via de koppeling. Stories uit de export hebben geen <b>Tikte weg</b> (staat nie in de export). <b>Muziek</b>: kies wat eronder zat${leeg?` (nog ${nf0.format(leeg)} zonder keuze in deze lijst)`:""}; "Andere muziek" en "Omgevingsgeluid" tellen ook mee (als zonder eigen muziek).</p>`+igStoryMuziekHTML();
 }
 /* ---------- stories: soort, likes en kwaliteit ----------
    Likes gevalideerd 01-10 (Meta Business Suite); herkomst = alleen tekst ja/nee:
@@ -795,7 +795,7 @@ function igStoryMuziekHTML(){
 }
 
 
-// Wachtkamâh: nieuwe posts (vanaf IG_WACHT_VANAF) zonder muziek-keuze. Ze gaan eruit zodra je iets kiest (ook "Geen eigen muziek").
+// Wachtkamâh: nieuwe posts (vanaf IG_WACHT_VANAF) zonder muziek-keuze. Ze gaan eruit zodra je iets kiest (ook "Andere muziek").
 const IG_WACHT_VANAF="2026-09-22";
 function igWachtend(){return IG.posts.filter(p=>p.gepost_om&&dagNL(p.gepost_om)>=IG_WACHT_VANAF&&!labelsVan(p,"muziek").length)}
 // stories van de laatste 2 dagen zonder muziek-keuze: zo kun je ook op de telefoon kiezen
@@ -814,10 +814,10 @@ function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="
 // Beide tellen als "zonder eigen muziek"; "(eigen muziek)" = automatisch label (wél eigen muziek, nummâh onbekend).
 function igGeenEigen(l){return l==="(geen)"||l==="(omgeving)"}
 function igIsNummer(l){return !!l&&l!=="(geen)"&&l!=="(omgeving)"&&l!=="(eigen muziek)"}
-function igMuziekNaam(l){return l==="(geen)"?"Geen eigen muziek":l==="(omgeving)"?"Omgevingsgeluid":l}
+function igMuziekNaam(l){return l==="(geen)"?"Andere muziek":l==="(omgeving)"?"Omgevingsgeluid":l}
 function igMuziekOpties(titels){
   const recent=JSON.parse(store.get("hc_ig_nummers")||"[]").filter(t=>titels.includes(t)).slice(0,3);
-  return `<option value="">— nog niet gekozen —</option><option value="(geen)">Geen eigen muziek</option><option value="(omgeving)">Geen muziek, alleen omgevingsgeluid</option>`+
+  return `<option value="">— nog niet gekozen —</option><option value="(geen)">Andere muziek</option><option value="(omgeving)">Geen muziek, alleen omgevingsgeluid</option>`+
     (recent.length?`<optgroup label="Laatst gekozen">${recent.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`:"")+
     `<optgroup label="Alle nummâhs (SoundCloud, Spotify, DJ·World, YouTube)">${titels.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</optgroup>`;
 }
@@ -853,7 +853,7 @@ function renderIgMuziek(){
   const wacht=igWachtend(),wachtSt=igWachtStories();
   $("igWacht").hidden=!wacht.length&&!wachtSt.length;
   if(wacht.length||wachtSt.length){
-    $("igWachtSub").innerHTML=`${igWachtTekst(wacht.length,wachtSt.length)} ${wacht.length+wachtSt.length>1?"wachten":"wacht"} tot je kiest welke muziek eronder zat. Kies "Geen eigen muziek" als er iets anders onder zat, of "Geen muziek, alleen omgevingsgeluid" als je alleen het geluid van buiten hoort; dan telt hij mee bij de vergelijking.`
+    $("igWachtSub").innerHTML=`${igWachtTekst(wacht.length,wachtSt.length)} ${wacht.length+wachtSt.length>1?"wachten":"wacht"} tot je kiest welke muziek eronder zat. Kies "Andere muziek" als er iets anders onder zat, of "Geen muziek, alleen omgevingsgeluid" als je alleen het geluid van buiten hoort; dan telt hij mee bij de vergelijking.`
       +(wachtSt.length?` Stories staan hier ${IG_WACHT_STORY_DAGEN} dagen.`:"");
     $("igWachtLijst").innerHTML=wacht.map(p=>igPostRij(p,opties,titels)).join("")+wachtSt.map(x=>igStoryWachtRij(x,opties,titels)).join("");
   }
