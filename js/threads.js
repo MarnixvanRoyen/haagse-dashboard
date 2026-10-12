@@ -213,8 +213,9 @@ function thVasteRijen(c){
     `${nf0.format(g[0])} reacties · ${nf0.format(g[1])} reposts · ${nf0.format(g[2])} quotes, laatste 7 dagen`+igVs(g[0]+g[1]+g[2],gv)]);
   rij.push(["Interactie per 1.000",it.nu==null?"—":thF1(it.nu),it.nu==null?`komt zodra er 3 posts met ${TH_INTER_MIN}+ weergaven zijn`:
     `likes + reacties + reposts + quotes per 1.000 weergaven · middelste van je laatste ${it.n} posts`+thVs10(it.nu,it.voor,thF1,0.15)]);
-  rij.push(["Weergaven (account)",av?nf0.format(av.v):"—",av?"laatste 7 dagen, volgens Meta"+igVs(av.v,av.vorig):"nog geen dag-cijfâhs",
-    ' <span class="pc">· Meta noemt dit "hoe vaak je profiel bekeken werd"</span>']);
+  // (chat 34, 12-10) Meta-docs zeggen "profielweergaven", maar het getal = Weergaven in de Threads-app (7 d: 682 = 682) → alle weergaven samen
+  rij.push(["Weergaven totaal",av?nf0.format(av.v):"—",av?"alles samen (posts, reacties, profiel), laatste 7 dagen"+igVs(av.v,av.vorig):"nog geen dag-cijfâhs",
+    ' <span class="pc">· zelfde getal as Weergaven in de Threads-app</span>']);
   rij.push(["Klikken op links",kl?nf0.format(kl.v):"—",kl?"laatste 7 dagen"+igVs(kl.v,kl.vorig):"nog geen dag-cijfâhs"]);
   return rij;
 }
