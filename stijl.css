@@ -610,20 +610,70 @@ body.popopen{overflow:hidden}
 /* menu Partnâhs (samenwerking.js, renderPartners): tabjes per kanaal; tabel mag nooit de pagina breder maken */
 #s-partners>div{min-width:0}
 
-/* "Deze gaat lekkâh!" bovenaan Ovâhzicht (25_post_uur.sql, insta.js igLekkerHTML) */
-.alarm.lekker{border-color:var(--groen);background:color-mix(in srgb,var(--groen) 16%,var(--surface))}
-.alarm.lekker .alarmicoon{background:var(--groen);color:#fff}
-.alarm.lekker.fik{border-color:var(--sc);background:color-mix(in srgb,var(--sc) 16%,var(--surface))}
-.alarm.lekker.fik .alarmicoon{background:var(--sc);font-size:14px}
-.lkrij{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:start}
-.lktekst{display:grid;gap:3px;min-width:0}
-.lktekst p{overflow-wrap:anywhere}
+/* gedeelde tekststijlen van de hittemetâh (stonden eerst bij "Deze gaat lekkâh!") */
 .lkx{font-family:var(--display);font-weight:400;font-size:20px;color:var(--hy)}
 .lksub{font-size:13px;color:var(--muted)}
 .lksub .chip{vertical-align:1px}
 .lkuitleg summary{cursor:pointer;font-size:13px;font-weight:700}
 .lkuitleg p{font-size:13px;margin-top:6px}
-@media (max-width:620px){.lkrij{grid-template-columns:52px minmax(0,1fr);gap:10px}}
+/* Hittemetâh bovenaan Ovâhzicht (chat 32, insta.js igLekkerHitte/igHitteHTML; vervangt "Deze gaat lekkâh!") */
+.hittes{display:grid;gap:12px}
+@media (min-width:900px){.hittes.meer{grid-template-columns:repeat(auto-fit,minmax(360px,1fr));align-items:start}}
+.alarm.hitte{--fc:var(--lb);border-color:var(--fc);background:color-mix(in srgb,var(--fc) 13%,var(--surface))}
+.alarm.hitte.f-normaal{--fc:var(--groen)}
+.alarm.hitte.f-warm{--fc:var(--hy)}
+.alarm.hitte.f-lekker{--fc:var(--sc)}
+.alarm.hitte.f-fik{--fc:var(--weg);background:color-mix(in srgb,var(--weg) 18%,var(--surface))}
+.alarm.hitte .alarmicoon{background:var(--fc);color:#fff;font-size:14px}
+.alarm.hitte.f-warm .alarmicoon{color:var(--hy-ink)}
+.hrij{display:grid;grid-template-columns:92px minmax(0,1fr);gap:12px;align-items:start}
+.htekst{display:grid;gap:3px;min-width:0}
+.htekst p{overflow-wrap:anywhere}
+.hpost{display:flex;gap:10px;align-items:center;margin-bottom:2px}
+.hpost p{margin:0}
+.hgetal{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.hmist{font-size:14px}
+.hmist b{color:var(--ink)}
+.chip.hkoel{background:color-mix(in srgb,var(--lb) 30%,var(--surface));color:var(--ink);border:1px solid var(--lb)}
+.hverloop{grid-column:1/-1;max-width:420px}
+.hverloop text{font-size:10.5px}
+@media (min-width:900px){.hittes:not(.meer) .hrij{grid-template-columns:92px minmax(0,1fr) minmax(260px,340px)}
+  .hittes:not(.meer) .hverloop{grid-column:auto;align-self:end}}
+/* de thermometer */
+.hmeter{--buis:132px;position:relative;display:grid;justify-items:start;padding:22px 0 0 10px}
+.hbuis{position:relative;width:18px;height:var(--buis);border-radius:999px;background:var(--bg);border:2px solid var(--line);z-index:1}
+.hkwik{position:absolute;left:2px;right:2px;bottom:0;height:calc(4% + .96 * var(--naar));border-radius:999px;overflow:hidden;
+  background:linear-gradient(to top,#4a95ec 0%,#5cc275 30%,#f5c518 45%,#f07a3f 70%,#d9432f 100%);
+  background-size:100% calc(var(--buis) - 4px);background-position:bottom;background-repeat:no-repeat}
+.hbol{position:relative;z-index:2;width:42px;height:42px;margin:-8px 0 0 -12px;border-radius:50%;background:var(--kleur);border:2px solid var(--line);
+  display:grid;place-items:center;box-shadow:0 0 0 3px color-mix(in srgb,var(--kleur) 25%,transparent)}
+.hbol b{font-family:var(--display);font-weight:400;font-size:11.5px;color:#0f262d;letter-spacing:-.02em}
+.hstreep{position:absolute;left:calc(100% + 2px);transform:translateY(50%);display:flex;align-items:center;gap:3px;pointer-events:none}
+.hstreep::before{content:"";width:6px;height:2px;background:var(--line);border-radius:2px}
+.hstreep em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted);line-height:1;white-space:nowrap}
+.hstreep.aan::before{background:var(--ink-2)}
+.hstreep.aan em{color:var(--ink)}
+.koelt .hbuis{border-color:#4a95ec;box-shadow:0 0 0 3px rgba(74,149,236,.25)}
+.hvlam{position:absolute;left:50%;bottom:calc(100% - 4px);width:30px;height:26px;transform:translateX(-50%);pointer-events:none}
+.hvlam i{position:absolute;bottom:0;left:50%;width:14px;height:22px;margin-left:-7px;border-radius:50% 50% 45% 45% / 60% 60% 40% 40%;
+  background:radial-gradient(circle at 50% 75%,#fff4b0 0 18%,#f5c518 35%,#f07a3f 65%,rgba(217,67,47,0) 100%);transform-origin:50% 100%}
+.hvlam i:nth-child(2){left:22%;width:10px;height:15px;margin-left:-5px}
+.hvlam i:nth-child(3){left:78%;width:10px;height:17px;margin-left:-5px}
+.hkwik i{position:absolute;bottom:-6px;width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.55);opacity:0}
+.hkwik i:nth-child(1){left:3px}.hkwik i:nth-child(2){left:7px}.hkwik i:nth-child(3){left:4px}.hkwik i:nth-child(4){left:8px}
+@media (prefers-reduced-motion:no-preference){
+  .hkwik{animation:hkwik 1.3s cubic-bezier(.2,.8,.2,1) .15s both}
+  @keyframes hkwik{from{height:calc(4% + .96 * var(--van))}to{height:calc(4% + .96 * var(--naar))}}
+  .hkwik i{animation:hbel 2.6s ease-in infinite}
+  .hkwik i:nth-child(2){animation-delay:.7s}.hkwik i:nth-child(3){animation-delay:1.4s}.hkwik i:nth-child(4){animation-delay:2s}
+  @keyframes hbel{0%{transform:translateY(0);opacity:0}15%{opacity:.9}100%{transform:translateY(-110px);opacity:0}}
+  .hvlam i{animation:hvlam .9s ease-in-out infinite alternate}
+  .hvlam i:nth-child(2){animation-duration:.7s;animation-delay:.2s}.hvlam i:nth-child(3){animation-duration:.8s;animation-delay:.4s}
+  @keyframes hvlam{from{transform:scale(1,1) rotate(-3deg)}to{transform:scale(.85,1.18) rotate(4deg)}}
+  .alarm.hitte.f-fik{animation:hgloei 2.4s ease-in-out infinite}
+  @keyframes hgloei{0%,100%{box-shadow:0 0 0 0 rgba(217,67,47,0)}50%{box-shadow:0 0 18px 2px rgba(217,67,47,.45)}}
+}
+@media (max-width:620px){.hrij{grid-template-columns:82px minmax(0,1fr);gap:10px}.hmeter{--buis:112px;padding-left:8px}}
 
 /* ---------- Partnâhs versimpeld + let op (chat 19, 12-10) ---------- */
 .seg.igsfilter{flex-wrap:wrap;margin-top:14px}

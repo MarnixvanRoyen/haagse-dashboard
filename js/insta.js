@@ -68,10 +68,11 @@ function igPostsVan(g){return IG.posts.filter(p=>soortGroep(p)===g)}
 // Geeft ook terug op hoeveel posts en sinds wanneer, zodat een kaart eerlijk kan zeggen waar het op rust.
 // opties: voor = alleen posts van vóór dit tijdstip (Kansâh: vóór de start), min = minimaal aantal posts (standaard 5).
 const IG_NORMAAL_MIN=5;
-function igNormaal(g,f,{voor=Infinity,min=IG_NORMAAL_MIN,posts=null}={}){
+// dagen = welke vensters na elkaar (standaard 120 → 365 → allâh tijde); de hittemetâh gebruikt 90 → 365 → allâh tijde (IG_LEKKER.normaalDagen).
+function igNormaal(g,f,{voor=Infinity,min=IG_NORMAAL_MIN,posts=null,dagen=[120,365,null]}={}){
   const bron=(posts||igPostsVan(g)).filter(p=>p.gepost_om&&Date.parse(p.gepost_om)<voor);
   const t0=Math.min(voor,Date.now());let n=0;
-  for(const d of [120,365,null]){
+  for(const d of dagen){
     const l=bron.filter(p=>!d||Date.parse(p.gepost_om)>t0-d*864e5).map(p=>({p,v:f(p)})).filter(x=>x.v!=null&&!isNaN(x.v));
     n=l.length;
     if(l.length>=min){const oudste=l.reduce((m,x)=>!m||x.p.gepost_om<m?x.p.gepost_om:m,null);
@@ -1085,26 +1086,31 @@ function instaTegel(){
   </article>`;
 }
 
-/* ---------- "Deze gaat lekkâh!" — kaart bovenaan Ovâhzicht (06-10, chat 10; 25_post_uur.sql) ----------
+/* ---------- Hittemetâh: hoe heet is mijn nieuwe post? (12-10, chat 32; vervangt de ja/nee-kaart "Deze gaat lekkâh!" van chat 10) ----------
    Supabase meet elke nieuwe post tot 48 uur na het posten elk uur (klusje instagram-post-uur op :10) en
-   ook bij elke ververs-ronde (ig_live → ig_media_dag → trigger). Tabel ig_post_uur: leeftijd in minuten + cijfers.
-   Twee niveaus (afspraak Marnix, geen push meer: alleen deze kaart):
-     gaat lekkâh   = bereik ≥ 500 én ≥ 2× zo snel als normaal voor die leeftijd
+   ook bij elke ververs-ronde (ig_live → ig_media_dag → trigger). Tabel ig_post_uur: leeftijd in minuten + cijfers (25_post_uur.sql).
+   REGELS (zelfde als chat 10; staan in IG_LEKKER, igLekkerNormaal en igLekkerOordeel):
+     gaat lekkâh     = bereik ≥ 500 én ≥ 2× zo snel als normaal voor die leeftijd
      staat in de fik = dat plus ≥ 20 likes én likes per kijkâh minstens je normaal
-   Alleen posts/carrousels/reels (geen stories). Gaat alleen af als het lukte vóór 24 uur oud; de kaart blijft
-   zolang de post nog voldoet, hooguit 48 uur. "Normaal" altijd binnen de eigen groep (soortGroep/igPostsVan/igNormaal):
-     1. zolang er < 10 eerdere posts in de groep met uurmetingen zijn: je normale eindbereik (igNormaal, posts ≥ 2 dagen oud)
-        × de gewone groei (IG_LEKKER.curve: welk deel van het eindbereik een post na X uur meestal heeft);
+   "Normaal" altijd binnen de eigen groep (soortGroep/igPostsVan/igNormaal):
+     1. zolang er < 10 eerdere posts in de groep met uurmetingen zijn: je normale eindbereik (igNormaal, posts ≥ 2 dagen oud,
+        sinds chat 32 eerst de laatste 90 dagen: IG_LEKKER.normaalDagen) × de gewone groei (IG_LEKKER.curve);
      2. daarna: de middelste van je eigen eerdere posts op precies dezelfde leeftijd (bereik én likes per kijkâh).
-   Reels: weinig data → altijd "voorzichtig" erbij (ook foto's als het normaal op < 10 posts rust).
+   Waarom 90 dagen (terugkijktest 12-10): de 120 dagen gingen terug tot half juni (veel uitschieters, normaal 2.267 tegen 1.155 over 90 dagen);
+   dan stond de metâh bij elke post van die week op ijskoud en was hij na ± 3 uur weg.
+   DE METÂH leest ALLEEN igLekkerHitte(p): temperatuur 0–100, fase, wat nog mist, afkoelen, verloop.
+   Chat 17 (betere eindstand) en chat 27 (per soort, ook stories) veranderen de regels via igLekkerNormaal/igLekkerOordeel/igLekkerHitte;
+   igHitteHTML (de metâh zelf) hoeft dan nie te veranderen.
+   Reels: weinig data → altijd "voorzichtig". Stories doen nog nie mee (komt in chat 27). Verwijderde posts tellen nie (igPostsVan/IG.posts).
    Rekent alles in de browser; geen extra vraag aan Supabase behalve het ophalen van ig_post_uur. */
 const IG_LEKKER={
   bereik:500,            // minimaal bereik
   snelheid:2,            // minstens zoveel keer zo snel als normaal (foto's & carrousels)
   snelheidReel:2,        // idem voor reels (strenger maken? bijv. 3)
   fikLikes:20,           // "in de fik": minimaal aantal likes
-  startUur:24,           // moet afgaan vóór de post zo oud is
-  kaartUur:48,           // kaart blijft hooguit zo lang
+  startUur:24,           // moet afgaan vóór de post zo oud is; de metâh is na zoveel uur weg
+  kaartUur:48,           // uurmetingen ophalen tot zo oud (de metâh zelf stopt bij startUur)
+  normaalDagen:90,       // normaal eindbereik: eerst de laatste zoveel dagen (dan 365, dan allâh tijde); terugkijktest 12-10
   minMinuut:60,          // jonger dan een uur: nog nie beoordelen (Meta loopt in het begin achter)
   curvePosts:10,         // vanaf zoveel eerdere posts mét uurmetingen: normaal op dezelfde leeftijd
   zeker:10,              // normaal rust op minder posts → "voorzichtig"
@@ -1149,9 +1155,10 @@ function igLekkerNormaal(p,m){
             voorzichtig:g==="reel"||st.length<IG_LEKKER.zeker};
   }
   const oud=eerder.filter(q=>Date.parse(q.gepost_om)<Date.now()-2*864e5);   // eindbereik: alleen posts die uitgegroeid zijn
-  const nb=igNormaal(g,q=>q.bereik==null?null:+q.bereik,{posts:oud});
+  const dagen=[IG_LEKKER.normaalDagen,365,null];
+  const nb=igNormaal(g,q=>q.bereik==null?null:+q.bereik,{posts:oud,dagen});
   if(!nb.genoeg||!(nb.waarde>0))return null;
-  const nl=igNormaal(g,q=>+q.bereik>0&&q.likes!=null?(+q.likes)/(+q.bereik):null,{posts:oud});
+  const nl=igNormaal(g,q=>+q.bereik>0&&q.likes!=null?(+q.likes)/(+q.bereik):null,{posts:oud,dagen});
   return {g,verwacht:nb.waarde*igCurveDeel(m/60),eind:nb.waarde,likesPk:nl.genoeg?nl.waarde:null,manier:"eind",n:nb.n,dagen:nb.dagen,
           voorzichtig:g==="reel"||nb.n<IG_LEKKER.zeker};
 }
@@ -1162,54 +1169,165 @@ function igLekkerOordeel(p,x){   // x = meting {m, r, l}
   const likesOk=x.l!=null&&x.l>=IG_LEKKER.fikLikes, pkOk=lpk!=null&&N.likesPk!=null&&lpk>=N.likesPk;
   return {N,snel,lpk,lekker,fik:lekker&&likesOk&&pkOk,likesOk,pkOk};
 }
-function igLekkerLijst(){
-  const uit=[],nu=Date.now();
-  (IG.posts||[]).forEach(p=>{
-    if(!p.gepost_om||soortGroep(p)==="story")return;
-    const t0=Date.parse(p.gepost_om);if(nu-t0>IG_LEKKER.kaartUur*36e5)return;
-    const rij=(IG.pu||new Map()).get(p.media_id);if(!rij||!rij.length)return;
-    const laatst=rij[rij.length-1];if(laatst.m<IG_LEKKER.minMinuut)return;
-    const o=igLekkerOordeel(p,laatst);if(!o||!o.lekker)return;   // nu nie (meer) lekkâh → geen kaart
-    const af=rij.find(x=>x.m>=IG_LEKKER.minMinuut&&x.m<IG_LEKKER.startUur*60&&(z=>z&&z.lekker)(igLekkerOordeel(p,x)));
-    if(!af)return;   // pas na 24 uur lekkâh geworden: telt nie
-    uit.push({p,x:laatst,o,af});
-  });
-  return uit.sort((a,b)=>(b.o.fik-a.o.fik)||(Date.parse(b.p.gepost_om)-Date.parse(a.p.gepost_om)));   // fik eerst, dan de jongste
+/* ---- Temperatuur, zwakste punt telt (keuze Marnix 12-10) ----
+   Tot het streepje Lekkâh (70%) telt de snelheid t.o.v. normaal op die leeftijd: 0,5× = 0% · 1× = 30% (Normaal) · 1,3× = 45% (Warm) ·
+   2× = 70% (Lekkâh, reels: IG_LEKKER.snelheidReel). Het bereik telt ook mee: 500 kijkâhs = 70%. Het laagste van die twee telt.
+   Is hij lekkâh, dan telt daarboven het zwakste van de fik-voorwaarden (likes ÷ 20, likes per kijkâh ÷ normaal) tot 100% = in de fik.
+   ---- Afkoelen (keuze Marnix 12-10, na de terugkijktest) ----
+   Meetpunten = elk heel uur + de laatste meting. Het kwik "zakt" als hij > 3% trager gaat dan bij het vorige meetpunt (t.o.v. normaal).
+   Weg als het 2 meetpunten op rij zakt én hij dan trager gaat dan normaal (< 1×). Eén trage meting kan toeval zijn: dan blijft hij staan.
+   Meetpunten tussen 01:00 en 07:00 tellen nie mee (dan zakt elke post en 's ochtends trekt hij weer bij). Uiterlijk weg na IG_LEKKER.startUur. */
+const IG_HITTE={
+  snel:[[.5,0],[1,30],[1.3,45]],   // [× zo snel as normaal, temperatuur]; daarboven loopt het door tot lekkâh (2×) = 70
+  lekker:70,                       // streepje Lekkâh
+  streepjes:[[30,"Normaal"],[45,"Warm"],[70,"Lekkâh"],[100,"Fik"]],
+  zakMarge:.03,                    // zakken = meer dan 3% trager dan het vorige meetpunt
+  zakKeer:2,                       // zoveel keer op rij zakken (én onder normaal) = weg
+  nachtVan:1,nachtTot:7,           // meetpunten tussen 01:00 en 07:00 (Den Haag) tellen nie mee voor het zakken
+  kleuren:[[0,[74,149,236]],[30,[92,194,117]],[45,[245,197,24]],[70,[240,122,63]],[100,[217,67,47]]]   // zee-blauw → groen → geel → oranje → rood
+};
+const IG_HITTE_FASE={
+  wacht:{kop:"Nieuwe post: effe wachte…",naam:"wacht op meting",icoon:"⏳"},
+  koud:{kop:"Nog lauw",naam:"lauw",icoon:"·"},
+  normaal:{kop:"Loopt normaal",naam:"normaal",icoon:"→"},
+  warm:{kop:"Wordt warm!",naam:"warm",icoon:"↗"},
+  lekker:{kop:"Gaat lekkâh!",naam:"lekkâh",icoon:"↗"},
+  fik:{kop:"In de fik!",naam:"in de fik",icoon:"🔥"}};
+const IG_HITTE_UUR=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Amsterdam",hour:"2-digit",hourCycle:"h23"});
+function igIsNacht(ts){const h=+IG_HITTE_UUR.format(ts)%24;return h>=IG_HITTE.nachtVan&&h<IG_HITTE.nachtTot}
+function igHitteKleur(t){const k=IG_HITTE.kleuren;t=Math.max(0,Math.min(100,t));
+  for(let i=1;i<k.length;i++)if(t<=k[i][0]){const [a,ca]=k[i-1],[b,cb]=k[i],f=(t-a)/(b-a);
+    return "rgb("+ca.map((c,j)=>Math.round(c+(cb[j]-c)*f)).join(",")+")"}
+  return "rgb("+k[k.length-1][1].join(",")+")";
+}
+function igHitteDrempel(N){return N.g==="reel"?IG_LEKKER.snelheidReel:IG_LEKKER.snelheid}
+// temperatuur van één meting: o = igLekkerOordeel(p, x), x = {m, r, l}
+function igHitteTemp(o,x){
+  const N=o.N,drempel=igHitteDrempel(N),s=o.snel,pts=[...IG_HITTE.snel,[drempel,IG_HITTE.lekker]];
+  let ts=0;
+  if(s>=drempel)ts=IG_HITTE.lekker;
+  else if(s>pts[0][0])for(let i=1;i<pts.length;i++)if(s<=pts[i][0]){const [a,ta]=pts[i-1],[b,tb]=pts[i];ts=ta+(tb-ta)*(s-a)/(b-a);break}
+  const tb=IG_HITTE.lekker*Math.min(1,x.r/IG_LEKKER.bereik);
+  if(!o.lekker)return {t:Math.min(ts,tb),ts,tb};
+  if(o.fik)return {t:100,ts,tb};
+  const likesDeel=x.l==null?0:Math.min(1,x.l/IG_LEKKER.fikLikes),pkDeel=o.lpk==null||N.likesPk==null?0:Math.min(1,o.lpk/N.likesPk);
+  return {t:Math.min(99,IG_HITTE.lekker+(100-IG_HITTE.lekker)*Math.min(likesDeel,pkDeel)),ts,tb};
+}
+function igHitteFase(t,o){return o.fik?"fik":o.lekker?"lekker":t>=45?"warm":t>=30?"normaal":"koud"}
+// wat mist nog in gewone woorden, het zwakste punt eerst
+function igHitteMist(o,x){
+  const N=o.N,drempel=igHitteDrempel(N),uit=[];
+  if(o.fik)return [];
+  if(!o.lekker){
+    if(o.snel<drempel)uit.push({d:o.snel/drempel,t:`${igNf1.format(o.snel)}× zo snel as normaal (lekkâh = ${nf1i.format(drempel)}×)`});
+    if(x.r<IG_LEKKER.bereik)uit.push({d:x.r/IG_LEKKER.bereik,t:`nog ${nf0.format(Math.ceil(IG_LEKKER.bereik-x.r))} kijkâhs (lekkâh = minstens ${nf0.format(IG_LEKKER.bereik)})`});
+  }else{
+    if(x.l==null||x.l<IG_LEKKER.fikLikes)uit.push({d:x.l==null?0:x.l/IG_LEKKER.fikLikes,t:x.l==null?"likes nog nie bekend":`nog ${nf0.format(Math.ceil(IG_LEKKER.fikLikes-x.l))} likes`});
+    if(N.likesPk==null||o.lpk==null)uit.push({d:0,t:"likes per kijkâh nog nie te vergelijken"});
+    else if(o.lpk<N.likesPk)uit.push({d:o.lpk/N.likesPk,t:`likes per kijkâh nog onder je normaal (${igPct1(o.lpk)}, normaal ${igPct1(N.likesPk)})`});
+  }
+  return uit.sort((a,b)=>a.d-b.d).map(u=>u.t);
+}
+/* DE functie voor de metâh. Geeft null (geen metâh) of:
+   {p, g, leeftijd (min), fase, t (0–100 nu), van (t vorige meetpunt), punten [{m, r, l, om, snel, lpk, o, t, fase, nacht, zakt}],
+    nu (laatste punt), N (normaal), mist [teksten], koelt, nachtrust, weg, wegNa (min), voorzichtig}
+   koelt = zakt nu én het kwik staat lager dan bij het vorige meetpunt (overdag); nachtrust = idem tussen 01:00 en 07:00.
+   fase "wacht" = nog geen meting van minstens IG_LEKKER.minMinuut (Meta loopt ± 1 uur achter). Stories → null (chat 27). */
+function igLekkerHitte(p,nu=Date.now()){
+  if(!p||!p.gepost_om)return null;
+  const g=soortGroep(p);if(g==="story")return null;
+  const t0=Date.parse(p.gepost_om),leeftijd=(nu-t0)/6e4;
+  if(!(leeftijd>=0)||leeftijd>=IG_LEKKER.startUur*60)return null;
+  const rij=((IG.pu||new Map()).get(p.media_id)||[]).filter(x=>x.m<=leeftijd+5);
+  const basis={p,g,leeftijd,fase:"wacht",t:0,van:0,punten:[],nu:null,N:null,mist:[],koelt:false,nachtrust:false,weg:false,wegNa:null,voorzichtig:g==="reel"};
+  const laatst=rij[rij.length-1];
+  if(!laatst||laatst.m<IG_LEKKER.minMinuut)return basis;
+  const pts=[];   // elk heel uur (echte meting binnen 10 min, anders ingevuld tussen 2 metingen) + de laatste meting
+  for(let h=1;h*60<=laatst.m+10;h++){const x=igPuStand(rij,h*60);if(x)pts.push({m:Math.min(h*60,laatst.m),r:x.r,l:x.l,om:x.om||null})}
+  if(!pts.length||laatst.m-pts[pts.length-1].m>10)pts.push({m:laatst.m,r:laatst.r,l:laatst.l,om:laatst.om||null});
+  const punten=[];let zak=0,weg=null;
+  for(const x of pts){
+    const o=igLekkerOordeel(p,x);if(!o)continue;
+    const T=igHitteTemp(o,x),nacht=igIsNacht(t0+x.m*6e4),vorig=punten[punten.length-1];
+    const zakt=!!vorig&&o.snel<vorig.snel*(1-IG_HITTE.zakMarge);
+    if(!nacht)zak=zakt?zak+1:0;   // 's nachts: telt nie mee (ook nie als "weer gestegen")
+    const t=Math.round(T.t);   // hele procenten: wat je op de bol ziet, bepaalt ook de fase
+    const pt={m:x.m,r:x.r,l:x.l,om:x.om,snel:o.snel,lpk:o.lpk,o,t,fase:igHitteFase(t,o),nacht,zakt};
+    punten.push(pt);
+    if(!weg&&zak>=IG_HITTE.zakKeer&&o.snel<1)weg=pt;
+  }
+  if(!punten.length)return null;   // geen normaal (te weinig eerdere posts in deze groep)
+  const n=punten[punten.length-1],v=punten[punten.length-2];
+  return {...basis,fase:n.fase,t:n.t,van:v?v.t:0,punten,nu:n,N:n.o.N,mist:igHitteMist(n.o,n),
+    koelt:!!v&&n.zakt&&!n.nacht&&n.t<v.t-1,nachtrust:!!v&&n.zakt&&n.nacht&&n.t<v.t-1,weg:!!weg,wegNa:weg?weg.m:null,voorzichtig:n.o.N.voorzichtig};
+}
+function igHitteLijst(nu=Date.now()){
+  return (IG.posts||[]).map(p=>igLekkerHitte(p,nu)).filter(h=>h&&!h.weg)
+    .sort((a,b)=>(b.t-a.t)||(Date.parse(b.p.gepost_om)-Date.parse(a.p.gepost_om)));   // heetste eerst, dan de jongste
 }
 function igLeeftijd(m){return m<120?`${Math.round(m)} min oud`:`${Math.floor(m/60)} uur oud`}
-function igLekkerHTML(){
-  const l=igLekkerLijst();if(!l.length)return "";
-  const nf=v=>nf1i.format(v);   // 2 / 2,5 (geen "2,0")
-  return l.map(({p,x,o,af})=>{
-    const N=o.N,G=IG_GROEPEN[N.g],uur=x.m/60;
-    const kop=o.fik?"Deze staat in de fik!":"Deze gaat lekkâh!";
-    const normTxt=N.manier==="leeftijd"?`normaal ± ${nf0.format(Math.round(N.verwacht))} na ${igLeeftijd(x.m).replace(" oud","")} (middelste van ${N.n} eerdere ${G.kort} op dezelfde leeftijd)`
-      :`normaal ± ${nf0.format(Math.round(N.verwacht))} na ${igLeeftijd(x.m).replace(" oud","")}`;
-    const likesTxt=o.lpk==null?"likes nog nie bekend":
-      `likes per kijkâh <b>${igPct1(o.lpk)}</b>${N.likesPk!=null?` · normaal ${igPct1(N.likesPk)}`:""} · ${nf0.format(Math.round(x.l))} likes`;
-    const waaromNie=o.fik?"":!o.likesOk?` · nog geen ${IG_LEKKER.fikLikes} likes`:N.likesPk==null?"":!o.pkOk?" · likes per kijkâh nog onder je normaal":"";
-    const voorz=N.voorzichtig?`<p class="lksub"><span class="chip">voorzichtig</span> Je normaal rust op maar ${N.n} ${N.n===1?G.een:G.kort}${N.manier==="eind"&&N.dagen!==120?(N.dagen?` (laatste ${N.dagen} dagen)`:" (allâh tijde)"):""}, dus neem 't met een korreltje zout.</p>`:"";
-    const tip=o.fik?"Mensen vinde 'm ook nog goed: deel 'm nâh in je story en reageer op de reacties!":"Tip: deel 'm nâh in je story, nâh 't loopt!";
-    return `<div class="alarm lekker${o.fik?" fik":""}" role="status">
-      <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${o.fik?"🔥":"↗"}</span><h2>${kop}</h2></div>
-      <div class="lkrij">
-        <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
-        <div class="lktekst">
-          <p><b>${soortNaam(p)} · ${igLeeftijd(x.m)}</b><span class="pc"> · ${esc(igEersteRegel(p.bijschrift)).slice(0,90)}</span></p>
-          <p><b class="lkx">${igNf1.format(o.snel)}×</b> zo snel as normaal · ${nf0.format(Math.round(x.r))} kijkâhs, ${normTxt}</p>
-          <p>${likesTxt}${waaromNie}</p>
-          ${voorz}
-          <p class="lksub">${tip} · gemeten ${x.om?tijdAms(x.om):""}${af.m<x.m-30?` · lekkâh sinds ${Math.max(1,Math.floor(af.m/60))} uur na posten`:""}</p>
-        </div>
-      </div>
-      <details class="lkuitleg"><summary>Hoe werkt dit?</summary>
-        <p>Supabase meet je nieuwe posts elk uur (en als je het dashboard opent), tot 48 uur na het posten.
-        <b>Gaat lekker</b> = minstens ${nf0.format(IG_LEKKER.bereik)} bereik én minstens ${nf(N.g==="reel"?IG_LEKKER.snelheidReel:IG_LEKKER.snelheid)}× zo snel als normaal voor een ${G.een} van die leeftijd.
-        <b>In de fik</b> = dat plus minstens ${IG_LEKKER.fikLikes} likes én likes per kijker minstens je normaal. Het moet lukken vóór de post ${IG_LEKKER.startUur} uur oud is; de kaart blijft zolang het nog klopt, hooguit ${IG_LEKKER.kaartUur} uur.</p>
-        <p>${N.manier==="leeftijd"?`Normaal = de middelste van je eerdere ${G.kort} op precies dezelfde leeftijd.`
-          :`Normaal = je normale eindbereik (${nf0.format(Math.round(N.eind))}, middelste van ${N.n} ${G.kort}) × hoeveel een post na ${nf(uur)} uur meestal al heeft (± ${pct(igCurveDeel(uur))}). Zodra er ${IG_LEKKER.curvePosts} ${G.kort} met uurmetingen zijn, vergelijkt hij met je eigen posts op dezelfde leeftijd.`}
-        Meta loopt in de eerste uren soms wat achter, dus het kan een uur later afgaan dan het echt gebeurt.</p>
-        <p><b>Kijk niet steeds zelf naar je nieuwe post.</b> Je eigen kijken telt hooguit 1× mee en maakt hem niet sneller; dit dashboard houdt het voor je bij.</p>
-      </details>
-    </div>`}).join("");
+function igHitteUurLabel(m){return m<120?`${Math.round(m)} min`:`${Math.floor(m/60)} u`}
+// de thermometer zelf (HTML + CSS; animatie: kwik van de vorige meting naar nu)
+function igHitteMeterHTML(h){
+  const t=Math.round(h.t),van=Math.round(h.van),F=IG_HITTE_FASE[h.fase];
+  const bel=h.t>=45&&h.fase!=="wacht"?`<i></i><i></i><i></i><i></i>`:"";
+  return `<div class="hmeter" role="img" aria-label="Hittemetâh: ${t}% (${esc(F.naam)})" style="--van:${van}%;--naar:${t}%;--kleur:${igHitteKleur(h.t)}">
+    <div class="hbuis"><div class="hkwik">${bel}</div>
+      ${IG_HITTE.streepjes.map(([v,n])=>`<span class="hstreep${h.t>=v&&h.fase!=="wacht"?" aan":""}" style="bottom:calc(4% + ${v*.96}%)"><em>${n}</em></span>`).join("")}
+      ${h.fase==="fik"?`<div class="hvlam" aria-hidden="true"><i></i><i></i><i></i></div>`:""}</div>
+    <div class="hbol"><b>${h.fase==="wacht"?"…":t+"%"}</b></div>
+  </div>`;
+}
+// verloop: één staafje per meetpunt op leeftijd 0–24 uur; aanwijzen/tikken = "2 u · 45% warm" (staafGetal, zoals de andere grafieken)
+function igHitteVerloopHTML(h){
+  if(h.punten.length<2)return "";
+  const W=300,H=64,top=10,bodem=50,uren=IG_LEKKER.startUur,x=m=>m/60/uren*W,y=t=>bodem-(bodem-top)*Math.max(2,t)/100,sw=W/uren;
+  const lijnen=IG_HITTE.streepjes.filter(([v])=>v<100).map(([v])=>`<line class="grid" x1="0" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`).join("");
+  const staaf=h.punten.map(pt=>{const xm=Math.min(W-3,Math.max(3,x(pt.m)));
+    return `<rect x="${(xm-2.5).toFixed(1)}" y="${y(pt.t).toFixed(1)}" width="5" height="${(bodem-y(pt.t)).toFixed(1)}" rx="1.5" fill="${igHitteKleur(pt.t)}"${pt.nacht?` fill-opacity=".55"`:""}/>`}).join("");
+  const hits=h.punten.map(pt=>{const xm=Math.min(W-3,Math.max(3,x(pt.m)));
+    return `<rect class="hit" x="${(xm-sw/2).toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="${bodem}"${staafGetal(xm,y(pt.t),`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
+  const as=[0,6,12,18,24].map(u=>`<text x="${Math.min(W-6,Math.max(6,x(u*60)))}" y="${H-2}" text-anchor="middle">${u} u</text>`).join("");
+  return `<div class="chart hverloop"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur per meting">${lijnen}<line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}${as}${hits}</svg></div>`;
+}
+function igHitteKaartHTML(h){
+  const p=h.p,G=IG_GROEPEN[h.g],F=IG_HITTE_FASE[h.fase],x=h.nu,N=h.N;
+  const post=`<div class="hpost"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a>
+      <p><b>${soortNaam(p)} · ${igLeeftijd(h.leeftijd)}</b><span class="pc"> · ${esc(igEersteRegel(p.bijschrift).slice(0,70))}</span></p></div>`;
+  let midden;
+  if(h.fase==="wacht"){
+    midden=`<p>Geplaatst om ${tijdAms(p.gepost_om)}. Meta loopt in het begin ± 1 uur achter: na de eerste meting gaat de metâh lopen.</p>`;
+  }else{
+    const normTxt=`normaal ± ${nf0.format(Math.round(x.r/x.snel))} na ${igHitteUurLabel(x.m).replace(" u"," uur")}`;
+    const likesTxt=x.l==null?"likes nog nie bekend":`${nf0.format(Math.round(x.l))} likes · likes per kijkâh ${x.lpk==null?"?":igPct1(x.lpk)}${N.likesPk!=null?` (normaal ${igPct1(N.likesPk)})`:""}`;
+    const mistKop=h.fase==="fik"?"":h.fase==="lekker"?"Nog nodig voâh de fik:":"Nog nodig voâh lekkâh:";
+    midden=`<p class="hgetal"><b class="lkx">${igNf1.format(x.snel)}×</b> zo snel as normaal${h.koelt?` <span class="chip hkoel">koelt af</span>`:h.nachtrust?` <span class="chip mute">'s nachts rustig</span>`:""}</p>
+      <p>${nf0.format(Math.round(x.r))} kijkâhs · ${normTxt}</p>
+      <p>${likesTxt}</p>
+      <p class="hmist">${h.fase==="fik"?"<b>Alles gehaald!</b> Snel, genoeg kijkâhs, genoeg likes én mensen vinde 'm goed.":`<b>${mistKop}</b> ${esc(h.mist.join(" · "))}`}</p>
+      ${h.voorzichtig?`<p class="lksub"><span class="chip">voorzichtig</span> ${h.g==="reel"?"Je hebt maar weinig reels, dus":`Je normaal rust op maar ${N.n} ${G.kort}, dus`} neem 't met een korreltje zout.</p>`:""}`;
+  }
+  const tip={wacht:"",koud:"Nog rustig. Gaat-ie 2 metingen op rij trager dan normaal, dan verdwijnt de metâh vanzelf.",
+    normaal:"Loopt as een gewone post.",warm:"Hij wordt warm: reageer op de reacties, dan blijft-ie lopen.",
+    lekker:"Tip: deel 'm nâh in je story, nâh 't loopt!",fik:"Mensen vinde 'm ook nog goed: deel 'm nâh in je story en reageer op de reacties!"}[h.fase];
+  const onder=[tip,x&&x.om?`gemeten ${tijdAms(x.om)}`:""].filter(Boolean).join(" · ");
+  return `<div class="alarm hitte f-${h.fase}${h.koelt?" koelt":""}" role="status">
+    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${F.icoon}</span><h2>${F.kop}</h2></div>
+    <div class="hrij">${igHitteMeterHTML(h)}<div class="htekst">${post}${midden}</div>${igHitteVerloopHTML(h)}</div>
+    ${onder?`<p class="lksub">${onder}</p>`:""}
+    <details class="lkuitleg"><summary>Hoe werkt de hittemetâh?</summary>
+      <p>Supabase meet je nieuwe posts elk uur (en als je het dashboard opent). De metâh vergelijkt je post met een normale ${G.een} van dezelfde leeftijd.
+      <b>Normaal</b> (30%) = even snel als normaal · <b>Warm</b> (45%) = 1,3× zo snel · <b>Lekkâh</b> (70%) = minstens ${nf1i.format(N?igHitteDrempel(N):IG_LEKKER.snelheid)}× zo snel én ${nf0.format(IG_LEKKER.bereik)} kijkâhs ·
+      <b>Fik</b> (100%) = dat plus ${IG_LEKKER.fikLikes} likes én likes per kijkâh minstens je normaal. Het zwakste punt telt: daaronder staat wat nog mist.</p>
+      <p>${N&&N.manier==="leeftijd"?`Normaal = de middelste van je eerdere ${G.kort} op precies dezelfde leeftijd.`
+        :N?`Normaal = je normale eindbereik (${nf0.format(Math.round(N.eind))}, middelste van ${N.n} ${G.kort}${N.dagen?` uit de laatste ${N.dagen} dagen`:""}) × hoeveel een post na zoveel uur meestal al heeft.`:""}
+      Gaat-ie 2 metingen op rij trager dan bij de vorige meting én trager dan normaal, dan is-ie afgekoeld en verdwijnt de metâh. Tussen 01:00 en 07:00 telt dat nie (dan zakt elke post). Na ${IG_LEKKER.startUur} uur is-ie sowieso weg.</p>
+      <p><b>Kijk niet steeds zelf naar je nieuwe post.</b> Je eigen kijken telt hooguit 1× mee en maakt hem niet sneller; dit dashboard houdt het voor je bij.</p>
+    </details>
+  </div>`;
+}
+// Ovâhzicht → #ovAlarm (bovenaan, vóór de alarmen): één metâh per nieuwe post, heetste eerst
+function igHitteHTML(){
+  const l=igHitteLijst();if(!l.length)return "";
+  return `<div class="hittes${l.length>1?" meer":""}">${l.map(igHitteKaartHTML).join("")}</div>`;
 }
