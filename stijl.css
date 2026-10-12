@@ -716,3 +716,17 @@ details.igsuit{border-top:1px solid var(--line);padding-top:8px}
 details.igsuit summary{cursor:pointer;font-weight:700}
 details.igsuit p{margin:8px 0 0;line-height:1.5}
 .alarm.letop .chip{vertical-align:1px}
+
+/* ---------- Wie kijkt d'r? (chat 13, js/demografie.js) ---------- */
+.demohaag{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--groen) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--groen) 45%,var(--line))}
+.demogroot{font-family:var(--display);font-size:30px;line-height:1;color:var(--hy)}
+.demo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 28px}
+@media (max-width:900px){.demo{grid-template-columns:1fr}}
+.demoblok h3,.demoop h3{margin:0 0 8px;font-size:15px}
+.demoblok .bar{grid-template-columns:22px minmax(80px,140px) 1fr auto}
+.demov{white-space:nowrap}
+.demod{font-size:11px;margin-left:4px}
+.demod.op{color:var(--good)}.demod.neer{color:var(--weg)}
+.demogroen{color:var(--good);font-weight:700}
+.demoop{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.demoop ul{margin:0;padding-left:18px;display:grid;gap:6px}

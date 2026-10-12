@@ -36,6 +36,7 @@ async function loadIG(){
   IG.status=await igStatusLaden();
   await igStoryLabels();
   await igStoryMinis();
+  IG.demo=typeof demoLaden==="function"?await demoLaden("ig_demografie"):{rijen:[],fout:null};   // wie kijkt d'r? (30_demografie.sql, js/demografie.js)
   if(typeof igSamenLaden==="function")await igSamenLaden();   // samenwerkingen + Facebook-sleutel (samenwerking.js)
   igBadge();
 }
@@ -623,6 +624,7 @@ function renderInsta(){
 
   renderIgStories();
   renderIgMuziek();
+  if(typeof renderIgDemo==="function")renderIgDemo();   // wie kijkt d'r? (js/demografie.js, alleen Mac/iPad)
 }
 
 /* ---------- grafiek per post: likes per kijkâh of kwaliteit (knop) ---------- */

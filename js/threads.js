@@ -10,7 +10,6 @@ let TH={acc:null,profiel:[],dag:[],posts:[],demo:[],status:{},err:null};
 let thPostMaat="views";      // grafiek per post: "views" of "inter"
 let thTopOp="views";         // toppâhs: sorteren op (zie TH_TOP_OP)
 let thTopPer="30";           // toppâhs: "30", "90" of "alles"
-let thDemoOp="city";         // waar wonen je volgâhs: "city" of "country"
 
 const TH_SOORT={TEXT_POST:"Tekst",IMAGE:"Foto",CAROUSEL_ALBUM:"Carrousel",VIDEO:"Video",AUDIO:"Audio",REPOST_FACADE:"Repost"};
 const TH_MIN_DAGEN=2, TH_N=10;              // posts pas vanaf 2 dagen oud in de trends; middelste van de laatste 10 vs de 10 daarvoor
@@ -330,24 +329,7 @@ function renderThTop(){
     lijst.map((p,i)=>`<tr${i>=5?' class="pc"':""}><td class="n">${i+1}</td><td><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${p.soortNaam}</a><span class="igcap" title="${esc(p.tekst.trim())}">${esc(igEersteRegel(p.tekst))}</span></td>${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${periode.length?"Nog geen posts met dit cijfâh in deze periode.":"Geen posts in deze periode."}</td></tr></tbody>`;
 }
-// waar wonen je volgâhs? (Meta geeft het pas vanaf 100 volgâhs; 1x per week gemeten)
-function thDemoNaam(soort,k){
-  if(soort==="country")return cName(k);
-  if(soort==="gender")return {F:"Vrouw",M:"Man",U:"Onbekend"}[k]||k;
-  if(soort==="city")return String(k).split(",")[0].replace(/^The Hague$/i,"Den Haag");
-  return k}
-function renderThDemo(){
-  if(!$("thDemo"))return;
-  document.querySelectorAll("#thDemoOp button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===thDemoOp));
-  const laatste=s=>TH.demo.find(r=>r.soort===s&&!r.fout&&r.data&&Object.keys(r.data).length);
-  const r=laatste(thDemoOp),fout=TH.demo.find(x=>x.soort===thDemoOp&&x.fout);
-  if(!r){$("thDemo").innerHTML=`<p class="sub" style="margin:0">${fout?"Meta gaf dit (nog) nie: "+esc(fout.fout.replace(/^Threads fout \d+ bij [^:]+:\s*/,""))+". Meta geeft het pas vanaf 100 volgâhs.":"Nog nie gemeten (1x per week, in de nacht)."}</p>`;$("thDemoSub").textContent="";return}
-  const rijen=Object.entries(r.data).map(([k,v])=>[k,+v]).sort((a,b)=>b[1]-a[1]),tot=rijen.reduce((a,x)=>a+x[1],0),max=rijen.length?rijen[0][1]:1;
-  const extra=["age","gender"].map(s=>{const x=laatste(s);if(!x)return "";const e=Object.entries(x.data).sort((a,b)=>b[1]-a[1]),t=e.reduce((a,y)=>a+(+y[1]),0);
-    return `${s==="age"?"Leeftijd":"Geslacht"}: `+e.slice(0,4).map(([k,v])=>`${esc(thDemoNaam(s,k))} ${pct(t?v/t:0)}`).join(" · ")}).filter(Boolean);
-  $("thDemoSub").innerHTML=`Gemeten ${dLabel(String(r.dag).slice(0,10),1)} · Meta telt alleen volgâhs van wie het dat weet, dus het totaal (${nf0.format(tot)}) is minder dan al je volgâhs.`+(extra.length?"<br>"+extra.join("<br>"):"");
-  $("thDemo").innerHTML=rijen.slice(0,8).map(([k,v],i)=>bar(thDemoNaam(thDemoOp,k),[{v,c:i===0?"groen":"hy"}],max,nf0.format(v)+" · "+pct(tot?v/tot:0),k,i+1)).join("");
-}
+// waar wonen je volgâhs: renderThDemo() staat sinds chat 13 in js/demografie.js (zelfde kaart als Insta "Wie kijkt d'r?")
 
 /* ---------- knoppen ---------- */
 document.addEventListener("click",async e=>{
@@ -356,12 +338,11 @@ document.addEventListener("click",async e=>{
     const {error}=await sb.rpc("th_post_terugzetten",{p_media_id:tz.dataset.thterug});
     if(error){tz.disabled=false;showMsg("Terugzetten lukte nie: "+(error.message||error),false);return}
     showMsg("Post telt weer mee. Effe verversen…",true);$("ververs").click();return}
-  const b=e.target.closest&&e.target.closest("#thPostMaat button, #thTopOp button, #thTopPer button, #thDemoOp button, [data-thtop]");if(!b)return;
+  const b=e.target.closest&&e.target.closest("#thPostMaat button, #thTopOp button, #thTopPer button, [data-thtop]");if(!b)return;
   if(b.dataset.thtop){thTopOp=b.dataset.thtop;renderThTop();return}
   const grp=b.parentElement.id;
   if(grp==="thPostMaat"){thPostMaat=b.dataset.v;renderThPostGrafiek()}
   else if(grp==="thTopOp"){thTopOp=b.dataset.v;renderThTop()}
   else if(grp==="thTopPer"){thTopPer=b.dataset.v;renderThTop()}
-  else if(grp==="thDemoOp"){thDemoOp=b.dataset.v;renderThDemo()}
 });
 let thRsz;addEventListener("resize",()=>{clearTimeout(thRsz);thRsz=setTimeout(()=>{if(sectie==="threads")renderThreads()},150)});

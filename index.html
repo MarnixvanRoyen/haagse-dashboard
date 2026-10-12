@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Haagse Content Performance Dashboard</title>
-<link rel="stylesheet" href="stijl.css?v=20261012d">
+<link rel="stylesheet" href="stijl.css?v=20261012e">
 </head>
 <body>
 
@@ -323,6 +323,15 @@
         <div class="tablewrap"><table id="igWw"></table></div>
         <p class="sub" style="margin:12px 0 0">Het archief vult zich elke nacht met 60 oudere posts (compleet rond half oktober). Samenhang is geen bewijs: kijk vooral naar groepen met <span class="chip good">betrouwbaar</span>.</p>
       </div>
+      <div class="card pc" id="igDemoKaart">
+        <div class="cardhead"><div><h2>Wie kijkt d'r?</h2><p class="sub" id="igDemoSub"></p></div>
+          <div class="seg" id="igDemoWie" role="group" aria-label="Welke groep mensen">
+            <button type="button" data-v="volgers" aria-pressed="true">Volgâhs</button>
+            <button type="button" data-v="reageert" aria-pressed="false">Reageert</button>
+            <button type="button" data-v="bereik" aria-pressed="false">Zag je</button>
+          </div></div>
+        <div id="igDemo"></div>
+      </div>
       <div class="card pc">
         <div class="cardhead"><div><h2>Stories</h2><p class="sub" id="igStorySub">Laatste 7 dagen, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken.</p></div>
           <div class="igtopknoppen">
@@ -399,13 +408,9 @@
           </div></div></div>
         <div class="tablewrap"><table id="thTop"></table></div>
       </div>
-      <div class="card">
-        <div class="cardhead"><div><h2>Waâh wone je volgâhs?</h2><p class="sub" id="thDemoSub"></p></div>
-          <div class="seg" id="thDemoOp" role="group" aria-label="Stad of land">
-            <button type="button" data-v="city" aria-pressed="true">Stad</button>
-            <button type="button" data-v="country" aria-pressed="false">Land</button>
-          </div></div>
-        <div class="bars" id="thDemo"></div>
+      <div class="card pc">
+        <div class="cardhead"><div><h2>Wie kijkt d'r?</h2><p class="sub" id="thDemoSub"></p></div></div>
+        <div id="thDemo"></div>
       </div>
     </div>
     <div class="card binnenkort" id="thNog" hidden>
@@ -545,19 +550,20 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <!-- ?v=… = versie (06-10, chat 14): bij elke wijziging in een .js/.css hier ALLE ?v= ophogen (zoek-en-vervang), anders gebruikt de browser tot ± 10 min de oude versie uit de cache (GitHub Pages) -->
-<script src="config.js?v=20261012d"></script>
-<script src="js/basis.js?v=20261012d"></script>
-<script src="js/live.js?v=20261012d"></script>
-<script src="js/muziek.js?v=20261012d"></script>
-<script src="js/verschil.js?v=20261012d"></script>
-<script src="js/apps.js?v=20261012d"></script>
-<script src="js/insta.js?v=20261012d"></script>
-<script src="js/samenwerking.js?v=20261012d"></script>
-<script src="js/bedankkaart.js?v=20261012d"></script>
-<script src="js/threads.js?v=20261012d"></script>
-<script src="js/kansen.js?v=20261012d"></script>
-<script src="js/ovahzicht.js?v=20261012d"></script>
-<script src="js/app.js?v=20261012d"></script>
-<script src="js/start.js?v=20261012d"></script>
+<script src="config.js?v=20261012e"></script>
+<script src="js/basis.js?v=20261012e"></script>
+<script src="js/live.js?v=20261012e"></script>
+<script src="js/muziek.js?v=20261012e"></script>
+<script src="js/verschil.js?v=20261012e"></script>
+<script src="js/apps.js?v=20261012e"></script>
+<script src="js/insta.js?v=20261012e"></script>
+<script src="js/samenwerking.js?v=20261012e"></script>
+<script src="js/bedankkaart.js?v=20261012e"></script>
+<script src="js/threads.js?v=20261012e"></script>
+<script src="js/demografie.js?v=20261012e"></script>
+<script src="js/kansen.js?v=20261012e"></script>
+<script src="js/ovahzicht.js?v=20261012e"></script>
+<script src="js/app.js?v=20261012e"></script>
+<script src="js/start.js?v=20261012e"></script>
 </body>
 </html>
