@@ -410,7 +410,7 @@ function kmOpenRegel(k){
   let s=null;try{s=kmStand({sleutel:k.id,gestart_om:new Date().toISOString(),gestopt_om:null})}catch(e){}
   const M=s&&s.M;
   const plan=kmPlan(k.id),dl=kmDeadline({sleutel:k.id,gestart_om:new Date().toISOString()},plan);
-  return `<div class="kloopt"><b>Doen:</b> ${kmDoenTekst(plan,dl)}. <b>Meten:</b> daarna tot je laatste post z'n eindstand heeft (± ${s?s.klaarNaFeed:5} dagen, reel ± ${s?s.klaarNaReel:10}), dan het rapport.${s&&s.alleMed!=null?` Verwachting: <b>${M.fmt(s.alleMed*s.factor)}</b> ${M.kort}${M.curve?" per post":""}${s.factor!==1?` (${kX(s.factor)} je normaal)`:""}.`:""}</div>`;
+  return `<div class="kloopt"><b>Doen:</b> ${kmDoenTekst(plan,dl)}. <b>Meten:</b> daarna tot je laatste post z'n eindstand heeft (± ${s?Math.round(s.klaarNaFeed):9} dagen, reel ± ${s?Math.round(s.klaarNaReel):9}), dan het rapport.${s&&s.alleMed!=null?` Verwachting: <b>${M.fmt(s.alleMed*s.factor)}</b> ${M.kort}${M.curve?" per post":""}${s.factor!==1?` (${kX(s.factor)} je normaal)`:""}.`:""}</div>`;
 }
 // mee bezig: looptijd + voortgang + afmelden
 function kansBezigKaart({p,k}){
@@ -457,7 +457,7 @@ function kansNuHTML(alle,bron){
 const KANS_OORDEEL={
   werkte:{t:"Werkte ✓",c:"good"},wisselend:{t:"Wisselend",c:"warn"},gelukt:{t:"Gelukt ✓",c:"good"},deels:{t:"Deels",c:"warn"},
   geen:{t:"Geen duidelijk effect",c:"mute"},slechter:{t:"Ging achteruit",c:"niks"},onbekend:{t:"Te weinig data",c:"mute"}};
-const KANS_RAPPORT_V=3;
+const KANS_RAPPORT_V=4;   // 4 = chat 17: nieuw normaal bereik + groeicurve (rapporten met meetplan 1x opnieuw uitgerekend)
 const KANS_TIP=["muziek-land","muziek-label-vs-sc","muziek-downloads","muziek-spotify-ontbreekt","muziek-abonnees","muziek-top3","muziek-te-boeken"];
 const KANS_INRICHT=["sneek-bio-link","sneek-story-links"];
 const KANS_STORYLINK=["sneek-beste-story","sneek-insta-zakt"];
@@ -618,8 +618,9 @@ function kansRapportHTML(p){
      andere challenges tellen nie mee in het normaal (anders trekken je eigen kansen het normaal omhoog).
      Te weinig posts in die situatie (< 5) → normaal van die soort, met en zonder partner samen.
    - verwachting bij de start: je normaal × wat dit soort post bij jou gemiddeld extra doet (alleen posts van vóór de start).
-   - wanneer zie je het: de groeicurve van je posts (uit ig_media_dag: hoeveel % van de eindstand een post na X dagen heeft).
-     Rapport = als de laatste taak-post ± 95% van z'n eindstand heeft (feed ± 5 dagen, reel ± 10; met eigen data dynamisch).
+   - wanneer zie je het: de groeicurve van je posts (igGroeiDeel in insta.js, chat 17: hoeveel % van de eindstand een post na X uur/dagen heeft).
+     Rapport = als de laatste taak-post ± 95% van z'n eindstand heeft (± 9 dagen; wordt vanzelf je eigen curve). Ervoor: verwachte eindstand met bandbreedte.
+   - normaal BEREIK (chat 17): igNormaalEind = middelste van je laatste 12 posts van vóór de start, eerlijk gemaakt voor partner.
    - per post ook de vaste set cijfers (KM_CIJFERS); wat Meta voor die soort nie geeft (reels: volgâhs, profielbezoek) valt weg.
    Andere kansen (muziek, Sneek, rest Insta) houden de vaste looptijd vanaf Mee bezig. */
 let KM={dag:[],err:null},KM_LAADT=null;                      // ig_media_dag: {media_id, dag, reach, om}
@@ -631,36 +632,12 @@ async function kmLadenEcht(){
     KM={dag:rijen.filter(r=>r.reach!=null).map(r=>({id:r.media_id,dag:String(r.dag).slice(0,10),reach:+r.reach,om:r.om})),err:null};
   }catch(e){KM={dag:[],err:e.message||String(e)}}
 }
-// standaard-groeicurves (deel van de eindstand na X dagen), tot er genoeg eigen metingen zijn
-const KM_CURVE_STD={
-  feed:[[0,0],[0.25,.3],[0.5,.5],[1,.72],[2,.85],[3,.9],[4,.93],[5,.95],[7,.97],[10,.99],[14,1]],
-  reel:[[0,0],[0.25,.2],[0.5,.35],[1,.55],[2,.7],[3,.78],[4,.83],[5,.87],[7,.92],[10,.97],[14,1]]};
-const KM_KNOPEN=[0.5,1,2,3,4,5,7,10];
-const kmGroep=p=>soortGroep(p)==="reel"?"reel":"feed";   // groeicurve: zelfde indeling als de rest (soortGroep in insta.js)
+// groeicurve: ÉÉN plek in insta.js (igGroeiDeel / igGroeiKlaarNa / igGroeiBron; chat 17). KM.dag (ig_media_dag) voedt daar het eigen lijstje.
+let KM_CURVE_CACHE=null;   // (oud, bewaard zodat kansNaLaden nie breekt)
+const kmGroep=p=>soortGroep(p)==="reel"?"reel":"feed";
 const kmLeeftijd=(p,t)=>((t??Date.now())-Date.parse(p.gepost_om))/864e5;
-function kmInterp(c,a){if(a<=0)return 0;for(let i=1;i<c.length;i++)if(a<=c[i][0]){const [x0,y0]=c[i-1],[x1,y1]=c[i];return y0+(y1-y0)*(a-x0)/(x1-x0)}return 1}
-// eigen curve: posts met metingen vanaf ≤ 1,5 dag én tot ≥ 10 dagen; per knoop de middelste waarde (min. 5 posts)
-let KM_CURVE_CACHE=null;
-function kmCurve(g){
-  if(!KM_CURVE_CACHE){KM_CURVE_CACHE={};
-    const per=new Map();KM.dag.forEach(r=>{if(!per.has(r.id))per.set(r.id,[]);per.get(r.id).push(r)});
-    const posts=new Map(IG.posts.map(p=>[p.media_id,p]));
-    for(const gg of ["feed","reel"]){
-      const krommen=[];
-      per.forEach((rij,id)=>{const p=posts.get(id);if(!p||!p.gepost_om||kmGroep(p)!==gg)return;
-        const pt=rij.map(r=>[kmLeeftijd(p,Date.parse(r.om||r.dag+"T12:00:00Z")),r.reach]).filter(([a])=>a>0&&a<=16).sort((a,b)=>a[0]-b[0]);
-        if(pt.length<4||pt[0][0]>1.5||pt[pt.length-1][0]<10)return;
-        const eind=Math.max(...pt.map(x=>x[1]));if(!eind)return;
-        const c=[[0,0],...pt.map(([a,v])=>[a,v/eind])];krommen.push(c)});
-      if(krommen.length>=5){
-        let vorige=0;const c=[[0,0],...KM_KNOPEN.map(k=>{const v=Math.max(vorige,Math.min(1,kMed(krommen.map(kr=>kmInterp(kr,k)))));vorige=v;return [k,v]}),[14,1]];
-        KM_CURVE_CACHE[gg]={c,bron:`je eigen posts (${krommen.length})`};
-      }else KM_CURVE_CACHE[gg]={c:KM_CURVE_STD[gg],bron:"standaard-curve (nog te weinig eigen metingen)"};
-    }}
-  return KM_CURVE_CACHE[g];
-}
-const kmDeel=(p,a)=>kmInterp(kmCurve(kmGroep(p)).c,a);
-const kmKlaarNa=g=>{const c=kmCurve(g).c;const k=c.find(([a,v])=>v>=0.95);return Math.max(3,Math.ceil(k?k[0]:7))};   // dagen tot ± 95%
+const kmDeel=(p,a)=>igGroeiDeel(p,a*1440);
+const kmKlaarNa=g=>Math.max(3,Math.round(igGroeiKlaarNa(.95)/144)/10);   // dagen tot ± 95% van de eindstand (zelfde curve voor reels: te weinig reels)
 
 // 00:00 Haagse tijd op een dag (JJJJ-MM-DD) als tijdstip
 function amsMiddernacht(dag){const t=Date.parse(dag+"T00:00:00Z");
@@ -706,15 +683,8 @@ const KM_CIJFERS=[
   {k:"kwal",naam:"Gedeeld + bewaard per 1.000 bereik",f:x=>x.bereik>=100&&(x.gedeeld!=null||x.bewaard!=null)?((x.gedeeld||0)+(x.bewaard||0))*1000/x.bereik:null,fmt:kKlein},
   {k:"likes",naam:"Likes per 100 kijkâhs",f:x=>x.bereik>=100&&x.likes!=null?x.likes*100/x.bereik:null,fmt:kKlein}];
 // partners die de uitnodiging accepteerden (op tijd: binnen 3 dagen na de post), uit samenwerking.js (IGS.partners)
-let KM_PI=null,KM_PI_BRON=null;
-function kmPartnersVan(x){
-  const lijst=(typeof IGS!=="undefined"&&IGS&&IGS.partners)||[];
-  if(KM_PI_BRON!==lijst){KM_PI_BRON=lijst;KM_PI=new Map();
-    lijst.forEach(r=>{if(r.status!=="Accepted"||r.weg)return;if(!KM_PI.has(r.media_id))KM_PI.set(r.media_id,[]);KM_PI.get(r.media_id).push(r)})}
-  const t=Date.parse(x.gepost_om);
-  return [...new Set((KM_PI.get(x.media_id)||[]).filter(r=>!(r.aangenomen_om&&Date.parse(r.aangenomen_om)-t>3*864e5)).map(r=>r.partner))].sort();
-}
-const kmSituatie=x=>kmPartnersVan(x).length?"partner":"solo";
+const kmPartnersVan=x=>igPartnersVan(x);   // de regel staat in insta.js (chat 17)
+const kmSituatie=x=>igSituatie(x);         // "partner" / "solo" / null = partner nog onbekend (eerste ± 3 uur)
 // welke posts horen bij een poging (zonder normaal te rekenen; ook gebruikt om posts van andere challenges uit het normaal te houden)
 function kmTaak(p,plan){
   plan=plan||kmPlan(p.sleutel);
@@ -755,7 +725,11 @@ function kmStand(p){
   const voorTs=amsMiddernacht(startDag),andere=kmAndereTaakIds(p);
   const pool=(g,sit)=>igPostsVan(g).filter(x=>!andere.has(x.media_id)&&(sit==null||kmSituatie(x)===sit));
   const normC={};
+  const bereikF=KM_MAAT.bereik.f;
   const normVan=(g,sit,f,key)=>{const k=g+"|"+sit+"|"+key;if(normC[k])return normC[k];
+    // bereik (chat 17): je laatste 12 posts van vóór de start, eerlijk gemaakt voor partner (zelfde normaal als de hittemetâh)
+    if(key==="bereik"||(key==="hoofd"&&f===bereikF)){const ne=igNormaalEind(null,{g,sit:sit??null,voor:voorTs,zonder:andere});
+      return normC[k]={waarde:ne.waarde,n:ne.n,genoeg:ne.genoeg,dagen:null,sinds:ne.sinds,sit,samen:ne.gemengd&&sit!=null,factor:ne.factor}}
     let n=igNormaal(g,f,{voor:voorTs,posts:pool(g,sit)}),samen=false;
     if(!n.genoeg&&sit!=null){n=igNormaal(g,f,{voor:voorTs,posts:pool(g,null)});samen=true}
     return normC[k]={...n,sit,samen}};
@@ -781,6 +755,7 @@ function kmStand(p){
     const a=kmLeeftijd(x,nu),nh=normHoofd(x),normaal=nh.waarde,waarde=M.f(x),klaarNa=M.curve?kmKlaarNa(kmGroep(x)):2;
     const deel=M.curve?kmDeel(x,a):1,klaar=a>=klaarNa;
     const eind=waarde==null?null:M.curve?(klaar||deel>=0.95?waarde:a>=0.5?waarde/deel:null):(a>=1?waarde:null);
+    const marge=M.curve&&eind!=null&&!klaar&&deel<0.95?igGroeiMarge(a*1440):0;   // bandbreedte uit de terugkijktest (chat 17)
     const gr=soortGroep(x),sit=kmSituatie(x),partners=kmPartnersVan(x),gn=plan.perSoort===false?"foto":gr;
     // vaste set cijfers: wat Meta voor deze post nie geeft (null) valt weg; het hoofdcijfer staat er al boven
     const cijfers=KM_CIJFERS.filter(c=>c.k!==M.zelfde).map(c=>{const v=c.f(x);if(v==null)return null;
@@ -790,7 +765,7 @@ function kmStand(p){
     const pn=partners.map(n=>partnerNorm(n,gn)),sterk=pn.filter(q=>q.waarde).sort((a,b)=>b.waarde-a.waarde)[0]||null;
     return {id:x.media_id,ts:x.gepost_om,soort:soortNaam(x),groep:gr,sit,partners,normaalSamen:nh.samen,normaalN:nh.n,normaalGenoeg:plan.perSoort===false||nh.genoeg,link:x.permalink,plaatje:x.plaatje,bijschrift:x.bijschrift,handmatig:plus.has(x.media_id),
       leeftijd:a,waarde,normaal,normaalNu:normaal!=null&&M.curve?normaal*deel:normaal,verwacht:normaal!=null?normaal*factor:null,
-      eind,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel,cijfers,
+      eind,eindLaag:marge?Math.max(waarde,eind*(1-marge)):null,eindHoog:marge?eind*(1+marge):null,x:eind!=null&&normaal?eind/normaal:null,klaar,klaarOp:new Date(Date.parse(x.gepost_om)+klaarNa*864e5).toISOString(),deel,cijfers,
       partnerX:sterk&&eind!=null?{naam:sterk.naam,n:sterk.n,norm:sterk.waarde,x:eind/sterk.waarde}:null,
       partnerTeWeinig:pn.filter(q=>!q.waarde).map(q=>({naam:q.naam,n:q.n}))}});
   const laatsteKlaar=rij.length?rij.map(r=>r.klaarOp).sort().pop():null;
@@ -815,7 +790,7 @@ function kmStand(p){
       van:startDag,tot,normaal,klaar:rij.filter(r=>vx.some(x=>x.media_id===r.id)).every(r=>r.klaar)};
   }
   return {plan,maat:plan.maat,M,taak:rij,nietMee,kiesbaar,pid:p.id,taakStart:p.gestart_om,deadline,doenAantal:plan.doen&&plan.doen.aantal,factor,factorN,factorBron,alleMed,E,boven,rapportOp,
-    volg,partnerSamen,curveBron:M.curve?kmCurve(rij[0]?kmGroep(IG.posts.find(x=>x.media_id===rij[0].id)):"feed").bron:null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
+    volg,partnerSamen,curveBron:M.curve?igGroeiBron():null,klaarNaFeed:kmKlaarNa("feed"),klaarNaReel:kmKlaarNa("reel")};
 }
 // oordeel (chat 30): alleen het hoofdcijfer; bij weinig posts moet het merendeel meedoen, anders "wisselend"
 function kmOordeel(s){
@@ -841,14 +816,14 @@ function kmCijfersHTML(s,M){
   const hoofd=`<tr class="hoofd"><td>${esc(M.naam[0].toUpperCase()+M.naam.slice(1))} <span class="sub">(hoofdcijfâh)</span></td>${s.taak.map(r=>`<td class="n"><b>${r.eind!=null?M.fmt(r.eind):r.waarde!=null?M.fmt(r.waarde):"—"}</b>${r.x!=null?` <span class="${kXcls(r.x)}">${kX(r.x)}</span>`:""}<br><span class="sub">normaal ${r.normaal!=null?M.fmt(r.normaal):"—"}</span></td>`).join("")}</tr>`;
   return `<div class="tablewrap kmcijf-tab"><table class="ktab"><thead><tr><th>Cijfâh</th>${s.taak.map(r=>`<th class="n">${kop(r)}</th>`).join("")}</tr></thead><tbody>${hoofd}
     ${keys.map(c=>`<tr><td>${esc(c.naam)}</td>${s.taak.map(r=>cel(r,c)).join("")}</tr>`).join("")}</tbody></table></div>
-    <p class="sub kdata">Elk cijfâh t.o.v. je normaal van dezelfde soort post (foto/carrousel of reel) in dezelfde situatie (met of zonder partner), van vóór de start. Optellende cijfâhs (bereik, volgâhs) vergelijken we pas als de post klaar is. Alleen het hoofdcijfâh telt voor het oordeel.</p>`;
+    <p class="sub kdata">Elk cijfâh t.o.v. je normaal van dezelfde soort post (foto/carrousel of reel) in dezelfde situatie (met of zonder partner), van vóór de start. Bereik: de middelste van je laatste 12 posts van vóór de start, eerlijk gemaakt voor partner (volgt het seizoen). Optellende cijfâhs (bereik, volgâhs) vergelijken we pas als de post klaar is. Alleen het hoofdcijfâh telt voor het oordeel.</p>`;
 }
 // HTML: verwachting + per post de stand (voor Mee bezig, meting loopt, pop-up en rapport)
 function kmHTML(s,{rapport=false}={}){
   if(!s)return "";const M=s.M;
   let h=`<div class="kmverw"><span class="k">Verwachting bij de start</span>
     <span class="v">${s.alleMed!=null?`${M.fmt(s.alleMed*s.factor)} <small>${M.kort}${M.curve?" per post":""}</small>`:"—"}</span>
-    <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}, foto's & carrousels met en zonder partner; per post hieronder het normaal van z'n eigen situatie) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${s.klaarNaFeed} dagen na een post (reel ± ${s.klaarNaReel}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
+    <span class="s">${s.factor!==1?`${kX(s.factor)} je normaal (${M.fmt(s.alleMed||0)}, foto's & carrousels met en zonder partner; per post hieronder het normaal van z'n eigen situatie) · `:""}${esc(s.factorBron)}${M.curve?` · eindstand zie je ± ${Math.round(s.klaarNaFeed)} dagen na een post (reel ± ${Math.round(s.klaarNaReel)}) · ${esc(s.curveBron||"")}`:""}</span></div>`;
   const knop=!rapport&&s.pid!=null;
   const kies=knop&&(s.kiesbaar||[]).length?`<label class="kmkies">Post toevoegen <select data-kmkies data-kpid="${s.pid}"><option value="">kies een post…</option>${s.kiesbaar.map(x=>`<option value="${esc(x.id)}">${dKort(dagNL(x.ts))} ${tijdAms(x.ts)} · ${esc(x.soort)} · ${esc(kEersteRegel(x.bijschrift).slice(0,40))}</option>`).join("")}</select></label>`:"";
   const nie=((s.nietMee||[]).length?`<details class="kmnie"${knop?" open":""}><summary>Nie meegeteld (${s.nietMee.length})</summary><ul>${s.nietMee.map(x=>`<li><a href="${esc(x.link||"#")}" target="_blank" rel="noopener">${dKort(dagNL(x.ts))} · ${esc(x.soort)}</a> <span class="sub">${esc(kEersteRegel(x.bijschrift))}</span> <span class="chip mute">${esc(x.reden)}</span>${knop&&!x.weg?` <button class="lnk" type="button" data-kmplus="${esc(x.id)}" data-kpid="${s.pid}">Tel mee</button>`:""}</li>`).join("")}</ul></details>`:"")+kies;
@@ -857,13 +832,13 @@ function kmHTML(s,{rapport=false}={}){
   h+=`<div class="kmposts">${s.taak.map(r=>{
     const pr=r.verwacht?Math.min(1.5,(r.eind??r.waarde??0)/r.verwacht):0;
     const vgl=r.groep==="reel"&&s.plan.perSoort!==false?"het normaal van je reels":"je normaal";
-    const sit=r.sit==="partner"?" met partner":" zonder partner";
+    const sit=r.sit==="partner"?" met partner":r.sit==="solo"?" zonder partner":" (partner nog onbekend)";
     return `<div class="kmpost">
       <a class="kmthumb" href="${esc(r.link||"#")}" target="_blank" rel="noopener">${r.plaatje?`<img src="${esc(r.plaatje)}" alt="" loading="lazy">`:""}</a>
       <div class="kmtekst"><span><b>${dKort(dagNL(r.ts))} ${tijdAms(r.ts)} · ${esc(r.soort)}</b>${r.bijschrift?` <span class="kmbs">${esc(kEersteRegel(r.bijschrift))}</span>`:""}</span><span> <span class="sub">· ${r.klaar?"klaar":`dag ${Math.max(1,Math.ceil(r.leeftijd))}, ± ${pct(Math.min(1,r.deel))} van de eindstand`}</span>${r.handmatig?' <span class="chip kbron" style="--c:var(--hy)">zelf toegevoegd</span>':""}${r.groep==="reel"?` <span class="chip mute">reel · ${s.plan.perSoort===false?`vs je foto's & carrousels ${r.normaal!=null?M.fmt(r.normaal):"—"}`:r.normaal!=null?`vs normaal reels ${M.fmt(r.normaal)}`:`te weinig eerdere reels (${r.normaalN||0}) om te vergelijken`}</span>`:""}${knop?` <button class="lnk kmuit" type="button" data-kmmin="${esc(r.id)}" data-kpid="${s.pid}">Haal eruit</button>`:""}</span>
         <span class="kmcijf kmpartner">${r.partners?kmPartnerTekst(r):""}${r.partnerX?` · met @${esc(r.partnerX.naam)} deed je eerder ${M.fmt(r.partnerX.norm)} (${r.partnerX.n} posts) → <b class="${kXcls(r.partnerX.x)}">${kX(r.partnerX.x)}</b>`:""}${r.partnerTeWeinig&&r.partnerTeWeinig.length&&!r.partnerX?` · <span class="sub">te weinig eerdere posts samen om de partner eruit te halen</span>`:""}</span>
         <span class="kmcijf">${M.kort} nu <b>${r.waarde!=null?M.fmt(r.waarde):"—"}</b>${M.curve&&!r.klaar&&r.normaalNu!=null?` · normaal op deze leeftijd ${M.fmt(r.normaalNu)}`:""}</span>
-        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.x!=null?` = <b class="${kXcls(r.x)}">${kX(r.x)}</b> ${vgl}${r.sit?sit:""}${r.normaalSamen?" (te weinig posts in die situatie: met en zonder partner samen)":""}`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
+        <span class="kmcijf">${r.klaar?"eindstand":"verwachte eindstand"} <b>${r.eind!=null?M.fmt(r.eind):"nog te vroeg"}</b>${r.eindLaag!=null?` <span class="sub">(${M.fmt(r.eindLaag)} – ${M.fmt(r.eindHoog)})</span>`:""}${r.x!=null?` = <b class="${kXcls(r.x)}">${kX(r.x)}</b> ${vgl}${r.sit?sit:""}${r.normaalSamen?" (te weinig posts in die situatie: met en zonder partner samen)":""}`:""} · verwacht ${r.verwacht!=null?M.fmt(r.verwacht):"—"}</span>
         <div class="kbalk kmbalk" title="t.o.v. de verwachting"><i style="width:${(Math.min(1,pr/1.5)*100).toFixed(1)}%"></i><s style="left:${(100/1.5).toFixed(1)}%"></s></div></div>
     </div>`}).join("")}</div>`;
   h+=kmCijfersHTML(s,M);
@@ -968,7 +943,8 @@ async function kansNaLaden(){
       await kpWijzig(p,{rapport:kansRapportMaak(p),rapport_klaar_om:new Date().toISOString()});
     // chat 30: rapporten van vóór de nieuwe rekenregels (v1/v2, met account-totalen) opnieuw uitrekenen; de oude versie vervalt.
     // Daarna staat het rapport weer als "nieuw" (pop-up + melding), zodat je de nieuwe uitkomst ziet.
-    for(const p of KP.rijen.filter(p=>p.rapport&&(p.rapport.v||1)<KANS_RAPPORT_V)){
+    // chat 17: rapporten met meetplan van vóór v4 (oud normaal bereik + oude groeicurve) ook 1x opnieuw.
+    for(const p of KP.rijen.filter(p=>p.rapport&&((p.rapport.v||1)<3||((p.rapport.v||1)<KANS_RAPPORT_V&&kmPlan(p.sleutel))))){
       if(kmPlan(p.sleutel)&&!kmStand(p))continue;   // Insta-cijfâhs nog nie geladen: volgende keer
       await kpWijzig(p,{rapport:kansRapportMaak(p),gelezen_om:null});
     }
