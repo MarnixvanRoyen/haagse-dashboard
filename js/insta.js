@@ -1176,13 +1176,19 @@ function igLekkerOordeel(p,x){   // x = meting {m, r, l}
    ---- Afkoelen (keuze Marnix 12-10, na de terugkijktest) ----
    Meetpunten = elk heel uur + de laatste meting. Het kwik "zakt" als hij > 3% trager gaat dan bij het vorige meetpunt (t.o.v. normaal).
    Weg als het 2 meetpunten op rij zakt én hij dan trager gaat dan normaal (< 1×). Eén trage meting kan toeval zijn: dan blijft hij staan.
-   Meetpunten tussen 01:00 en 07:00 tellen nie mee (dan zakt elke post en 's ochtends trekt hij weer bij). Uiterlijk weg na IG_LEKKER.startUur. */
+   Zakken tussen 01:00 en 07:00 telt nie mee (dan zakt elke post en 's ochtends trekt hij weer bij).
+   ---- Opleven (keuze Marnix 12-10) ----
+   Weg is nie voorgoed: gaat een verdwenen post 2 meetpunten op rij > 3% sneller (ook 's nachts: dat is juist bijzonder) én weer
+   minstens even snel als normaal, dan komt hij terug met "Leeft weer op!". Daarna geldt de afkoelregel weer.
+   De metâh volgt een post tot IG_HITTE.maxUur (48): zolang meet Supabase elk uur (ig_post_uur). Opleven ná 48 uur → actie 32.2. */
 const IG_HITTE={
   snel:[[.5,0],[1,30],[1.3,45]],   // [× zo snel as normaal, temperatuur]; daarboven loopt het door tot lekkâh (2×) = 70
   lekker:70,                       // streepje Lekkâh
   streepjes:[[30,"Normaal"],[45,"Warm"],[70,"Lekkâh"],[100,"Fik"]],
   zakMarge:.03,                    // zakken = meer dan 3% trager dan het vorige meetpunt
   zakKeer:2,                       // zoveel keer op rij zakken (én onder normaal) = weg
+  stijgKeer:2,                     // zoveel keer op rij > zakMarge sneller (én ≥ 1× normaal) = verdwenen post komt terug ("Leeft weer op!")
+  maxUur:48,                       // de metâh volgt een post zo lang (= zolang ig_post_uur elk uur meet, IG_LEKKER.kaartUur)
   nachtVan:1,nachtTot:7,           // meetpunten tussen 01:00 en 07:00 (Den Haag) tellen nie mee voor het zakken
   kleuren:[[0,[74,149,236]],[30,[92,194,117]],[45,[245,197,24]],[70,[240,122,63]],[100,[217,67,47]]]   // zee-blauw → groen → geel → oranje → rood
 };
@@ -1229,37 +1235,39 @@ function igHitteMist(o,x){
   return uit.sort((a,b)=>a.d-b.d).map(u=>u.t);
 }
 /* DE functie voor de metâh. Geeft null (geen metâh) of:
-   {p, g, leeftijd (min), fase, t (0–100 nu), van (t vorige meetpunt), punten [{m, r, l, om, snel, lpk, o, t, fase, nacht, zakt}],
-    nu (laatste punt), N (normaal), mist [teksten], koelt, nachtrust, weg, wegNa (min), voorzichtig}
+   {p, g, leeftijd (min), fase, t (0–100 nu), van (t vorige meetpunt), punten [{m, r, l, om, snel, lpk, o, t, fase, nacht, zakt, stijgt, weg}],
+    nu (laatste punt), N (normaal), mist [teksten], koelt, nachtrust, weg (nu weg), wegNa (min, laatste keer weg), opgeleefd (terug na weg), voorzichtig}
    koelt = zakt nu én het kwik staat lager dan bij het vorige meetpunt (overdag); nachtrust = idem tussen 01:00 en 07:00.
-   fase "wacht" = nog geen meting van minstens IG_LEKKER.minMinuut (Meta loopt ± 1 uur achter). Stories → null (chat 27). */
+   fase "wacht" = nog geen meting van minstens IG_LEKKER.minMinuut (Meta loopt ± 1 uur achter). Stories → null (chat 27).
+   Ouder dan IG_HITTE.maxUur → null. */
 function igLekkerHitte(p,nu=Date.now()){
   if(!p||!p.gepost_om)return null;
   const g=soortGroep(p);if(g==="story")return null;
   const t0=Date.parse(p.gepost_om),leeftijd=(nu-t0)/6e4;
-  if(!(leeftijd>=0)||leeftijd>=IG_LEKKER.startUur*60)return null;
+  if(!(leeftijd>=0)||leeftijd>=IG_HITTE.maxUur*60)return null;
   const rij=((IG.pu||new Map()).get(p.media_id)||[]).filter(x=>x.m<=leeftijd+5);
-  const basis={p,g,leeftijd,fase:"wacht",t:0,van:0,punten:[],nu:null,N:null,mist:[],koelt:false,nachtrust:false,weg:false,wegNa:null,voorzichtig:g==="reel"};
+  const basis={p,g,leeftijd,fase:"wacht",t:0,van:0,punten:[],nu:null,N:null,mist:[],koelt:false,nachtrust:false,weg:false,wegNa:null,opgeleefd:false,voorzichtig:g==="reel"};
   const laatst=rij[rij.length-1];
   if(!laatst||laatst.m<IG_LEKKER.minMinuut)return basis;
   const pts=[];   // elk heel uur (echte meting binnen 10 min, anders ingevuld tussen 2 metingen) + de laatste meting
   for(let h=1;h*60<=laatst.m+10;h++){const x=igPuStand(rij,h*60);if(x)pts.push({m:Math.min(h*60,laatst.m),r:x.r,l:x.l,om:x.om||null})}
   if(!pts.length||laatst.m-pts[pts.length-1].m>10)pts.push({m:laatst.m,r:laatst.r,l:laatst.l,om:laatst.om||null});
-  const punten=[];let zak=0,weg=null;
+  const punten=[];let zak=0,stijg=0,weg=false,wegNa=null,opgeleefd=false;
   for(const x of pts){
     const o=igLekkerOordeel(p,x);if(!o)continue;
     const T=igHitteTemp(o,x),nacht=igIsNacht(t0+x.m*6e4),vorig=punten[punten.length-1];
-    const zakt=!!vorig&&o.snel<vorig.snel*(1-IG_HITTE.zakMarge);
-    if(!nacht)zak=zakt?zak+1:0;   // 's nachts: telt nie mee (ook nie als "weer gestegen")
+    const zakt=!!vorig&&o.snel<vorig.snel*(1-IG_HITTE.zakMarge),stijgt=!!vorig&&o.snel>vorig.snel*(1+IG_HITTE.zakMarge);
+    if(!nacht)zak=zakt?zak+1:0;   // 's nachts zakken: telt nie mee (ook nie als "weer gestegen")
+    stijg=stijgt?stijg+1:0;        // stijgen telt altijd, ook 's nachts
+    if(!weg&&zak>=IG_HITTE.zakKeer&&o.snel<1){weg=true;wegNa=x.m;opgeleefd=false;stijg=0}
+    else if(weg&&stijg>=IG_HITTE.stijgKeer&&o.snel>=1){weg=false;opgeleefd=true;zak=0}
     const t=Math.round(T.t);   // hele procenten: wat je op de bol ziet, bepaalt ook de fase
-    const pt={m:x.m,r:x.r,l:x.l,om:x.om,snel:o.snel,lpk:o.lpk,o,t,fase:igHitteFase(t,o),nacht,zakt};
-    punten.push(pt);
-    if(!weg&&zak>=IG_HITTE.zakKeer&&o.snel<1)weg=pt;
+    punten.push({m:x.m,r:x.r,l:x.l,om:x.om,snel:o.snel,lpk:o.lpk,o,t,fase:igHitteFase(t,o),nacht,zakt,stijgt,weg});
   }
   if(!punten.length)return null;   // geen normaal (te weinig eerdere posts in deze groep)
   const n=punten[punten.length-1],v=punten[punten.length-2];
   return {...basis,fase:n.fase,t:n.t,van:v?v.t:0,punten,nu:n,N:n.o.N,mist:igHitteMist(n.o,n),
-    koelt:!!v&&n.zakt&&!n.nacht&&n.t<v.t-1,nachtrust:!!v&&n.zakt&&n.nacht&&n.t<v.t-1,weg:!!weg,wegNa:weg?weg.m:null,voorzichtig:n.o.N.voorzichtig};
+    koelt:!!v&&n.zakt&&!n.nacht&&n.t<v.t-1,nachtrust:!!v&&n.zakt&&n.nacht&&n.t<v.t-1,weg,wegNa,opgeleefd,voorzichtig:n.o.N.voorzichtig};
 }
 function igHitteLijst(nu=Date.now()){
   return (IG.posts||[]).map(p=>igLekkerHitte(p,nu)).filter(h=>h&&!h.weg)
@@ -1281,13 +1289,13 @@ function igHitteMeterHTML(h){
 // verloop: één staafje per meetpunt op leeftijd 0–24 uur; aanwijzen/tikken = "2 u · 45% warm" (staafGetal, zoals de andere grafieken)
 function igHitteVerloopHTML(h){
   if(h.punten.length<2)return "";
-  const W=300,H=64,top=10,bodem=50,uren=IG_LEKKER.startUur,x=m=>m/60/uren*W,y=t=>bodem-(bodem-top)*Math.max(2,t)/100,sw=W/uren;
+  const W=300,H=64,top=10,bodem=50,uren=IG_HITTE.maxUur,x=m=>m/60/uren*W,y=t=>bodem-(bodem-top)*Math.max(2,t)/100,sw=W/uren,bw=Math.max(3,Math.min(5,sw-1.5));
   const lijnen=IG_HITTE.streepjes.filter(([v])=>v<100).map(([v])=>`<line class="grid" x1="0" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`).join("");
   const staaf=h.punten.map(pt=>{const xm=Math.min(W-3,Math.max(3,x(pt.m)));
-    return `<rect x="${(xm-2.5).toFixed(1)}" y="${y(pt.t).toFixed(1)}" width="5" height="${(bodem-y(pt.t)).toFixed(1)}" rx="1.5" fill="${igHitteKleur(pt.t)}"${pt.nacht?` fill-opacity=".55"`:""}/>`}).join("");
+    return `<rect x="${(xm-bw/2).toFixed(1)}" y="${y(pt.t).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bodem-y(pt.t)).toFixed(1)}" rx="1.5" fill="${igHitteKleur(pt.t)}"${pt.weg?` fill-opacity=".3"`:pt.nacht?` fill-opacity=".55"`:""}/>`}).join("");
   const hits=h.punten.map(pt=>{const xm=Math.min(W-3,Math.max(3,x(pt.m)));
-    return `<rect class="hit" x="${(xm-sw/2).toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="${bodem}"${staafGetal(xm,y(pt.t),`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
-  const as=[0,6,12,18,24].map(u=>`<text x="${Math.min(W-6,Math.max(6,x(u*60)))}" y="${H-2}" text-anchor="middle">${u} u</text>`).join("");
+    return `<rect class="hit" x="${(xm-sw/2).toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="${bodem}"${staafGetal(xm,y(pt.t),`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.weg?" (afgekoeld)":pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
+  const as=[0,1,2,3,4].map(i=>i*uren/4).map(u=>`<text x="${Math.min(W-6,Math.max(6,x(u*60)))}" y="${H-2}" text-anchor="middle">${u} u</text>`).join("");
   return `<div class="chart hverloop"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur per meting">${lijnen}<line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}${as}${hits}</svg></div>`;
 }
 function igHitteKaartHTML(h){
@@ -1311,8 +1319,9 @@ function igHitteKaartHTML(h){
     normaal:"Loopt as een gewone post.",warm:"Hij wordt warm: reageer op de reacties, dan blijft-ie lopen.",
     lekker:"Tip: deel 'm nâh in je story, nâh 't loopt!",fik:"Mensen vinde 'm ook nog goed: deel 'm nâh in je story en reageer op de reacties!"}[h.fase];
   const onder=[tip,x&&x.om?`gemeten ${tijdAms(x.om)}`:""].filter(Boolean).join(" · ");
+  const opKop=h.opgeleefd&&["koud","normaal","warm"].includes(h.fase);   // terug na afkoelen: kop "Leeft weer op!" (bij lekkâh/fik een chip)
   return `<div class="alarm hitte f-${h.fase}${h.koelt?" koelt":""}" role="status">
-    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${F.icoon}</span><h2>${F.kop}</h2></div>
+    <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${opKop?"↺":F.icoon}</span><h2>${opKop?"Leeft weer op!":F.kop}</h2>${h.opgeleefd&&!opKop?`<span class="chip hop">leeft weer op</span>`:""}</div>
     <div class="hrij">${igHitteMeterHTML(h)}<div class="htekst">${post}${midden}</div>${igHitteVerloopHTML(h)}</div>
     ${onder?`<p class="lksub">${onder}</p>`:""}
     <details class="lkuitleg"><summary>Hoe werkt de hittemetâh?</summary>
@@ -1321,7 +1330,7 @@ function igHitteKaartHTML(h){
       <b>Fik</b> (100%) = dat plus ${IG_LEKKER.fikLikes} likes én likes per kijkâh minstens je normaal. Het zwakste punt telt: daaronder staat wat nog mist.</p>
       <p>${N&&N.manier==="leeftijd"?`Normaal = de middelste van je eerdere ${G.kort} op precies dezelfde leeftijd.`
         :N?`Normaal = je normale eindbereik (${nf0.format(Math.round(N.eind))}, middelste van ${N.n} ${G.kort}${N.dagen?` uit de laatste ${N.dagen} dagen`:""}) × hoeveel een post na zoveel uur meestal al heeft.`:""}
-      Gaat-ie 2 metingen op rij trager dan bij de vorige meting én trager dan normaal, dan is-ie afgekoeld en verdwijnt de metâh. Tussen 01:00 en 07:00 telt dat nie (dan zakt elke post). Na ${IG_LEKKER.startUur} uur is-ie sowieso weg.</p>
+      Gaat-ie 2 metingen op rij trager dan bij de vorige meting én trager dan normaal, dan is-ie afgekoeld en verdwijnt de metâh. Tussen 01:00 en 07:00 telt dat zakken nie (dan zakt elke post). Gaat een verdwenen post 2 metingen op rij weer sneller én minstens even snel als normaal, dan komt-ie terug: <b>Leeft weer op!</b> De metâh volgt een post ${IG_HITTE.maxUur} uur (zolang meet Supabase elk uur).</p>
       <p><b>Kijk niet steeds zelf naar je nieuwe post.</b> Je eigen kijken telt hooguit 1× mee en maakt hem niet sneller; dit dashboard houdt het voor je bij.</p>
     </details>
   </div>`;

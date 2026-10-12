@@ -634,6 +634,7 @@ body.popopen{overflow:hidden}
 .hgetal{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
 .hmist{font-size:14px}
 .hmist b{color:var(--ink)}
+.chip.hop{background:color-mix(in srgb,var(--hy) 30%,var(--surface));color:var(--ink);border:1px solid var(--hy)}
 .chip.hkoel{background:color-mix(in srgb,var(--lb) 30%,var(--surface));color:var(--ink);border:1px solid var(--lb)}
 .hverloop{grid-column:1/-1;max-width:420px}
 .hverloop text{font-size:10.5px}
