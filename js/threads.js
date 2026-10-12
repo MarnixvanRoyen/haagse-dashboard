@@ -10,6 +10,7 @@ let TH={acc:null,profiel:[],dag:[],posts:[],demo:[],status:{},err:null};
 let thPostMaat="views";      // grafiek per post: "views" of "inter"
 let thTopOp="views";         // toppâhs: sorteren op (zie TH_TOP_OP)
 let thTopPer="30";           // toppâhs: "30", "90" of "alles"
+let thManFoto="alles";       // kaart Hoe post je?: "alles", "foto" (foto/video/carrousel) of "tekst"
 
 const TH_SOORT={TEXT_POST:"Tekst",IMAGE:"Foto",CAROUSEL_ALBUM:"Carrousel",VIDEO:"Video",AUDIO:"Audio",REPOST_FACADE:"Repost"};
 const TH_MIN_DAGEN=2, TH_N=10;              // posts pas vanaf 2 dagen oud in de trends; middelste van de laatste 10 vs de 10 daarvoor
@@ -32,6 +33,7 @@ async function loadTH(){
   // (zelfde als igActief bij Insta), zodat het ook klopt als de view nog nie is bijgewerkt.
   TH.weg=await thWegLaden();const thWegIds=new Set(TH.weg.map(x=>x.media_id));
   TH.posts=(TH.posts||[]).filter(p=>!thWegIds.has(p.id));
+  TH.reac=await thReactiesLaden();
   const [dm,v,t]=await Promise.all([
     sb.from("th_demografie").select("soort,dag,data,fout").order("dag",{ascending:false}).limit(40).then(r=>r,()=>({})),
     sb.from("th_ververst").select("om,fout").limit(1).then(r=>r,()=>({})),
@@ -39,6 +41,16 @@ async function loadTH(){
   TH.demo=dm.data||[];
   TH.status={ververst:(v.data&&v.data[0])||null,token:(t.data&&t.data[0])||null};
   thBadge();
+}
+// je reacties (posts onder een andere post), sinds 31_threads_reacties.sql (chat 34) in een eigen tabel.
+// Bewust nie in TH.posts: de tegels, toppâhs en Threads vs Insta blijven over gewone posts gaan.
+// Tabel bestaat nog nie (of ophalen lukt nie) → null; de kaart Hoe post je? zegt dan wat er mist.
+async function thReactiesLaden(){
+  try{const since=new Date(Date.now()-120*864e5).toISOString();
+    const r=await igAlles(()=>sb.from("th_reactie").select("media_id,soort,gepost_om,tekst,permalink,plaatje,root_post,cijfers")
+      .is("verwijderd_op",null).gte("gepost_om",since).order("gepost_om",{ascending:false}));
+    return r.map(x=>({...thPost({...x,cijfers_dag:null}),root:x.root_post||null,reactie:true}))}
+  catch(e){return null}
 }
 async function thWegLaden(){   // kolom bestaat pas na 24_threads_verwijderd.sql → anders een lege lijst
   try{const r=await sb.from("th_media").select("media_id,soort,gepost_om,tekst,permalink,verwijderd_op,verwijderd_reden")
@@ -239,6 +251,69 @@ function threadsTegel(){
   </article>`;
 }
 
+/* ---------- Hoe post je? De 4 manieren (chat 34, 12-10) ----------
+   Eén regel (thManier) voor alles:
+   - Van Insta: gewone post die bij een Insta-post hoort (zelfde koppeling als Threads vs Insta, thKoppel)
+   - Alleen Threads: gewone post zonder Insta-tweeling
+   - Reactie onder eigen post / onder andermans post: Meta vult root_post (bovenste post van het gesprek) alleen
+     als die van jou is (check 12-10). Staat die id bij je eigen posts → eigen, anders → andermans post.
+   Met foto = foto, video of carrousel. Threads geeft geen nieuwe volgâhs per post: welke manier volgâhs oplevert
+   is nie te zien, alleen weergaven en gesprek. */
+const TH_MANIER=[
+  {k:"insta",naam:"Van Insta",uit:"je Insta-post ging vanzelf mee"},
+  {k:"threads",naam:"Alleen Threads",uit:"zelf geplaatst, alleen op Threads"},
+  {k:"eigen",naam:"Reactie onder eigen post",uit:"doorpraten onder je eigen post"},
+  {k:"ander",naam:"Reactie onder andermans post",uit:"jouw post onder de post van een ander"}];
+const TH_FOTO=new Set(["IMAGE","VIDEO","CAROUSEL_ALBUM"]);
+const TH_MAN_DAGEN=90, TH_MAN_MIN=3;          // 90 dagen terug; middelste pas vanaf 3 posts van minstens 2 dagen oud
+function thEigenIds(){return new Set([...TH.posts.map(p=>p.id),...(TH.weg||[]).map(x=>x.media_id)])}
+function thManier(p,eigen){
+  if(p.reactie)return p.root&&(eigen||thEigenIds()).has(p.root)?"eigen":"ander";
+  return thKoppel().thIds.has(p.id)?"insta":"threads";
+}
+function thManierNaam(p){const k=thManier(p);return (TH_MANIER.find(m=>m.k===k)||{}).naam||""}
+function thManierStats(foto=thManFoto){
+  const grens=Date.now()-TH_MAN_DAGEN*864e5,klaar=Date.now()-TH_MIN_DAGEN*864e5,eigen=thEigenIds();
+  const alle=[...TH.posts,...(TH.reac||[])].filter(p=>p.gepost_om&&Date.parse(p.gepost_om)>grens)
+    .filter(p=>foto==="alles"||(foto==="foto")===TH_FOTO.has(p.soort));
+  const mid=(ps,k)=>{const v=ps.filter(p=>p[k]!=null).map(p=>p[k]);return v.length>=TH_MAN_MIN?med(v):null};
+  const rij=TH_MANIER.map(m=>{
+    const ps=alle.filter(p=>thManier(p,eigen)===m.k),ok=ps.filter(p=>Date.parse(p.gepost_om)<=klaar);
+    return {...m,n:ps.length,nOk:ok.length,foto:ps.filter(p=>TH_FOTO.has(p.soort)).length,
+      views:mid(ok,"views"),likes:mid(ok,"likes"),replies:mid(ok,"replies"),inter:mid(ok,"inter1k"),
+      nViews:ok.filter(p=>p.views!=null).length}});
+  const basis=rij[0].views;
+  rij.forEach(r=>r.x=r.views!=null&&basis?r.views/basis:null);
+  return rij;
+}
+function renderThManier(){
+  if(!$("thMan"))return;
+  document.querySelectorAll("#thManFoto button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===thManFoto));
+  const rij=thManierStats(),zonder=TH.reac==null;
+  const xTxt=r=>r.k==="insta"?'<span class="sub">basis</span>':r.x==null?"—":
+    `<b${r.x>=1.25?' class="up"':r.x<=0.8?' class="down"':""}>${igNf1.format(r.x)}×</b>`;
+  const getal=(r,v,f)=>v==null?(r.n&&r.nOk<TH_MAN_MIN?'<span class="sub">te weinig</span>':"—"):f(v);
+  const fotoTxt={alles:"",foto:" Alleen posts mét foto, video of carrousel.",tekst:" Alleen posts zónder foto (tekst)."}[thManFoto];
+  // wat valt op: de manier met de meeste weergaven per post t.o.v. Van Insta (vanaf 1,25× of tot 0,8×)
+  const vgl=rij.filter(r=>r.k!=="insta"&&r.x!=null).sort((a,b)=>b.x-a.x);
+  const op=[];
+  if(vgl.length&&vgl[0].x>=1.25)op.push(`<b>${vgl[0].naam}</b> haalt per post ${igNf1.format(vgl[0].x)}× zoveel weergaven als een post die van Insta meegaat.`);
+  const laag=vgl.filter(r=>r.x<=0.8).pop();if(laag)op.push(`<b>${laag.naam}</b> haalt minder: ${igNf1.format(laag.x)}×.`);
+  $("thManSub").innerHTML=`Laatste ${TH_MAN_DAGEN} dagen.${fotoTxt} Per manier de middelste per post (posts van minstens 2 dagen oud; onder de ${TH_MAN_MIN} "te weinig"). `
+    +(op.length?op.join(" ")+" ":"")
+    +`Threads geeft geen nieuwe volgâhs per post, dus welke manier volgâhs oplevert is nie te zien: alleen weergaven en gesprek. Weergaven per post noemt Meta nog "in ontwikkeling".`
+    +(zonder?` <b>Reacties ontbreken nog:</b> draai <code>supabase/31_threads_reacties.sql</code> in Supabase.`:"");
+  $("thMan").innerHTML=`<thead><tr><th>Manier</th><th class="n">Posts</th><th class="n">Weergaven per post</th><th class="n">t.o.v. Van Insta</th><th class="n">Likes per post</th><th class="n">Reacties per post</th><th class="n">Interactie /1.000</th></tr></thead><tbody>`+
+    rij.map(r=>{const reac=r.k==="eigen"||r.k==="ander";
+      return `<tr><td><b>${r.naam}</b><span class="igcap">${r.uit}${thManFoto==="alles"&&r.n?` · ${nf0.format(r.foto)} met foto`:""}</span></td>
+      <td class="n">${reac&&zonder?"—":nf0.format(r.n)}</td>
+      <td class="n">${reac&&zonder?'<span class="sub">draai 31</span>':getal(r,r.views,v=>nf0.format(v))}</td>
+      <td class="n">${reac&&zonder?"—":xTxt(r)}</td>
+      <td class="n">${reac&&zonder?"—":getal(r,r.likes,v=>thF1(v))}</td>
+      <td class="n">${reac&&zonder?"—":getal(r,r.replies,v=>thF1(v))}</td>
+      <td class="n">${reac&&zonder?"—":getal(r,r.inter,v=>thF1(v))}</td></tr>`}).join("")+"</tbody>";
+}
+
 /* ---------- de Threads-tab ---------- */
 const TH_MATEN={
   views:{kop:"Weergaven per post",aria:"Weergaven per post",v:p=>p.views,as:t=>nf0.format(t),lbl:p=>nf0.format(p.views),
@@ -292,6 +367,8 @@ function renderThreads(){
   renderThPostGrafiek();
   // 4. Threads vs Insta
   renderThInsta(c.vs);
+  // 4b. hoe post je? (4 manieren, alleen Mac/iPad)
+  renderThManier();
   // 5. toppâhs
   renderThTop();
   // 6. waar wonen je volgâhs
@@ -336,7 +413,7 @@ function renderThTop(){
   const kop=k=>`<th class="n${thTopOp===k?" gesorteerd":""}${smal(k)}"><button type="button" class="igtopkop" data-thtop="${k}">${TH_TOP_OP[k].kop}${thTopOp===k?" ↓":""}</button></th>`;
   const cel=(p,k)=>{const v=TH_TOP_OP[k].v(p);return `<td class="n${thTopOp===k?" gesorteerd":""}${smal(k)}">${v==null?"—":TH_TOP_OP[k].f.format(v)}</td>`};
   $("thTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th>${kols.map(kop).join("")}</tr></thead><tbody>`+
-    lijst.map((p,i)=>`<tr${i>=5?' class="pc"':""}><td class="n">${i+1}</td><td><div class="igtoprij">${thThumbHTML(p)}<div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${p.soortNaam}</a><span class="igcap" title="${esc(p.tekst.trim())}">${esc(igEersteRegel(p.tekst))}</span></div></div></td>${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
+    lijst.map((p,i)=>`<tr${i>=5?' class="pc"':""}><td class="n">${i+1}</td><td><div class="igtoprij">${thThumbHTML(p)}<div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${p.soortNaam}</a> <span class="chip mute pc">${thManierNaam(p)}</span><span class="igcap" title="${esc(p.tekst.trim())}">${esc(igEersteRegel(p.tekst))}</span></div></div></td>${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${periode.length?"Nog geen posts met dit cijfâh in deze periode.":"Geen posts in deze periode."}</td></tr></tbody>`;
 }
 // waar wonen je volgâhs: renderThDemo() staat sinds chat 13 in js/demografie.js (zelfde kaart als Insta "Wie kijkt d'r?")
@@ -348,11 +425,12 @@ document.addEventListener("click",async e=>{
     const {error}=await sb.rpc("th_post_terugzetten",{p_media_id:tz.dataset.thterug});
     if(error){tz.disabled=false;showMsg("Terugzetten lukte nie: "+(error.message||error),false);return}
     showMsg("Post telt weer mee. Effe verversen…",true);$("ververs").click();return}
-  const b=e.target.closest&&e.target.closest("#thPostMaat button, #thTopOp button, #thTopPer button, [data-thtop]");if(!b)return;
+  const b=e.target.closest&&e.target.closest("#thPostMaat button, #thTopOp button, #thTopPer button, #thManFoto button, [data-thtop]");if(!b)return;
   if(b.dataset.thtop){thTopOp=b.dataset.thtop;renderThTop();return}
   const grp=b.parentElement.id;
   if(grp==="thPostMaat"){thPostMaat=b.dataset.v;renderThPostGrafiek()}
   else if(grp==="thTopOp"){thTopOp=b.dataset.v;renderThTop()}
   else if(grp==="thTopPer"){thTopPer=b.dataset.v;renderThTop()}
+  else if(grp==="thManFoto"){thManFoto=b.dataset.v;renderThManier()}
 });
 let thRsz;addEventListener("resize",()=>{clearTimeout(thRsz);thRsz=setTimeout(()=>{if(sectie==="threads")renderThreads()},150)});
