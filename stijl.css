@@ -624,3 +624,44 @@ body.popopen{overflow:hidden}
 .lkuitleg summary{cursor:pointer;font-size:13px;font-weight:700}
 .lkuitleg p{font-size:13px;margin-top:6px}
 @media (max-width:620px){.lkrij{grid-template-columns:52px minmax(0,1fr);gap:10px}}
+
+/* ---------- Partnâhs versimpeld + let op (chat 19, 12-10) ---------- */
+.seg.igsfilter{flex-wrap:wrap;margin-top:14px}
+.seg.igsfilter .seg-n{opacity:.7;font-weight:600;margin-left:2px}
+#igSamen th .igskop{all:unset;cursor:pointer;font:inherit;color:inherit;white-space:nowrap}
+#igSamen th .igskop:focus-visible{outline:2px solid var(--hy);outline-offset:2px;border-radius:4px}
+#igSamen th.igsaan{color:var(--ink)}
+#igSamen td{vertical-align:top}
+tr.igsrij{cursor:pointer}
+tr.igsrij:hover td{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
+tr.igsrij:focus-visible{outline:2px solid var(--hy);outline-offset:-2px}
+tr.igsrij.open td{background:var(--surface-2);border-bottom-color:transparent}
+td.igspijl,th.igspijl{width:18px;color:var(--muted);text-align:center;padding-inline:2px}
+tr.igsdetail>td{background:var(--surface-2);padding:4px 12px 16px}
+.igsdet{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.igsblok{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;align-content:start}
+.igsblok h4{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.igsblok .igsvs{white-space:normal}
+.igslijst{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13.5px;line-height:1.4}
+.igsdl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13.5px}
+.igsdl dt{color:var(--muted)}.igsdl dd{margin:0;text-align:right}
+.igsknoppen{display:flex;flex-wrap:wrap;gap:8px}
+.igsstopform{display:grid;gap:6px}
+.igsstopform label{font-size:12.5px;color:var(--muted);font-weight:600}
+.igsstopform input{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-height:38px;color:var(--ink);font:inherit;font-size:14px}
+.igswrap{white-space:normal}
+.igsfout{color:var(--yt)}
+.igsreden{font-style:italic;max-width:220px;white-space:normal}
+.igsleeg{color:var(--muted)}
+.letok{color:var(--good);font-weight:900}
+.chip.letrood{background:var(--yt-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--yt) 60%,transparent)}
+.chip.letgeel{background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--hy) 60%,transparent)}
+.chip.letstop{background:var(--surface-2);color:var(--ink);border:1px solid var(--yt)}
+.chip.letoke,.chip.letok,.chip.letonbekend{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.letdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.chip.letrood .letdot{background:var(--yt)}.chip.letgeel .letdot{background:var(--hy)}
+.letrood-t{color:var(--yt)}.letgeel-t{color:var(--hy)}
+details.igsuit{border-top:1px solid var(--line);padding-top:8px}
+details.igsuit summary{cursor:pointer;font-weight:700}
+details.igsuit p{margin:8px 0 0;line-height:1.5}
+.alarm.letop .chip{vertical-align:1px}
