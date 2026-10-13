@@ -225,7 +225,13 @@ nav.hoofdmenu button{border:0;background:none;padding:10px 20px;cursor:pointer;f
 nav.hoofdmenu button:hover{color:var(--ink);background:var(--surface-2)}
 nav.hoofdmenu button[aria-current=page]{background:var(--hy);color:var(--hy-ink)}
 .sectie{display:grid;gap:16px}
-footer.eind{justify-content:flex-end;border-top:0;padding-top:0}
+footer.eind{flex-direction:column;align-items:center;justify-content:center;gap:6px;border-top:0;padding-top:22px}
+/* logo onderaan (chat 40): wit logo met een geel/groene gloed die rustig "ademt"; aanwijzen/tikken = feller */
+.merk{display:block;width:min(300px,72vw);padding:10px 14px;border-radius:14px;-webkit-tap-highlight-color:transparent}
+.merk img{display:block;width:100%;height:auto;filter:drop-shadow(0 0 3px rgba(245,197,24,.8)) drop-shadow(0 0 14px rgba(47,143,70,1));transition:filter .25s ease,transform .25s ease}
+.merk:hover img,.merk:focus-visible img,.merk:active img{animation:none;transform:scale(1.03);filter:drop-shadow(0 0 4px rgba(245,197,24,1)) drop-shadow(0 0 10px rgba(245,197,24,.7)) drop-shadow(0 0 24px rgba(47,143,70,1))}
+@media (prefers-reduced-motion:no-preference){.merk img{animation:merk-gloed 6s ease-in-out infinite}
+  @keyframes merk-gloed{0%,100%{filter:drop-shadow(0 0 3px rgba(245,197,24,.8)) drop-shadow(0 0 14px rgba(47,143,70,1))}50%{filter:drop-shadow(0 0 3px rgba(47,143,70,1)) drop-shadow(0 0 16px rgba(245,197,24,.6))}}}
 
 /* ---------- ovâhzicht-tegels ---------- */
 .tegels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
