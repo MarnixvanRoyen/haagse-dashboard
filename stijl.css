@@ -515,6 +515,7 @@ td.igszelf .igsvs{white-space:normal}
 .igt5rij .cijf{text-align:right;display:grid;gap:1px}
 .igt5rij .cijf b{font-family:var(--display);font-weight:400;font-size:20px;line-height:1.1}
 .igt5rij .cijf span{font-size:12px;color:var(--muted);white-space:nowrap}
+.igt5rij .cijf span.bij{font-size:11px;opacity:.8;margin-top:2px}   /* chat 38: extra cijfâh op eigen regel, nie naast het label */
 /* Wat is d'r nieuw?: check of de nieuwste upload anders is dan de vorige */
 .vscheck{font-size:13.5px;border-radius:12px;padding:9px 14px;margin:0 0 12px;border-left:4px solid var(--good);background:var(--good-soft);color:var(--ink)}
 .vscheck.let{border-left-color:var(--hy);background:var(--warn-soft)}

@@ -727,7 +727,7 @@ function renderIgT5(){
     const binnen=`<span class="nr">${i+1}</span>
       <span class="igthumb ${st?"story":"klein"}" aria-hidden="true">${beeld?`<img src="${esc(beeld)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
       <span class="wat"><b>${kop}</b>${loopt?`<span>${loopt}</span>`:""}${tekst?`<span class="igcap">${esc(tekst)}</span>`:""}</span>
-      <span class="cijf"><b>${op.f(+r.v)}</b><span>${igT5Op==="kwaliteit"?"per 1.000":op.naam}${bij?" · "+bij:""}</span></span>`;
+      <span class="cijf"><b>${op.f(+r.v)}</b><span>${igT5Op==="kwaliteit"?"per 1.000":op.naam}</span>${bij?`<span class="bij">${bij}</span>`:""}</span>`;
     return link?`<a class="igt5rij" href="${esc(link)}" target="_blank" rel="noopener">${binnen}</a>`:`<div class="igt5rij">${binnen}</div>`}).join("");
 }
 
