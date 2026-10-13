@@ -740,3 +740,26 @@ details.igsuit p{margin:8px 0 0;line-height:1.5}
 /* Threads: plaatje bij een post (chat 33). Tekst-post zonder plaatje = vakje met "Tekst" erin. Telefoon iets kleiner. */
 .igthumb.th span{left:50%;bottom:50%;transform:translate(-50%,50%);background:none;color:var(--muted);font-size:10px}
 @media (max-width:700px){#thVs .igthumb.klein,#thTop .igthumb.klein{width:38px;height:38px}#thVs .igtoprij,#thTop .igtoprij{gap:7px}#thVs .igcap{max-width:24vw}#thTop .igcap{max-width:32vw}}
+
+/* ---------- ooievaar rechtsboven op de bovenste kaart van elke tab (chat 39) ----------
+   Eén plaatje (img/ooievaar.svg), via ::after, dus geen extra HTML in de kaart.
+   De kop van de kaart krijgt rechts ruimte, zodat titel, knoppen en labels er nooit onder schuiven. */
+.ooi-kaart,#ovTegels>.tegel:first-child{position:relative;--ooi-h:62px;--ooi-w:49px}
+.ooi-kaart::after,#ovTegels>.tegel:first-child::after{content:"";position:absolute;top:14px;right:16px;width:var(--ooi-w);height:var(--ooi-h);
+  background:url(img/ooievaar.svg?v=20261013c) no-repeat center/contain;pointer-events:none;
+  filter:drop-shadow(0 0 2px rgba(245,197,24,.8)) drop-shadow(0 0 9px rgba(47,143,70,1))}
+.ooi-kaart>.cardhead{padding-right:calc(var(--ooi-w) + 12px)}
+#ovTegels>.tegel:first-child>.tkop{padding-right:calc(var(--ooi-w) + 10px)}
+.hero.ooi-kaart::after{top:22px;right:clamp(18px,3vw,34px)}
+.hero.ooi-kaart .hero-top{padding-right:calc(var(--ooi-w) + 12px)}
+@media (max-width:620px){
+  .ooi-kaart,#ovTegels>.tegel:first-child{--ooi-h:52px;--ooi-w:41px}
+  .ooi-kaart::after,#ovTegels>.tegel:first-child::after{top:12px;right:12px}
+  .hero.ooi-kaart::after{top:20px;right:18px}
+  .ooi-kaart>.cardhead{padding-right:0}   /* telefoon: alleen de titel opzij, knoppen mogen eronder de hele breedte */
+  .ooi-kaart>.cardhead>div:first-child{padding-right:calc(var(--ooi-w) + 8px);min-height:calc(var(--ooi-h) - 4px)}
+}
+@media (prefers-reduced-motion:no-preference){
+  .ooi-kaart::after,#ovTegels>.tegel:first-child::after{animation:ooi-gloed 6s ease-in-out infinite}
+  @keyframes ooi-gloed{0%,100%{filter:drop-shadow(0 0 2px rgba(245,197,24,.8)) drop-shadow(0 0 9px rgba(47,143,70,1))}50%{filter:drop-shadow(0 0 2px rgba(47,143,70,1)) drop-shadow(0 0 11px rgba(245,197,24,.6))}}
+}
