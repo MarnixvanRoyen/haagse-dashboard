@@ -908,3 +908,19 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
   .a-fik .hkanim i{animation:hvlam .8s ease-in-out infinite alternate}
   .a-fik .hkanim i:nth-child(2){animation-duration:.6s;animation-delay:.2s}.a-fik .hkanim i:nth-child(3){animation-duration:.7s;animation-delay:.4s}.a-fik .hkanim i:nth-child(4){animation-delay:.1s}
 }
+
+/* ingeklapt: klein verloop-grafiekje (14-10). Brede kaart (Mac): ernaast. Smalle kaart (telefoon): eronder over de hele breedte. */
+.hittes.dicht .alarm.hitte{container-type:inline-size}
+.hittes.dicht .hkort{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:6px 14px}
+.hkort .hkgraf{grid-column:1/-1;width:auto}
+.hkort .hkgraf svg{max-height:70px}
+.hkort .hkgraf text{font-size:10px}
+.hkort .hkgraf text.hknorm{font-size:9px;fill:var(--muted)}
+@container (min-width:470px){
+  .hittes.dicht .hkort{grid-template-columns:auto auto minmax(110px,auto) minmax(150px,1fr)}
+  .hkort .hkgraf{grid-column:auto}
+}
+@media (prefers-reduced-motion:no-preference){
+  .hittes.dicht .hkgraf rect:not(.hit){transform-box:fill-box;transform-origin:50% 100%;animation:hkstaaf .6s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes hkstaaf{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+}

@@ -1403,6 +1403,21 @@ function igHitteVerloopHTML(h){
   const as=[0,1,2,3,4].map(i=>i*uren/4).map(u=>`<text x="${Math.min(W-6,Math.max(6,x(u*60)))}" y="${H-2}" text-anchor="middle">${u} u</text>`).join("");
   return `<div class="chart hverloop"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur per meting">${lijnen}<line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}${as}${hits}</svg></div>`;
 }
+// mini-verloop voor de ingeklapte kaart (14-10): zoomt in op de leeftijd van de post (nie 0–48 u), streepje = normaal (30%)
+function igHitteMiniHTML(h){
+  const pts=h.punten||[];if(pts.length<2)return "";
+  const W=220,H=62,top=6,bodem=46,maxM=Math.max(180,pts[pts.length-1].m),x=m=>4+(W-8)*m/maxM,y=t=>bodem-(bodem-top)*Math.max(3,Math.min(100,t))/100;
+  const bw=Math.max(3,Math.min(14,(W-8)/pts.length-2));
+  const staaf=pts.map((pt,i)=>{const xm=Math.min(W-4-bw/2,Math.max(4+bw/2,x(pt.m)));
+    return `<rect x="${(xm-bw/2).toFixed(1)}" y="${y(pt.t).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bodem-y(pt.t)).toFixed(1)}" rx="1.5" fill="${igHitteKleur(pt.t)}"${pt.nacht?` fill-opacity=".55"`:""} style="animation-delay:${(i*.04).toFixed(2)}s"/>`}).join("");
+  const hits=pts.map(pt=>{const xm=Math.min(W-4,Math.max(4,x(pt.m))),sw=Math.max(bw+2,(W-8)/pts.length);
+    return `<rect class="hit" x="${(xm-sw/2).toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="${bodem}"${staafGetal(xm,y(pt.t),`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
+  const yN=y(30).toFixed(1);
+  return `<div class="chart hkgraf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur, ${pts.length} metingen">
+    <line class="grid" x1="0" x2="${W}" y1="${yN}" y2="${yN}"/><text x="4" y="${(+yN-3).toFixed(1)}" class="hknorm">normaal</text>
+    <line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}
+    <text x="4" y="${H-2}">0 u</text><text x="${W-4}" y="${H-2}" text-anchor="end">${igHitteUurLabel(pts[pts.length-1].m)}</text>${hits}</svg></div>`;
+}
 function igHitteKaartHTML(h){
   const p=h.p,G=IG_GROEPEN[h.g],F=IG_HITTE_FASE[h.fase],x=h.nu,N=h.N;
   const post=`<div class="hpost"${pdAttr(p)}><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a>
@@ -1431,7 +1446,8 @@ function igHitteKaartHTML(h){
   const animIn={wacht:"<i></i>",koud:"<i>❄</i><i>❄</i><i>❄</i><i>❄</i>",normaal:"",warm:"<i></i><i></i><i></i>",lekker:"<i></i><i></i><i></i><i></i><i></i>",fik:"<i></i><i></i><i></i><i></i>"}[anim]||"";
   const kort=`<div class="hkort">${igHitteMeterHTML(h)}
     <div class="hkfoto a-${anim}"${pdAttr(p)}><a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><span class="hkanim" aria-hidden="true">${animIn}</span></div>
-    <div class="hkscore"><b>${h.fase==="wacht"?"…":t+"%"}</b><span>${esc(opKop?"leeft weer op":h.koelt?"koelt af":F.naam)}</span><small>${soortNaam(p)} · ${igLeeftijd(h.leeftijd)}</small></div></div>`;
+    <div class="hkscore"><b>${h.fase==="wacht"?"…":t+"%"}</b><span>${esc(opKop?"leeft weer op":h.koelt?"koelt af":F.naam)}</span><small>${soortNaam(p)} · ${igLeeftijd(h.leeftijd)}</small></div>
+    ${igHitteMiniHTML(h)}</div>`;   // klein verloop-grafiekje ernaast (14-10)
   const dicht=igHitteDicht();
   return `<div class="alarm hitte f-${h.fase}${h.koelt?" koelt":""}" role="status">
     <button class="htoggle" type="button" data-hdicht aria-expanded="${!dicht}" title="${dicht?"Uitklappe":"Inklappe"}" aria-label="${dicht?"Hittemetâh uitklappe":"Hittemetâh inklappe"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
