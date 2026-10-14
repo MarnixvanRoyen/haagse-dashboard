@@ -930,3 +930,7 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
   .hittes.dicht .hkpuls{animation:hkstip 1.8s ease-out 1.2s infinite}
   @keyframes hkstip{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.2);opacity:0}}
 }
+
+/* Stories-tabel: vergelijking met story 1 van die dag, onder het bereik (14-10) */
+.stvgl{display:block;font-size:12px;margin-top:2px;white-space:nowrap}
+.stvgl.gelijk{color:var(--muted);font-weight:600}

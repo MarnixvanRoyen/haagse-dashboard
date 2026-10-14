@@ -757,7 +757,9 @@ function renderIgStories(){
   [...perDag].reverse().forEach(([d,rij])=>{
     const eersteBereik=rij[0].cijfers&&rij[0].cijfers.reach;
     rij.forEach((s,i)=>{const x=s.cijfers||{};const weg=igStoryWeg(s),lk=igStoryLikes(s),kw=igStoryKwal(s),her=igStoryHerkomst(s);
-      const vast=eersteBereik&&x.reach!=null&&i?` <span class="sub">(${pct(x.reach/eersteBereik)} van de 1e)</span>`:"";
+      // t.o.v. story 1 van die dag (14-10: was "108% van de 1e", nu in gewone woorden met pijltje)
+      const vgl=eersteBereik&&x.reach!=null&&i?Math.round((x.reach/eersteBereik-1)*100):null;
+      const vast=vgl==null?"":`<span class="stvgl ${vgl>2?"up":vgl<-2?"down":"gelijk"}" title="Bereik van deze story vergeleken met je eerste story van die dag (${nf0.format(eersteBereik)})">${vgl>2?`↑ ${vgl}% meâh`:vgl<-2?`↓ ${-vgl}% minder`:"± even veel"} dan story 1</span>`;
       const verlopen=Date.parse(s.gepost_om)<Date.now()-864e5;
       const wie=her==="gedeeld"?` <span class="chip mute" title="${esc(s.bijschrift||"")}">met tekst</span>`:"";
       const bl=igStoryBeeld(s);
