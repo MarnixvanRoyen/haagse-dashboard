@@ -913,14 +913,20 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
 .hittes.dicht .alarm.hitte{container-type:inline-size}
 .hittes.dicht .hkort{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:6px 14px}
 .hkort .hkgraf{grid-column:1/-1;width:auto}
-.hkort .hkgraf svg{max-height:70px}
+.hkort .hkgraf svg{max-height:90px}
 .hkort .hkgraf text{font-size:10px}
 .hkort .hkgraf text.hknorm{font-size:9px;fill:var(--muted)}
 @container (min-width:470px){
   .hittes.dicht .hkort{grid-template-columns:auto auto minmax(110px,auto) minmax(150px,1fr)}
   .hkort .hkgraf{grid-column:auto}
 }
+/* lijn tekent zich, vlak komt erachteraan, stip bij de laatste meting "klopt" */
+.hkpuls{transform-box:fill-box;transform-origin:center;opacity:0}
 @media (prefers-reduced-motion:no-preference){
-  .hittes.dicht .hkgraf rect:not(.hit){transform-box:fill-box;transform-origin:50% 100%;animation:hkstaaf .6s cubic-bezier(.2,.8,.2,1) both}
-  @keyframes hkstaaf{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .hittes.dicht .hklijn{stroke-dasharray:1;stroke-dashoffset:1;animation:hklijn 1.1s cubic-bezier(.4,0,.2,1) .1s forwards}
+  @keyframes hklijn{to{stroke-dashoffset:0}}
+  .hittes.dicht .hkvlak{animation:hkvlak .9s ease .5s both}
+  @keyframes hkvlak{from{opacity:0}to{opacity:1}}
+  .hittes.dicht .hkpuls{animation:hkstip 1.8s ease-out 1.2s infinite}
+  @keyframes hkstip{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.2);opacity:0}}
 }

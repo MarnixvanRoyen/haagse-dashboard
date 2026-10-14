@@ -1403,20 +1403,37 @@ function igHitteVerloopHTML(h){
   const as=[0,1,2,3,4].map(i=>i*uren/4).map(u=>`<text x="${Math.min(W-6,Math.max(6,x(u*60)))}" y="${H-2}" text-anchor="middle">${u} u</text>`).join("");
   return `<div class="chart hverloop"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur per meting">${lijnen}<line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}${as}${hits}</svg></div>`;
 }
-// mini-verloop voor de ingeklapte kaart (14-10): zoomt in op de leeftijd van de post (nie 0–48 u), streepje = normaal (30%)
+// mini-verloop voor de ingeklapte kaart (14-10): doorlopende lijn + vlak (altijd aaneengesloten, ook bij 2 metingen),
+// van de eerste tot de laatste meting; kleur loopt mee met de hoogte (zelfde kleuren als de thermometer); streepje = normaal (30%)
+let igMiniNr=0;
 function igHitteMiniHTML(h){
   const pts=h.punten||[];if(pts.length<2)return "";
-  const W=220,H=62,top=6,bodem=46,maxM=Math.max(180,pts[pts.length-1].m),x=m=>4+(W-8)*m/maxM,y=t=>bodem-(bodem-top)*Math.max(3,Math.min(100,t))/100;
-  const bw=Math.max(3,Math.min(14,(W-8)/pts.length-2));
-  const staaf=pts.map((pt,i)=>{const xm=Math.min(W-4-bw/2,Math.max(4+bw/2,x(pt.m)));
-    return `<rect x="${(xm-bw/2).toFixed(1)}" y="${y(pt.t).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bodem-y(pt.t)).toFixed(1)}" rx="1.5" fill="${igHitteKleur(pt.t)}"${pt.nacht?` fill-opacity=".55"`:""} style="animation-delay:${(i*.04).toFixed(2)}s"/>`}).join("");
-  const hits=pts.map(pt=>{const xm=Math.min(W-4,Math.max(4,x(pt.m))),sw=Math.max(bw+2,(W-8)/pts.length);
-    return `<rect class="hit" x="${(xm-sw/2).toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="${bodem}"${staafGetal(xm,y(pt.t),`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
+  const W=220,H=80,top=8,bodem=64,m0=pts[0].m,m1=Math.max(pts[pts.length-1].m,m0+1),
+    x=m=>6+(W-12)*(m-m0)/(m1-m0),y=t=>bodem-(bodem-top)*Math.max(2,Math.min(100,t))/100,id="hkg"+(++igMiniNr);
+  const xy=pts.map(pt=>[x(pt.m),y(pt.t)]);
+  // vloeiende lijn (monotone, schiet nie boven/onder de metingen uit)
+  const n=xy.length,d=[];for(let i=0;i<n-1;i++)d.push((xy[i+1][1]-xy[i][1])/(xy[i+1][0]-xy[i][0]));
+  const tg=xy.map((_,i)=>i===0?d[0]:i===n-1?d[n-2]:(d[i-1]*d[i]<=0?0:(d[i-1]+d[i])/2));
+  let lijn=`M${xy[0][0].toFixed(1)},${xy[0][1].toFixed(1)}`;
+  for(let i=0;i<n-1;i++){const [x0,y0]=xy[i],[x1,y1]=xy[i+1],dx=(x1-x0)/3;
+    lijn+=` C${(x0+dx).toFixed(1)},${(y0+tg[i]*dx).toFixed(1)} ${(x1-dx).toFixed(1)},${(y1-tg[i+1]*dx).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`}
+  const vlak=`${lijn} L${xy[n-1][0].toFixed(1)},${bodem} L${xy[0][0].toFixed(1)},${bodem} Z`;
+  const kl=[[0,"#4a95ec"],[30,"#5cc275"],[45,"#f5c518"],[70,"#f07a3f"],[100,"#d9432f"]];
+  const grad=`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${y(0)}" y2="${y(100)}">${kl.map(([v,k])=>`<stop offset="${v}%" stop-color="${k}"/>`).join("")}</linearGradient>
+    <linearGradient id="${id}v" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient>
+    <mask id="${id}m"><rect x="0" y="0" width="${W}" height="${H}" fill="url(#${id}v)"/></mask>`;
+  const [xl,yl]=xy[n-1],laatste=pts[n-1];
+  const hits=pts.map((pt,i)=>{const l=i?(xy[i][0]+xy[i-1][0])/2:0,r=i<n-1?(xy[i][0]+xy[i+1][0])/2:W;
+    return `<rect class="hit" x="${l.toFixed(1)}" y="0" width="${(r-l).toFixed(1)}" height="${bodem}"${staafGetal(xy[i][0],xy[i][1],`${Math.round(pt.t)}% ${IG_HITTE_FASE[pt.fase].naam}${pt.nacht?" (nacht)":""}`,igHitteUurLabel(pt.m))}/>`}).join("");
   const yN=y(30).toFixed(1);
-  return `<div class="chart hkgraf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur, ${pts.length} metingen">
-    <line class="grid" x1="0" x2="${W}" y1="${yN}" y2="${yN}"/><text x="4" y="${(+yN-3).toFixed(1)}" class="hknorm">normaal</text>
-    <line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>${staaf}
-    <text x="4" y="${H-2}">0 u</text><text x="${W-4}" y="${H-2}" text-anchor="end">${igHitteUurLabel(pts[pts.length-1].m)}</text>${hits}</svg></div>`;
+  return `<div class="chart hkgraf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verloop van de temperatuur, ${n} metingen, nu ${Math.round(laatste.t)}%"><defs>${grad}</defs>
+    <line class="grid" x1="0" x2="${W}" y1="${yN}" y2="${yN}"/><text x="6" y="${(pts[0].t>=30?+yN+9:+yN-3).toFixed(1)}" class="hknorm">normaal</text>
+    <line class="base" x1="0" x2="${W}" y1="${bodem}" y2="${bodem}"/>
+    <path class="hkvlak" d="${vlak}" fill="url(#${id})" mask="url(#${id}m)"/>
+    <path class="hklijn" d="${lijn}" pathLength="1" fill="none" stroke="url(#${id})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle class="hkpuls" cx="${xl.toFixed(1)}" cy="${yl.toFixed(1)}" r="4" fill="${igHitteKleur(laatste.t)}"/>
+    <circle cx="${xl.toFixed(1)}" cy="${yl.toFixed(1)}" r="3.5" fill="${igHitteKleur(laatste.t)}" stroke="var(--surface)" stroke-width="1.5"/>
+    <text x="6" y="${H-2}">${igHitteUurLabel(pts[0].m)}</text><text x="${W-6}" y="${H-2}" text-anchor="end">${igHitteUurLabel(laatste.m)}</text>${hits}</svg></div>`;
 }
 function igHitteKaartHTML(h){
   const p=h.p,G=IG_GROEPEN[h.g],F=IG_HITTE_FASE[h.fase],x=h.nu,N=h.N;
