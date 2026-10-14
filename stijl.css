@@ -828,3 +828,14 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
 }
 
 @media (max-width:700px){.vnpopkaart.pdkaart h2{font-size:18px}}
+
+/* ---------- ooievaar in de kop, naast Ververse: alleen op Ovâhzicht, alleen Mac/iPad (14-10) ----------
+   Op de telefoon blijft-ie op de Insta-tegel staan (kop is daar te smal). */
+.top-ooi{display:none}
+@media (min-width:621px){
+  #app:has(#s-ovahzicht:not([hidden])) .top-ooi{display:block;flex:none;margin-left:auto;width:58px;height:74px;
+    background:url(img/ooievaar.svg?v=20261013c) no-repeat center/contain;
+    filter:drop-shadow(0 0 2px rgba(245,197,24,.8)) drop-shadow(0 0 9px rgba(47,143,70,1))}
+  #ovTegels>.tegel:first-child::after{content:none}
+  #ovTegels>.tegel:first-child>.tkop{padding-right:0;flex-wrap:nowrap;justify-content:space-between}
+}
