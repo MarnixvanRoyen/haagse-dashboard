@@ -763,3 +763,68 @@ details.igsuit p{margin:8px 0 0;line-height:1.5}
   .ooi-kaart::after,#ovTegels>.tegel:first-child::after{animation:ooi-gloed 6s ease-in-out infinite}
   @keyframes ooi-gloed{0%,100%{filter:drop-shadow(0 0 2px rgba(245,197,24,.8)) drop-shadow(0 0 9px rgba(47,143,70,1))}50%{filter:drop-shadow(0 0 2px rgba(47,143,70,1)) drop-shadow(0 0 11px rgba(245,197,24,.6))}}
 }
+
+/* Post in detail (14-10, chat 44): tik op een post of story → pop-up met de hele performance (js/postdetail.js) */
+[data-pd]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-pd]:hover{background:color-mix(in srgb,var(--hy) 6%,transparent)}
+[data-pd][tabindex]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.vnpopkaart.pdkaart{max-width:760px}
+.pdnav{display:flex;gap:6px;flex:0 0 auto}
+.pdnav .btn{min-width:40px;font-size:16px;padding-inline:0;justify-content:center}
+.pdnav .btn:disabled{opacity:.35;cursor:not-allowed}
+.pdkop{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:start;margin-bottom:14px}
+.pdkop .pdbeeld{width:120px;height:150px;border-radius:12px}
+.pdkop .pdbeeld.story{height:200px}
+.pdkop .pdbeeld img{width:100%;height:100%;object-fit:cover}
+.pdkoptekst{display:grid;gap:8px;min-width:0}
+.pdkoptekst p{margin:0}
+.pdsamen{font-size:15.5px;line-height:1.4}
+.pdchips{display:flex;flex-wrap:wrap;gap:5px}
+.pdchips .chip{white-space:normal}
+.pdcap{font-size:13px;color:var(--ink-2);white-space:pre-line;overflow-wrap:anywhere;max-height:7.5em;overflow:hidden}
+.pdinsta{justify-self:start;text-decoration:none}
+.pdtegels{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.pdtegels .ytstat .v{font-size:23px}
+.pdtegels .ytstat .s b{font-weight:800}
+.pdnoot{margin:8px 0 0}
+.pdblok{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.pdblok h3{font-family:var(--display);font-weight:400;font-size:17px;margin:0 0 8px;color:var(--hy)}
+.pdblok p{margin:0 0 8px}
+.pdblok .sub{font-size:12.5px}
+.pdtkop{font-weight:800;font-size:13px;margin:10px 0 4px!important}
+.pdlijst{margin:0 0 8px;padding-left:18px;display:grid;gap:6px}
+.pdlijst .chip{vertical-align:1px}
+.pdbalken{display:grid;gap:5px;margin:2px 0 10px}
+.pdbalk{display:grid;grid-template-columns:minmax(64px,108px) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px}
+.pdbalk .k{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pdbalk .k .chip{font-size:10px;padding:0 6px}
+.pdbalk .b{height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.pdbalk .b i{display:block;height:100%;background:var(--lb);border-radius:6px}
+.pdbalk.aan .b i{background:var(--hy)}
+.pdbalk.aan .k{color:var(--ink);font-weight:800}
+.pdbalk .v{font-variant-numeric:tabular-nums;font-weight:800;text-align:right;white-space:nowrap}
+.pdbalk .v small{font-weight:600;color:var(--muted);font-size:11px}
+.pdnaast .pdbalk:first-child .b i{background:var(--hy)}
+.pdgroeikies{margin-bottom:8px}
+.pdgroeikies button:disabled{opacity:.4;cursor:not-allowed}
+.chart .pdlijn{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .pdlijn.deze{stroke:var(--hy)}
+.chart .pdlijn.norm{stroke:var(--ink-2);stroke-dasharray:4 4;stroke-width:1.6}
+.chart .pdpunt{fill:var(--hy);stroke:var(--surface);stroke-width:1.5;pointer-events:none}
+.pdleg{display:inline-block;width:16px;height:0;border-top:3px solid var(--hy);vertical-align:3px}
+.pdleg.norm{border-top:2px dashed var(--ink-2)}
+.pdgroeisub{margin-top:6px!important}
+.pdhitte{margin-top:10px}
+.pdhitte .hverloop{max-width:420px}
+.pdeff .igeff{display:block;white-space:normal}
+@media (max-width:700px){
+  .vnpopkaart.pdkaart{max-height:92dvh}
+  .pdkop{grid-template-columns:84px minmax(0,1fr);gap:12px}
+  .pdkop .pdbeeld{width:84px;height:105px}
+  .pdkop .pdbeeld.story{height:150px}
+  .pdtegels{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pdtegels .ytstat .v{font-size:20px}
+  .pdinsta.btn{width:100%;justify-content:center}
+}
+
+@media (max-width:700px){.vnpopkaart.pdkaart h2{font-size:18px}}

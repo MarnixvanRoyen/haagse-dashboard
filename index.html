@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Haagse Content Performance Dashboard</title>
-<link rel="stylesheet" href="stijl.css?v=20261013c">
+<link rel="stylesheet" href="stijl.css?v=20261014a">
 </head>
 <body>
 
@@ -295,7 +295,7 @@
         <div class="igt5" id="igT5"></div>
       </div>
       <div class="card pc">
-        <div class="cardhead"><div><h2>Je toppâhs</h2><p class="sub" id="igTopSub">Beste posts van de laatste 90 dagen, op bereik. Klik om de post te openen.</p></div>
+        <div class="cardhead"><div><h2>Je toppâhs</h2><p class="sub" id="igTopSub">Beste posts van de laatste 90 dagen, op bereik. Klik op een post voor alle cijfâhs.</p></div>
           <div class="igtopknoppen">
           <div class="seg igtopop" id="igTopOp" role="group" aria-label="Sorteer op">
             <button type="button" data-v="bereik" aria-pressed="true">Bereik</button>
@@ -516,7 +516,7 @@
 
   <!-- logo onderaan elke tab (chat 40): klik = Insta @the_hague_beachlife; witte SVG met geel/groene gloed (stijl.css .merk) -->
   <footer class="eind">
-    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261013c" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
+    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261014a" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
     <span class="sig">Gemaakt in 070, âhwe!</span>
   </footer>
 </div>
@@ -561,22 +561,31 @@
     <div class="kpopknop"><button class="btn yellow" type="button" id="kansPopGelezen">Gelezen ✓</button><button class="btn" type="button" id="kansPopLater">Later</button></div>
   </div>
 </div>
+<!-- pop-up "Post in detail": tik op een post of story, waar die ook staat (postdetail.js, pdOpen; chat 44) -->
+<div class="vnpop" id="pdPop" hidden>
+  <div class="vnpopkaart card pdkaart" role="dialog" aria-modal="true" aria-labelledby="pdTitel">
+    <div class="cardhead"><div><h2 id="pdTitel">Post</h2><p class="sub" id="pdSub"></p></div>
+      <div class="pdnav"><button class="btn" type="button" id="pdVorige" aria-label="Vorige (oudere) post" title="Oudere post">‹</button><button class="btn" type="button" id="pdVolgende" aria-label="Volgende (nieuwere) post" title="Nieuwere post">›</button><button class="btn" type="button" id="pdDicht" aria-label="Sluite">✕</button></div></div>
+    <div id="pdInhoud"></div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <!-- ?v=… = versie (06-10, chat 14): bij elke wijziging in een .js/.css hier ALLE ?v= ophogen (zoek-en-vervang), anders gebruikt de browser tot ± 10 min de oude versie uit de cache (GitHub Pages) -->
-<script src="config.js?v=20261013c"></script>
-<script src="js/basis.js?v=20261013c"></script>
-<script src="js/live.js?v=20261013c"></script>
-<script src="js/muziek.js?v=20261013c"></script>
-<script src="js/verschil.js?v=20261013c"></script>
-<script src="js/apps.js?v=20261013c"></script>
-<script src="js/insta.js?v=20261013c"></script>
-<script src="js/samenwerking.js?v=20261013c"></script>
-<script src="js/bedankkaart.js?v=20261013c"></script>
-<script src="js/threads.js?v=20261013c"></script>
-<script src="js/demografie.js?v=20261013c"></script>
-<script src="js/kansen.js?v=20261013c"></script>
-<script src="js/ovahzicht.js?v=20261013c"></script>
-<script src="js/app.js?v=20261013c"></script>
-<script src="js/start.js?v=20261013c"></script>
+<script src="config.js?v=20261014a"></script>
+<script src="js/basis.js?v=20261014a"></script>
+<script src="js/live.js?v=20261014a"></script>
+<script src="js/muziek.js?v=20261014a"></script>
+<script src="js/verschil.js?v=20261014a"></script>
+<script src="js/apps.js?v=20261014a"></script>
+<script src="js/insta.js?v=20261014a"></script>
+<script src="js/samenwerking.js?v=20261014a"></script>
+<script src="js/bedankkaart.js?v=20261014a"></script>
+<script src="js/threads.js?v=20261014a"></script>
+<script src="js/demografie.js?v=20261014a"></script>
+<script src="js/postdetail.js?v=20261014a"></script>
+<script src="js/kansen.js?v=20261014a"></script>
+<script src="js/ovahzicht.js?v=20261014a"></script>
+<script src="js/app.js?v=20261014a"></script>
+<script src="js/start.js?v=20261014a"></script>
 </body>
 </html>

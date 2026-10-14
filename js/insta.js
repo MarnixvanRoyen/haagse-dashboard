@@ -671,13 +671,13 @@ function renderIgTop(){
       ?`Je 10 beste ${G.kort} ooit, ${optxt}. Gekeken naâh ${nf0.format(metCijfers.length)} ${G.kort} met cijfâhs${oudste?`, de oudste van ${dLabel(dagNL(oudste),1)}`:""}.`
         +(zonder?(zonder===1?" 1 post heb (nog) geen cijfâhs en telt nie mee.":` ${nf0.format(zonder)} posts hebbe (nog) geen cijfâhs en telle nie mee.`):"")
         +" Het archief vult zich elke nacht verder aan, dus oude toppâhs kunne d'r nog bij komme."
-      :`Beste ${G.kort} van de laatste 90 dagen, ${optxt}.${periode.length<3?` <b>Let op:</b> maar ${periode.length} ${periode.length===1?G.een:G.kort} in deze periode, kijk ook bij Allâh tijde.`:""} Klik op een post om hem te openen, of op een kolomkop om daarop te sorteren.`;
+      :`Beste ${G.kort} van de laatste 90 dagen, ${optxt}.${periode.length<3?` <b>Let op:</b> maar ${periode.length} ${periode.length===1?G.een:G.kort} in deze periode, kijk ook bij Allâh tijde.`:""} Klik op een post voor alle cijfâhs (Cmd-klik = op Insta), of op een kolomkop om daarop te sorteren.`;
   }
   const kop=k=>`<th class="n${igTopOp===k?" gesorteerd":""}"><button type="button" class="igtopkop" data-igtop="${k}">${IG_TOP_OP[k].kop}${igTopOp===k?" ↓":""}</button></th>`;
   const cel=(p,k)=>{const v=IG_TOP_OP[k].v(p);return `<td class="n${igTopOp===k?" gesorteerd":""}">${v==null?"—":IG_TOP_OP[k].f.format(v)}</td>`};
   const kols=Object.keys(IG_TOP_OP).filter(k=>!nieVoorReel(k));
   $("igTop").innerHTML=lijst.length?`<thead><tr><th class="n">#</th><th>Post</th>${kols.map(kop).join("")}</tr></thead><tbody>`+
-    lijst.map((p,i)=>`<tr><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span></div></div></td>
+    lijst.map((p,i)=>`<tr${pdAttr(p)}><td class="n">${i+1}</td><td><div class="igtoprij"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><div style="min-width:0"><a href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${dLabel(dagNL(p.gepost_om),alles)} · ${soortNaam(p)}</a> <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span></div></div></td>
       ${kols.map(k=>cel(p,k)).join("")}</tr>`).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${periode.length?`Nog geen ${G.kort} met een cijfâh voor ${op.kop.toLowerCase()}${alles?"":" in de laatste 90 dagen"}.`:alles?`Nog geen ${G.kort} met cijfâhs.`:`Geen ${G.kort} met cijfâhs in de laatste 90 dagen.`}</td></tr></tbody>`;
 }
@@ -715,7 +715,7 @@ function renderIgT5(){
   if(teKlein)extra.push(`${nf0.format(teKlein)} met minder dan ${nf0.format(drempel)} bereik tellen nie mee`);
   if(zonder)extra.push(`${nf0.format(zonder)} zonder dit cijfâh`);
   $("igT5Sub").innerHTML=`Je 5 beste ${wat} van de laatste ${igT5Per} dagen, ${uitleg}. ${nf0.format(n)} ${n===1?(st?"story":G.een):wat} in deze periode`+(extra.length?` (${extra.join(", ")})`:"")+"."
-    +(st?" Tik op een story van de laatste 24 uur om hem te openen.":" Tik op een post om hem te openen.");
+    +(st?" Tik op een story voor alle cijfâhs.":" Tik op een post voor alle cijfâhs.");
   if(!lijst.length){$("igT5").innerHTML=`<p class="sub" style="margin:0">${n?`Nog geen ${wat} met een cijfâh voor ${op.naam} in de laatste ${igT5Per} dagen.`:`Geen ${wat} in de laatste ${igT5Per} dagen.`}</p>`;return}
   $("igT5").innerHTML=lijst.map((r,i)=>{const x=r.x,d=dagNL(x.gepost_om),oud=Date.now()-Date.parse(x.gepost_om);
     const loopt=oud<(st?1:2)*864e5?' <span class="chip mute">loopt nog</span>':"";
@@ -728,7 +728,7 @@ function renderIgT5(){
       <span class="igthumb ${st?"story":"klein"}" aria-hidden="true">${beeld?`<img src="${esc(beeld)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
       <span class="wat"><b>${kop}</b>${loopt?`<span>${loopt}</span>`:""}${tekst?`<span class="igcap">${esc(tekst)}</span>`:""}</span>
       <span class="cijf"><b>${op.f(+r.v)}</b><span>${igT5Op==="kwaliteit"?"per 1.000":op.naam}</span>${bij?`<span class="bij">${bij}</span>`:""}</span>`;
-    return link?`<a class="igt5rij" href="${esc(link)}" target="_blank" rel="noopener">${binnen}</a>`:`<div class="igt5rij">${binnen}</div>`}).join("");
+    return link?`<a class="igt5rij" href="${esc(link)}" target="_blank" rel="noopener"${pdAttr(x)}>${binnen}</a>`:`<div class="igt5rij"${pdAttr(x,true)}>${binnen}</div>`}).join("");
 }
 
 function renderIgStories(){
@@ -740,7 +740,7 @@ function renderIgStories(){
   const eerste=IG.stories.reduce((m,s)=>!m||s.gepost_om<m?s.gepost_om:m,null);
   if($("igStorySub"))$("igStorySub").innerHTML=`${dagen?`Laatste ${dagen} dagen`:"Allâh stories"}, per dag in de volgorde waarin je ze plaatste: zo zie je waar mensen afhaken. `
     +(igStoryWie==="eigen"?"Alleen stories zonder tekst. ":igStoryWie==="gedeeld"?"Alleen stories met tekst (bijschrift). ":"")
-    +`Stories blijven hier bewaard, ook als ze na 24 uur van Insta verdwijnen (cijfers = laatste meting, vanaf 1 okt ± 10 minuten voor het einde; klein plaatje bewaard vanaf eind sep)${eerste?`; de eerste is van ${dLabel(dagNL(eerste),1)}`:""}.`;
+    +`Stories blijven hier bewaard, ook als ze na 24 uur van Insta verdwijnen (cijfers = laatste meting, vanaf 1 okt ± 10 minuten voor het einde; klein plaatje bewaard vanaf eind sep)${eerste?`; de eerste is van ${dLabel(dagNL(eerste),1)}`:""}. Tik op een story voor alle cijfâhs.`;
   if(!st.length){$("igStories").innerHTML=`<p class="sub">Nog geen stories gemeten${dagen?` in de laatste ${dagen} dagen`:""}${igStoryWie!=="alles"&&inPeriode.length?" van deze soort (kies \"Alles\")":""}. Stories worden elk uur opgehaald zolang ze online staan (24 uur).</p>`;return}
   const titels=igTrackTitels(),opties=igMuziekOpties(titels);
   // samenvatting: de middelste story (één uitschietâh telt nie te zwaar)
@@ -761,7 +761,7 @@ function renderIgStories(){
       const verlopen=Date.parse(s.gepost_om)<Date.now()-864e5;
       const wie=her==="gedeeld"?` <span class="chip mute" title="${esc(s.bijschrift||"")}">met tekst</span>`:"";
       const bl=igStoryBeeld(s);
-      h+=`<tr data-id="${esc(s.media_id)}"><td><div class="igtoprij"><span class="igthumb story" aria-hidden="true">${bl?`<img src="${esc(bl)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><div>${verlopen?`${dLabel(d)} ${tijdAms(s.gepost_om)}`:`<a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a>`} · ${i+1}/${rij.length}${wie}</div></div></td>
+      h+=`<tr data-id="${esc(s.media_id)}"${pdAttr(s,verlopen)}><td><div class="igtoprij"><span class="igthumb story" aria-hidden="true">${bl?`<img src="${esc(bl)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><div>${verlopen?`${dLabel(d)} ${tijdAms(s.gepost_om)}`:`<a href="${esc(s.permalink||"#")}" target="_blank" rel="noopener">${dLabel(d)} ${tijdAms(s.gepost_om)}</a>`} · ${i+1}/${rij.length}${wie}</div></div></td>
       <td class="n">${x.reach==null?(s.fout?'<span class="sub" title="'+esc(s.fout)+'">nog geen</span>':"—"):nf0.format(x.reach)+vast}</td><td class="n">${x.views==null?"—":nf0.format(x.views)}</td>
       <td class="n">${lk==null?"—":nf0.format(lk)}</td><td class="n">${kw==null?"—":igKwalF(kw)}</td>
       <td class="n">${weg==null?"—":pct(weg)}</td><td class="n">${x.replies==null?"—":nf0.format(x.replies)}</td>
@@ -826,11 +826,17 @@ function igMuziekSelect(m,opties,titels,aria){
 // eerste regel van een post-bijschrift (afgesproken 01-10): de eerste nie-lege regel, mét "Oh oh #thehague" erbij.
 // Te lang? Dan kapt de CSS hem af met "…". Zweef je erover (Mac), dan zie je het hele bijschrift (title).
 function igEersteRegel(t){return String(t||"").split(/\r?\n/).map(x=>x.trim()).find(x=>x)||""}
+// aantikbare post/story → pop-up "Post in detail" (js/postdetail.js, chat 44). eigenFocus = rij zelf krijgt de toetsenbord-focus
+// (alleen nodig als er in de rij geen link naar de post zit, bijv. een verlopen story).
+function pdAttr(x,eigenFocus){
+  if(!x||!x.media_id)return "";const st=soortGroep(x)==="story";
+  return ` data-pd="${esc(x.media_id)}"${st?' data-pdst="1"':""}${eigenFocus?` tabindex="0" role="button" aria-haspopup="dialog" aria-label="Alle cijfâhs van deze ${st?"story":"post"}"`:""}`;
+}
 function igPostRij(p,opties,titels){
   const m=labelsVan(p,"muziek")[0]||"",ond=labelsVan(p,"onderwerp");
   const eff=igIsNummer(m)?igPlaysEffect(m,dagNL(p.gepost_om)):null;
   const effTxt=eff?igEffectHTML(eff):"";
-  return `<div class="igpost" data-id="${esc(p.media_id)}">
+  return `<div class="igpost" data-id="${esc(p.media_id)}"${pdAttr(p)}>
       <a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>${soortNaam(p)}</span></a>
       <div class="iginfo"><span><b>${dLabel(dagNL(p.gepost_om),1)}</b> · ${p.bereik==null?"nog geen cijfâhs":"bereik "+nf0.format(p.bereik)+(p.kwaliteit!=null?" · kwaliteit "+nf0.format(p.kwaliteit):"")}</span>
         <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span>
@@ -840,7 +846,7 @@ function igPostRij(p,opties,titels){
 }
 function igStoryWachtRij(x,opties,titels){   // zelfde opmaak als een post in de wachtkamâh
   const c=x.cijfers||{},lk=igStoryLikes(x);
-  return `<div class="igpost" data-id="${esc(x.media_id)}">
+  return `<div class="igpost" data-id="${esc(x.media_id)}"${pdAttr(x)}>
       <a class="igthumb" href="${esc(x.permalink||"#")}" target="_blank" rel="noopener">${igStoryBeeld(x)?`<img src="${esc(igStoryBeeld(x))}" alt="" loading="lazy" onerror="this.remove()">`:""}<span>Story</span></a>
       <div class="iginfo"><span><b>${dLabel(dagNL(x.gepost_om),1)} ${tijdAms(x.gepost_om)}</b> · story${c.reach==null?" · nog geen cijfâhs":" · bereik "+nf0.format(c.reach)+(lk!=null?" · ≈ "+nf0.format(lk)+" likes":"")}</span>
         ${x.bijschrift?`<span class="igcap">${esc(x.bijschrift.slice(0,90))}</span>`:""}</div>
@@ -1399,7 +1405,7 @@ function igHitteVerloopHTML(h){
 }
 function igHitteKaartHTML(h){
   const p=h.p,G=IG_GROEPEN[h.g],F=IG_HITTE_FASE[h.fase],x=h.nu,N=h.N;
-  const post=`<div class="hpost"><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a>
+  const post=`<div class="hpost"${pdAttr(p)}><a class="igthumb klein" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a>
       <p><b>${soortNaam(p)} · ${igLeeftijd(h.leeftijd)}</b><span class="pc"> · ${esc(igEersteRegel(p.bijschrift).slice(0,70))}</span></p></div>`;
   let midden;
   if(h.fase==="wacht"){
