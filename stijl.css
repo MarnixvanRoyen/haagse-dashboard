@@ -625,7 +625,7 @@ body.popopen{overflow:hidden}
 .lkuitleg p{font-size:13px;margin-top:6px}
 /* Hittemetâh bovenaan Ovâhzicht (chat 32, insta.js igLekkerHitte/igHitteHTML; vervangt "Deze gaat lekkâh!") */
 .hittes{display:grid;gap:12px}
-@media (min-width:900px){.hittes.meer{grid-template-columns:repeat(auto-fit,minmax(360px,1fr));align-items:start}}
+@media (min-width:900px){.hittes.meer{grid-template-columns:repeat(auto-fit,minmax(360px,1fr));align-items:stretch}}  /* 14-10: naast elkaar even hoog */
 .alarm.hitte{--fc:var(--lb);border-color:var(--fc);background:color-mix(in srgb,var(--fc) 13%,var(--surface))}
 .alarm.hitte.f-normaal{--fc:var(--groen)}
 .alarm.hitte.f-warm{--fc:var(--hy)}
@@ -838,4 +838,73 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
     filter:drop-shadow(0 0 2px rgba(245,197,24,.8)) drop-shadow(0 0 9px rgba(47,143,70,1))}
   #ovTegels>.tegel:first-child::after{content:none}
   #ovTegels>.tegel:first-child>.tkop{padding-right:0;flex-wrap:nowrap;justify-content:space-between}
+}
+
+/* ---------- Hittemetâh: even hoog + inklappen (14-10) ----------
+   Uitgeklapt: kaarten naast elkaar even hoog; uitleg + "gemeten" staan onderaan op dezelfde hoogte.
+   Ingeklapt: alleen thermometer + foto + score, met een animatie die past bij de temperatuur. */
+.alarm.hitte{position:relative}
+.alarm.hitte .alarmkop{padding-right:42px}
+.hvol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.hvol>.hrij{flex:1 1 auto;align-content:start}
+.htoggle{position:absolute;top:12px;right:12px;z-index:3;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--surface) 75%,transparent);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.htoggle:hover{border-color:var(--fc);color:var(--fc)}
+.htoggle:focus-visible{outline:2px solid var(--hy);outline-offset:2px}
+.htoggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s ease}
+.hittes.dicht .htoggle svg{transform:rotate(180deg)}
+.hkort{display:none}
+.hittes.dicht .hvol{display:none}
+.hittes.dicht{grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));align-items:stretch}
+.hittes.dicht .alarm.hitte{padding:10px 14px 12px}
+.hittes.dicht .hkort{display:flex;align-items:center;gap:14px;padding-right:38px;min-width:0}
+.hkort .hmeter{--buis:68px;padding:16px 0 0 8px;flex:none}
+.hkort .hstreep{display:none}
+.hkort .hbol{width:34px;height:34px;margin:-6px 0 0 -8px}
+.hkort .hbol b{font-size:9.5px}
+.hkort .hvlam{transform:translateX(-50%) scale(.75);transform-origin:50% 100%}
+.hkfoto{position:relative;flex:none;width:86px;height:86px;border-radius:14px;overflow:hidden;cursor:pointer;box-shadow:0 0 0 2px color-mix(in srgb,var(--fc) 55%,transparent)}
+.hkfoto .igthumb{width:100%;height:100%;border-radius:14px}
+.hkanim{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.hkanim i{position:absolute;font-style:normal}
+.hkscore{display:grid;gap:2px;min-width:0}
+.hkscore b{font-family:var(--display);font-weight:400;font-size:34px;line-height:1;color:var(--fc)}
+.hkscore span{font-weight:800;font-size:15px}
+.hkscore small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alarm.hitte.f-koud .hkscore b,.alarm.hitte.koelt .hkscore b{color:#8fc0ff}
+/* per temperatuur een eigen sfeer op de foto (stil plaatje als je "minder beweging" aan hebt) */
+.a-wacht .hkanim{background:rgba(15,38,45,.45)}
+.a-wacht .hkanim i{left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff}
+.a-koud .hkanim{background:linear-gradient(to bottom,rgba(74,149,236,.38),rgba(74,149,236,.08))}
+.a-koud .hkanim i{color:#e6f2ff;font-size:13px;top:6px;text-shadow:0 0 4px rgba(74,149,236,.9)}
+.a-koud .hkanim i:nth-child(1){left:12%}.a-koud .hkanim i:nth-child(2){left:38%;top:30px;font-size:10px}.a-koud .hkanim i:nth-child(3){left:62%;top:14px}.a-koud .hkanim i:nth-child(4){left:82%;top:44px;font-size:10px}
+.a-warm .hkanim,.a-lekker .hkanim{background:linear-gradient(to top,rgba(240,122,63,.45),rgba(245,197,24,0) 70%)}
+.a-lekker .hkanim{background:linear-gradient(to top,rgba(217,67,47,.5),rgba(240,122,63,.15) 60%,rgba(245,197,24,0))}
+.a-warm .hkanim i,.a-lekker .hkanim i{bottom:-10px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,rgba(255,236,170,.9),rgba(245,197,24,0) 70%)}
+.a-warm .hkanim i:nth-child(1),.a-lekker .hkanim i:nth-child(1){left:12%}
+.a-warm .hkanim i:nth-child(2),.a-lekker .hkanim i:nth-child(2){left:44%}
+.a-warm .hkanim i:nth-child(3),.a-lekker .hkanim i:nth-child(3){left:72%}
+.a-lekker .hkanim i:nth-child(4){left:28%}.a-lekker .hkanim i:nth-child(5){left:60%}
+.a-fik .hkanim{background:linear-gradient(to top,rgba(217,67,47,.55),rgba(217,67,47,0) 65%)}
+.a-fik .hkanim i{bottom:-4px;width:22px;height:34px;margin-left:-11px;border-radius:50% 50% 45% 45% / 60% 60% 40% 40%;transform-origin:50% 100%;
+  background:radial-gradient(circle at 50% 75%,#fff4b0 0 18%,#f5c518 35%,#f07a3f 65%,rgba(217,67,47,0) 100%)}
+.a-fik .hkanim i:nth-child(1){left:18%;height:26px}.a-fik .hkanim i:nth-child(2){left:42%}.a-fik .hkanim i:nth-child(3){left:64%;height:30px}.a-fik .hkanim i:nth-child(4){left:86%;height:22px}
+@media (prefers-reduced-motion:no-preference){
+  .hittes.dicht .hkort,.hittes:not(.dicht) .hvol{animation:hkin .35s ease both}
+  @keyframes hkin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .a-wacht .hkanim i{animation:hkdraai 1s linear infinite}
+  @keyframes hkdraai{to{transform:rotate(360deg)}}
+  .a-koud .hkanim i{top:-16px;animation:hksneeuw 3.4s linear infinite}
+  .a-koud .hkanim i:nth-child(2){animation-delay:.9s;animation-duration:4s}.a-koud .hkanim i:nth-child(3){animation-delay:1.8s}.a-koud .hkanim i:nth-child(4){animation-delay:2.5s;animation-duration:3.8s}
+  @keyframes hksneeuw{from{transform:translate(0,0) rotate(0)}50%{transform:translate(6px,55px) rotate(120deg)}to{transform:translate(-3px,110px) rotate(240deg)}}
+  .a-normaal{animation:hkpuls 2.6s ease-in-out infinite}
+  @keyframes hkpuls{0%,100%{box-shadow:0 0 0 2px color-mix(in srgb,var(--fc) 55%,transparent)}50%{box-shadow:0 0 0 2px var(--fc),0 0 14px 2px color-mix(in srgb,var(--fc) 60%,transparent)}}
+  .a-warm .hkanim i,.a-lekker .hkanim i{animation:hkwarm 2.4s ease-in infinite}
+  .a-warm .hkanim i:nth-child(2),.a-lekker .hkanim i:nth-child(2){animation-delay:.8s}.a-warm .hkanim i:nth-child(3),.a-lekker .hkanim i:nth-child(3){animation-delay:1.6s}
+  .a-lekker .hkanim i{animation-duration:1.6s}.a-lekker .hkanim i:nth-child(4){animation-delay:.4s}.a-lekker .hkanim i:nth-child(5){animation-delay:1.2s}
+  @keyframes hkwarm{0%{transform:translateY(0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translateY(-96px) scale(1.4);opacity:0}}
+  .a-lekker,.a-fik{animation:hkgloed 1.8s ease-in-out infinite}
+  @keyframes hkgloed{0%,100%{box-shadow:0 0 0 2px color-mix(in srgb,var(--fc) 60%,transparent)}50%{box-shadow:0 0 0 2px var(--fc),0 0 18px 4px color-mix(in srgb,var(--fc) 70%,transparent)}}
+  .a-fik .hkanim i{animation:hvlam .8s ease-in-out infinite alternate}
+  .a-fik .hkanim i:nth-child(2){animation-duration:.6s;animation-delay:.2s}.a-fik .hkanim i:nth-child(3){animation-duration:.7s;animation-delay:.4s}.a-fik .hkanim i:nth-child(4){animation-delay:.1s}
 }

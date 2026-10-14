@@ -1426,7 +1426,17 @@ function igHitteKaartHTML(h){
     lekker:"Tip: deel 'm nâh in je story, nâh 't loopt!",fik:"Deel 'm nâh in je story en reageer op de reacties!"}[h.fase];
   const onder=[tip,x&&x.om?`gemeten ${tijdAms(x.om)}`:""].filter(Boolean).join(" · ");
   const opKop=h.opgeleefd&&["koud","normaal","warm"].includes(h.fase);   // terug na afkoelen: kop "Leeft weer op!" (bij lekkâh/fik een chip)
+  // ingeklapt (14-10): alleen foto + thermometer + score, met een animatie die past bij de temperatuur
+  const t=Math.round(h.t),anim=h.koelt?"koud":h.fase;
+  const animIn={wacht:"<i></i>",koud:"<i>❄</i><i>❄</i><i>❄</i><i>❄</i>",normaal:"",warm:"<i></i><i></i><i></i>",lekker:"<i></i><i></i><i></i><i></i><i></i>",fik:"<i></i><i></i><i></i><i></i>"}[anim]||"";
+  const kort=`<div class="hkort">${igHitteMeterHTML(h)}
+    <div class="hkfoto a-${anim}"${pdAttr(p)}><a class="igthumb" href="${esc(p.permalink||"#")}" target="_blank" rel="noopener">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</a><span class="hkanim" aria-hidden="true">${animIn}</span></div>
+    <div class="hkscore"><b>${h.fase==="wacht"?"…":t+"%"}</b><span>${esc(opKop?"leeft weer op":h.koelt?"koelt af":F.naam)}</span><small>${soortNaam(p)} · ${igLeeftijd(h.leeftijd)}</small></div></div>`;
+  const dicht=igHitteDicht();
   return `<div class="alarm hitte f-${h.fase}${h.koelt?" koelt":""}" role="status">
+    <button class="htoggle" type="button" data-hdicht aria-expanded="${!dicht}" title="${dicht?"Uitklappe":"Inklappe"}" aria-label="${dicht?"Hittemetâh uitklappe":"Hittemetâh inklappe"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+    ${kort}
+    <div class="hvol">
     <div class="alarmkop"><span class="alarmicoon" aria-hidden="true">${opKop?"↺":F.icoon}</span><h2>${opKop?"Leeft weer op!":F.kop}</h2>${h.opgeleefd&&!opKop?`<span class="chip hop">leeft weer op</span>`:""}</div>
     <div class="hrij">${igHitteMeterHTML(h)}<div class="htekst">${post}${midden}</div>${igHitteVerloopHTML(h)}</div>
     ${onder?`<p class="lksub">${onder}</p>`:""}
@@ -1440,10 +1450,21 @@ function igHitteKaartHTML(h){
       <p>      Gaat-ie 2 metingen op rij trager dan bij de vorige meting én trager dan normaal, dan is-ie afgekoeld en verdwijnt de metâh. Tussen 01:00 en 07:00 telt dat zakken nie (dan zakt elke post). Gaat een verdwenen post 2 metingen op rij weer sneller én minstens even snel als normaal, dan komt-ie terug: <b>Leeft weer op!</b> De metâh volgt een post ${IG_HITTE.maxUur} uur (zolang meet Supabase elk uur).</p>
       <p><b>Kijk niet steeds zelf naar je nieuwe post.</b> Je eigen kijken telt hooguit 1× mee en maakt hem niet sneller; dit dashboard houdt het voor je bij.</p>
     </details>
+    </div>
   </div>`;
 }
 // Ovâhzicht → #ovAlarm (bovenaan, vóór de alarmen): één metâh per nieuwe post, heetste eerst
 function igHitteHTML(){
   const l=igHitteLijst();if(!l.length)return "";
-  return `<div class="hittes${l.length>1?" meer":""}">${l.map(igHitteKaartHTML).join("")}</div>`;
+  return `<div class="hittes${l.length>1?" meer":""}${igHitteDicht()?" dicht":""}">${l.map(igHitteKaartHTML).join("")}</div>`;
 }
+// in-/uitklappen (14-10): één knop per kaart, klapt ze allemaal tegelijk (blijven dan even hoog), keuze onthouden in deze browser
+function igHitteDicht(){return store.get("hc_hitte_dicht")==="1"}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-hdicht]");if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  const box=b.closest(".hittes");if(!box)return;
+  const d=!box.classList.contains("dicht");
+  box.classList.toggle("dicht",d);store.set("hc_hitte_dicht",d?"1":"0");
+  box.querySelectorAll("[data-hdicht]").forEach(x=>{x.setAttribute("aria-expanded",String(!d));x.title=d?"Uitklappe":"Inklappe";x.setAttribute("aria-label",d?"Hittemetâh uitklappe":"Hittemetâh inklappe")});
+});
