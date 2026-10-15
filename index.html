@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Haagse Content Performance Dashboard</title>
-<link rel="stylesheet" href="stijl.css?v=20261015a">
+<link rel="stylesheet" href="stijl.css?v=20261015b">
 </head>
 <body>
 
@@ -489,12 +489,12 @@
     <div id="kansGesch" class="kansblok" hidden></div>
   </section>
 
-  <!-- Plekkies: serie "Haagse plekkies doâh Haagse mense" (plekkies.js, chat 50): mense, shoots, tekst, post-cijfâhs.
+  <!-- Plekkies: serie "Haagse plekkies doâh Haagse mense" (plekkies.js, chat 50): één kaart per plekkie (persoon + plek + shoot + tekst + post).
        Persoonsgegevens alleen in Supabase (hp_mensen, hp_shoots; 32_plekkies.sql), nooit in de browser bewaard. -->
   <section class="sectie" id="s-plekkies" hidden>
     <div class="card ooi-kaart">
       <div class="cardhead"><div><h2>Haagse plekkies doâh Haagse mense</h2><p class="sub">Wie doet mee, waâh en wanneer shoote we, welke tekst komt erbij, en hoe deed de post het?</p></div></div>
-      <div class="hpnieuw"><button class="btn yellow" type="button" id="hpNieuwShoot">+ Shoot</button><button class="btn" type="button" id="hpNieuwPersoon">+ Persoon</button></div>
+      <div class="hpnieuw"><button class="btn yellow" type="button" id="hpNieuw">+ Plekkie</button></div>
       <div class="ytstats" id="hpStats"></div>
     </div>
     <div id="hpInhoud" class="hpinhoud"></div>
@@ -529,7 +529,7 @@
 
   <!-- logo onderaan elke tab (chat 40): klik = Insta @the_hague_beachlife; witte SVG met geel/groene gloed (stijl.css .merk) -->
   <footer class="eind">
-    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261015a" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
+    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261015b" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
     <span class="sig">Gemaakt in 070, âhwe!</span>
   </footer>
 </div>
@@ -582,7 +582,7 @@
     <div id="pdInhoud"></div>
   </div>
 </div>
-<!-- pop-up Plekkies: persoon of shoot toevoegen/bewerken (plekkies.js, hpOpen; chat 50) -->
+<!-- pop-up Plekkies: één kaart (persoon + plek + shoot) toevoegen/bewerken (plekkies.js, hpOpen; chat 50) -->
 <div class="vnpop" id="hpPop" hidden>
   <div class="vnpopkaart card hpkaartpop" role="dialog" aria-modal="true" aria-labelledby="hpTitel">
     <div class="cardhead"><div><h2 id="hpTitel">Plekkies</h2><p class="sub" id="hpSub"></p></div>
@@ -592,22 +592,22 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <!-- ?v=… = versie (06-10, chat 14): bij elke wijziging in een .js/.css hier ALLE ?v= ophogen (zoek-en-vervang), anders gebruikt de browser tot ± 10 min de oude versie uit de cache (GitHub Pages) -->
-<script src="config.js?v=20261015a"></script>
-<script src="js/basis.js?v=20261015a"></script>
-<script src="js/live.js?v=20261015a"></script>
-<script src="js/muziek.js?v=20261015a"></script>
-<script src="js/verschil.js?v=20261015a"></script>
-<script src="js/apps.js?v=20261015a"></script>
-<script src="js/insta.js?v=20261015a"></script>
-<script src="js/samenwerking.js?v=20261015a"></script>
-<script src="js/bedankkaart.js?v=20261015a"></script>
-<script src="js/threads.js?v=20261015a"></script>
-<script src="js/demografie.js?v=20261015a"></script>
-<script src="js/postdetail.js?v=20261015a"></script>
-<script src="js/plekkies.js?v=20261015a"></script>
-<script src="js/kansen.js?v=20261015a"></script>
-<script src="js/ovahzicht.js?v=20261015a"></script>
-<script src="js/app.js?v=20261015a"></script>
-<script src="js/start.js?v=20261015a"></script>
+<script src="config.js?v=20261015b"></script>
+<script src="js/basis.js?v=20261015b"></script>
+<script src="js/live.js?v=20261015b"></script>
+<script src="js/muziek.js?v=20261015b"></script>
+<script src="js/verschil.js?v=20261015b"></script>
+<script src="js/apps.js?v=20261015b"></script>
+<script src="js/insta.js?v=20261015b"></script>
+<script src="js/samenwerking.js?v=20261015b"></script>
+<script src="js/bedankkaart.js?v=20261015b"></script>
+<script src="js/threads.js?v=20261015b"></script>
+<script src="js/demografie.js?v=20261015b"></script>
+<script src="js/postdetail.js?v=20261015b"></script>
+<script src="js/plekkies.js?v=20261015b"></script>
+<script src="js/kansen.js?v=20261015b"></script>
+<script src="js/ovahzicht.js?v=20261015b"></script>
+<script src="js/app.js?v=20261015b"></script>
+<script src="js/start.js?v=20261015b"></script>
 </body>
 </html>

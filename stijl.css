@@ -1026,3 +1026,6 @@ details.hparchief .sub{margin-bottom:10px}
 .hpform select{text-overflow:ellipsis}
 #hpFilter{flex-wrap:wrap;max-width:100%}
 .hpknoppen a.btn{color:var(--ink)}
+.hpplek{font-family:var(--display);font-weight:400;font-size:17px}
+.hpformknop .hprechts{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.hpkaart .hpformknop{margin-top:2px}
