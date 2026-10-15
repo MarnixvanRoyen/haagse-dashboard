@@ -1029,3 +1029,8 @@ details.hparchief .sub{margin-bottom:10px}
 .hpplek{font-family:var(--display);font-weight:400;font-size:17px}
 .hpformknop .hprechts{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
 .hpkaart .hpformknop{margin-top:2px}
+/* Plekkies: status-knoppen bovenaan het formulier (te plannen → gepland → geschoten → gepost) */
+.seg.hpstatus{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;box-sizing:border-box}
+.seg.hpstatus button{justify-content:center;text-align:center;padding:6px 4px;min-height:38px}
+.seg.hpstatus button[aria-pressed=true]{background:var(--groen);color:#fff}
+@media (max-width:420px){.seg.hpstatus{grid-template-columns:repeat(2,minmax(0,1fr))}}

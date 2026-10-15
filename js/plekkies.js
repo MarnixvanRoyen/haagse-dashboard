@@ -24,7 +24,8 @@ const HP_DAG=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day
 const HP_DAGJ=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day:"numeric",month:"short",year:"numeric"});
 const HP_TIJD=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,hour:"2-digit",minute:"2-digit"});
 const HP_DELEN=new Intl.DateTimeFormat("en-CA",{timeZone:HP_TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
-const HP_STATUS={gepland:"Gepland",geschoten:"Geschoten",gepost:"Gepost"};
+const HP_STATUS={te_plannen:"Te plannen",gepland:"Gepland",geschoten:"Geschoten",gepost:"Gepost"};   // volgorde = volgorde van de knoppen (33_plekkies_te_plannen.sql)
+const HP_STATUS_KL={te_plannen:"mute",gepland:"lb",geschoten:"warn",gepost:"good"};
 const HP_TEKST={idee:"Tekst: idee",klaar:"Tekst: klaar",gepost:"Tekst: gepost"};
 const HP_HOE={dm:"Insta-DM",mail:"Mail",mondeling:"Mondeling",anders:"Anders"};
 const HP_NF1=new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -53,6 +54,7 @@ function hpFout(e){const m=(e&&e.message)||String(e);
   if(/email_check/.test(m))return "Dat e-mailadres klopt nie.";
   if(/telefoon_check/.test(m))return "Telefoonnummâh: alleen cijfers, spatie, + - ( ).";
   if(/kaart_link_check/.test(m))return "Kaart-link moet met https:// beginnen.";
+  if(/status_check/.test(m))return "Status \"Te plannen\" kent de database nog nie: draai eerst 33_plekkies_te_plannen.sql.";
   if(/naam_check|plek_check/.test(m))return "Naam en plek mogen nie leeg zijn.";
   if(/Alleen voor Marnix|row-level security|permission denied/i.test(m))return "Geen toegang (alleen voor Marnix).";
   return m.length>160?m.slice(0,160)+"…":m;
@@ -66,7 +68,7 @@ function hpKaarten(){
   return k;
 }
 const hpKaartVan=(mid,sid)=>hpKaarten().find(k=>(sid&&k.s&&k.s.id===sid)||(!sid&&mid&&k.m&&k.m.id===mid))||null;
-const hpStatus=k=>k.s?k.s.status:"gepland";
+const hpStatus=k=>k.s?k.s.status:"te_plannen";
 const hpPost=id=>id&&(IG.posts||[]).find(p=>p.media_id===id)||null;
 const hpTijd=k=>k.s&&k.s.wanneer?Date.parse(k.s.wanneer):null;
 
@@ -131,10 +133,11 @@ async function renderPlekkies(){
   const nu=Date.now(),alle=hpKaarten();
   const actief=alle.filter(k=>!(k.m&&k.m.archief)),arch=alle.filter(k=>k.m&&k.m.archief);
   const komend=actief.filter(k=>hpStatus(k)==="gepland").sort((a,b)=>(hpTijd(a)??9e15)-(hpTijd(b)??9e15));
-  const tel={alles:actief.length,gepland:komend.length,geschoten:0,gepost:0};
+  const tel={alles:actief.length,te_plannen:0,gepland:komend.length,geschoten:0,gepost:0};
   actief.forEach(k=>{const st=hpStatus(k);if(st!=="gepland")tel[st]++});
   $("hpStats").innerHTML=
     `<div class="ytstat"><span class="k">Plekkies</span><span class="v">${actief.length}</span><span class="s">${actief.filter(k=>k.m&&k.m.akkoord).length} met akkoord${arch.length?` · ${arch.length} in archief`:""}</span></div>`+
+    `<div class="ytstat"><span class="k">Te plannen</span><span class="v">${tel.te_plannen}</span><span class="s">nog geen datum geprikt</span></div>`+
     `<div class="ytstat"><span class="k">Gepland</span><span class="v">${tel.gepland}</span><span class="s">${komend[0]&&hpTijd(komend[0])?"eâhste: "+esc(HP_DAG.format(new Date(hpTijd(komend[0])))):"nog niks in de agenda"}</span></div>`+
     `<div class="ytstat"><span class="k">Gepost</span><span class="v">${tel.gepost}</span><span class="s">${tel.geschoten} geschoten, nog nie gepost</span></div>`;
 
@@ -147,7 +150,7 @@ async function renderPlekkies(){
   const lijst=actief.filter(k=>HP.filter==="alles"||hpStatus(k)===HP.filter)
     .sort((a,b)=>(hpTijd(b)??Date.parse((b.s||b.m).aangemaakt_om))-(hpTijd(a)??Date.parse((a.s||a.m).aangemaakt_om)));
   h+=`<div class="card"><div class="cardhead"><div><h2>Allâh plekkies</h2><p class="sub">Nieuwste bovenaan. Tik op de post voâh alle cijfâhs.</p></div>
-    <div class="seg" id="hpFilter" role="group" aria-label="Filter plekkies">${["alles","gepland","geschoten","gepost"].map(k=>
+    <div class="seg" id="hpFilter" role="group" aria-label="Filter plekkies">${["alles",...Object.keys(HP_STATUS)].map(k=>
       `<button type="button" data-v="${k}" aria-pressed="${HP.filter===k}">${k==="alles"?"Allâh":HP_STATUS[k]} <span class="seg-n">${tel[k]}</span></button>`).join("")}</div></div>`;
   h+=lijst.length?`<div class="hpkaarten">${lijst.map(k=>hpKaart(k,nu)).join("")}</div>`:`<p class="sub">${actief.length?"Niks met deze status.":"Nog geen plekkies. Tik op <b>+ Plekkie</b>."}</p>`;
   h+=`</div>`;
@@ -180,7 +183,7 @@ function hpKaart(k,nu){
   const voorbij=st==="gepland"&&t&&t<nu-3*36e5;
   const stil=m&&(m.email||m.telefoon||m.notitie)&&nu-(t||Date.parse(m.aangemaakt_om))>HP_STIL_DAGEN*864e5;
   const tekst=s?[s.caption&&"caption",s.story_tekst&&"storytekst"].filter(Boolean).join(" + "):"";
-  const kl={gepland:"mute",geschoten:"warn",gepost:"good"}[st];
+  const kl=HP_STATUS_KL[st];
   return `<div class="hpkaart"><div class="hpkaartkop"><div><b class="hpplek">${s?esc(s.plek):"<i>nog geen plek</i>"}</b>
         <div class="sub">${hpWieHTML(k)}</div><div class="sub">${esc(hpDatum(s&&s.wanneer))}</div></div>
       ${hpBewerkKnop(k)}</div>
@@ -217,7 +220,12 @@ function hpFormTeken(){
   $("hpTitel").textContent=nieuw?"Nieuw plekkie":(s?s.plek:"Plekkie")+(m?" · "+m.naam:"");
   $("hpSub").textContent=nieuw?"Wie, waâh, wanneer, tekst en post: alles op één kaart":`Toegevoegd ${HP_DAGJ.format(new Date((s||m).aangemaakt_om))}`;
   const w=hpDelen(s&&s.wanneer),ak=m?m.akkoord:false;
+  const st0=s?s.status:"te_plannen";
   let h=`<form id="hpF" class="hpform" novalidate>
+    <fieldset class="hpstatusveld"><legend>Status</legend><input type="hidden" name="status" value="${st0}">
+      <div class="seg hpstatus" id="hpStatus" role="radiogroup" aria-label="Status">${Object.entries(HP_STATUS).map(([k,v])=>
+        `<button type="button" role="radio" data-hpst="${k}" aria-checked="${st0===k}" aria-pressed="${st0===k}">${v}</button>`).join("")}</div>
+    </fieldset>
     <fieldset><legend>Wie</legend>
       ${m||nieuw?`<label>Naam <input name="naam" required maxlength="100" autocomplete="off" value="${esc(m?m.naam:"")}"></label>
       <label>Insta-naam <input name="insta" maxlength="31" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="zonder @" value="${esc(m&&m.insta||"")}"></label>
@@ -239,7 +247,6 @@ function hpFormTeken(){
       <label>Kaart-link <small>mag leeg: dan zoekt Route op de naam van de plek</small><input name="kaart_link" type="url" maxlength="1000" autocomplete="off" placeholder="https://maps.apple.com/…" value="${esc(s&&s.kaart_link||"")}"></label>
       <button class="btn hpklein" type="button" id="hpZoekKaart">Zoek plek op de kaart ↗</button>
       <div class="hptwee"><label>Datum <input type="date" name="d" value="${esc(w.d)}"></label><label>Tijd <input type="time" name="t" value="${esc(w.t)}"></label></div>
-      <label>Status <select name="status">${Object.entries(HP_STATUS).map(([k,v])=>`<option value="${k}" ${(s?s.status:"gepland")===k?"selected":""}>${v}</option>`).join("")}</select></label>
     </fieldset>
     <fieldset><legend>Tekst</legend>
       <label>Caption <small>tekst onder de post</small><textarea name="caption" rows="4" maxlength="5000">${esc(s&&s.caption||"")}</textarea></label>
@@ -262,6 +269,9 @@ function hpFormTeken(){
   $("hpForm").innerHTML=h;
   hpAkkoordVelden();hpPostKiesTeken();
 }
+// status zetten (knoppen bovenaan + verborgen veld dat wordt opgeslagen)
+function hpZetStatus(st){const f=$("hpF");if(!f)return;f.status.value=st;
+  document.querySelectorAll("#hpStatus [data-hpst]").forEach(b=>{const aan=b.dataset.hpst===st;b.setAttribute("aria-checked",aan);b.setAttribute("aria-pressed",aan)})}
 function hpAkkoordVelden(){
   const f=$("hpF");if(!f||!f.akkoord)return;const aan=f.akkoord.checked;
   ["akkoord_op","akkoord_hoe","email","telefoon"].forEach(k=>{f[k].disabled=!aan});
@@ -372,11 +382,12 @@ document.addEventListener("click",e=>{
   if(t.closest("#hpZoekKaart")){const f=$("hpF");const q=(f.plek.value.trim()||"Den Haag")+", Den Haag";window.open("https://maps.apple.com/?q="+encodeURIComponent(q),"_blank","noopener");return}
   if(t.closest("#hpKopieer")){const txt=$("hpToestTekst").textContent;const b=t.closest("#hpKopieer");
     (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{b.textContent="Gekopieerd ✓"},()=>{b.textContent="Kopiëren lukte nie: selecteer de tekst"});return}
+  const sk=t.closest("[data-hpst]");if(sk){hpZetStatus(sk.dataset.hpst);HPF.vuil=true;return}
   if(t.closest("#hpPkMeer")){HPF.pkAlles=true;hpPostKiesTeken();return}
   if(t.closest("#hpGeenPost")){HPF.post=null;HPF.vuil=true;hpPostKiesTeken();return}
   const pk=t.closest("[data-hppk]");
   if(pk){HPF.post=pk.dataset.hppk;HPF.vuil=true;const f=$("hpF");
-    if(f.status.value!=="gepost"){f.status.value="gepost";f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
+    if(f.status.value!=="gepost"){hpZetStatus("gepost");f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
     hpPostKiesTeken();return}
 });
 // formulier opnieuw tekenen (bijv. voor de wis-bevestiging) zonder getypte tekst kwijt te raken
@@ -384,7 +395,7 @@ function hpBewaarInvoer(){
   const f=$("hpF"),w={};if(f)[...f.elements].forEach(x=>{if(x.name)w[x.name]=x.type==="checkbox"?x.checked:x.value});
   hpFormTeken();const g=$("hpF");if(!g)return;
   [...g.elements].forEach(x=>{if(x.name&&x.name in w){if(x.type==="checkbox")x.checked=w[x.name];else x.value=w[x.name]}});
-  hpAkkoordVelden();hpPostKiesTeken();
+  hpZetStatus(g.status.value);hpAkkoordVelden();hpPostKiesTeken();
   const b=$("hpPop").querySelector(".hpbevestig");if(b)b.scrollIntoView({block:"nearest"});
 }
 document.addEventListener("submit",e=>{if(e.target.id==="hpF"){e.preventDefault();hpOpslaan()}});
@@ -394,6 +405,7 @@ document.addEventListener("input",e=>{
   if(n==="akkoord")hpAkkoordVelden();
   if(n==="naam"){const p=$("hpToestTekst");if(p)p.textContent=hpToestemming(e.target.value.trim())}
   if(n==="insta"||n==="d")hpPostKiesTeken();
+  if(n==="d"&&e.target.value){const f=$("hpF");if(f.status.value==="te_plannen"){hpZetStatus("gepland");hpMeld("Datum geprikt: status op Gepland gezet.")}}
 });
 document.addEventListener("keydown",e=>{
   if(!HPF||$("hpPop").hidden)return;
