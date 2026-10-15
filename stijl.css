@@ -934,3 +934,95 @@ tr[data-pd]:hover>td,.igpost[data-pd]:hover,.kmpost[data-pd]:hover,.hpost[data-p
 /* Stories-tabel: vergelijking met story 1 van die dag, onder het bereik (14-10) */
 .stvgl{display:block;font-size:12px;margin-top:2px;white-space:nowrap}
 .stvgl.gelijk{color:var(--muted);font-weight:600}
+
+/* ---------- Plekkies: serie "Haagse plekkies doâh Haagse mense" (15-10, chat 50; plekkies.js) ---------- */
+.hpinhoud{display:grid;gap:16px}
+.hpnieuw{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.hpnieuw .btn{min-width:120px}
+.hplijst{display:grid;gap:8px}
+.hprij{display:flex;align-items:flex-start;gap:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.hprij.arch{opacity:.9}
+.hprijin{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.hprijin a,.hpkaart a{color:var(--ink-2)}
+.hpdatum{flex:none;width:76px;display:grid;justify-items:center;text-align:center;background:var(--hg-deep);border-radius:10px;padding:6px 4px;line-height:1.2}
+.hpdatum b{font-family:var(--display);font-weight:400;font-size:14px;color:var(--hy)}
+.hpdatum span{font-size:13px;color:var(--on-hg-2)}
+.hpdatum.voorbij{background:var(--warn-soft)}
+.hpchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.hpknoppen{flex:none;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.btn.hpklein{min-height:32px;padding:4px 10px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.rood{background:color-mix(in srgb,var(--weg) 22%,var(--surface-2));border-color:var(--weg);color:var(--ink)}
+.btn.rood:hover{background:color-mix(in srgb,var(--weg) 35%,var(--surface-2))}
+.hpnotitie{margin-top:6px;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hpkaarten{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.hpkaart{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:8px;align-content:start;min-width:0}
+.hpkaartkop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hpkaartkop>div{min-width:0;overflow-wrap:anywhere}
+.hpkaart .hpchips{margin-top:0}
+.hppost{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer}
+.hppost:hover,.hppost:focus-visible{border-color:var(--hy)}
+.hppost.leeg{cursor:default}
+.igthumb.hpthumb{width:56px;height:56px;flex:none}
+.hppostin{flex:1 1 auto;min-width:0}
+.hppostkop{font-size:13px;font-weight:700;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px}
+.hpkijk{color:var(--hy);font-weight:700}
+.hpcijfers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:6px}
+.hpcijf{display:grid;line-height:1.2}
+.hpcijf b{font-family:var(--display);font-weight:400;font-size:18px}
+.hpcijf small{font-size:11.5px;color:var(--muted)}
+.hpcijf.goed b{color:var(--good)}
+.hpcijf.laag b{color:var(--sc)}
+.hpx{margin:6px 0 0!important;font-size:12.5px}
+details.hparchief summary{cursor:pointer;list-style:none}
+details.hparchief summary::-webkit-details-marker{display:none}
+details.hparchief summary h2::before{content:"▸ ";color:var(--muted)}
+details.hparchief[open] summary h2::before{content:"▾ "}
+details.hparchief .sub{margin-bottom:10px}
+/* formulier in de pop-up */
+.vnpopkaart.hpkaartpop{max-width:620px}
+.hpform{display:grid;gap:12px}
+.hpform label{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.hpform label small{font-weight:600;color:var(--muted)}
+.hpform input:not([type=checkbox]),.hpform select,.hpform textarea{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:16px;font-weight:600;color:var(--ink);min-width:0}
+.hpform textarea{resize:vertical;font-family:var(--body);line-height:1.4}
+.hpform input:focus,.hpform select:focus,.hpform textarea:focus{outline:2px solid var(--focus);outline-offset:1px}
+.hpform input:disabled,.hpform select:disabled{opacity:.45}
+.hpform fieldset{border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px;margin:0;display:grid;gap:10px;min-width:0}
+.hpform legend{font-family:var(--display);font-size:15px;padding:0 6px;color:var(--hy)}
+.hptwee{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.hpform label.hpvink{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.hpvink input{width:20px;height:20px;accent-color:var(--groen)}
+.hpzonder{margin:0!important}
+.hptoest summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--ink-2)}
+.hptoest pre{white-space:pre-wrap;font-family:var(--body);font-size:13.5px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0}
+.hpbevestig{border:1px solid var(--weg);background:color-mix(in srgb,var(--weg) 12%,var(--surface));border-radius:14px;padding:10px 12px}
+.hpbevestig ul{margin:6px 0 10px;padding-left:20px;font-size:13.5px}
+.hpformknop{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hpformknop .hprechts{margin-left:auto}
+.hpmeld{margin:0;font-size:13.5px;font-weight:700;color:var(--good)}
+.hpmeld.fout{color:var(--sc)}
+.hppklijst{display:grid;gap:6px}
+.hppklijst>.sub{margin:0}
+.hppk{display:flex;gap:10px;align-items:center;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:6px;cursor:pointer;font-size:13px;min-width:0}
+.hppk.aan{border-color:var(--hy);background:var(--warn-soft)}
+.hppk .igthumb.hpthumb{width:44px;height:44px}
+.hppktxt{min-width:0;overflow-wrap:anywhere}
+.hppktxt small{color:var(--muted)}
+@media (max-width:560px){
+  .hprij{flex-wrap:wrap}
+  .hpdatum{width:64px}
+  .hpknoppen{flex-direction:row;flex-wrap:wrap;width:100%}
+  .hpkaarten{grid-template-columns:minmax(0,1fr)}
+  .vnpopkaart.hpkaartpop{max-height:94dvh}
+}
+/* hoofdmenu (15-10, chat 50): met Plekkies erbij past het nie meer op één regel → netjes naar een 2e regel i.p.v. uit beeld schuiven */
+@media (max-width:1100px){nav.hoofdmenu{flex-wrap:wrap;justify-self:stretch;border-radius:22px;row-gap:2px}nav.hoofdmenu button{flex:1 1 auto}}
+@media (max-width:560px){nav.hoofdmenu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-radius:18px}nav.hoofdmenu button{padding:9px 2px;font-size:14px}}
+@media (max-width:400px){nav.hoofdmenu button{padding:8px 1px;font-size:13px}}
+@media (max-width:340px){nav.hoofdmenu button{padding:7px 0;font-size:12px}}
+/* Plekkies-formulier: lange keuzes (bijv. naam + @insta) mogen het formulier nooit breder maken dan het scherm */
+.hpform,.hpform label,.hpform fieldset{grid-template-columns:minmax(0,1fr)}
+.hptwee{grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))}
+.hpform select{text-overflow:ellipsis}
+#hpFilter{flex-wrap:wrap;max-width:100%}
+.hpknoppen a.btn{color:var(--ink)}
