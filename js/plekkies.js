@@ -11,14 +11,13 @@
 //    is de shoot nog nie gepost, dan gaat die mee weg.
 //  * "Kaart wisse": shoot weg + persoon helemaal weg (rpc hp_alles_wissen).
 //  * Archief → "Alles wisse" (rpc hp_alles_wissen): persoon helemaal weg; een geposte shoot blijft als "gewiste persoon".
-// Post-cijfers: alleen bestaande functies (pdEind, pdNorm, pdFase uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
-// Tik op de post op een kaart = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
+// Post-cijfers: alleen bestaande functies (pdEind uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
+// Tik op het postje in een regel = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
 
 let HP={mensen:[],shoots:[],geladen:false,laden:null,err:null,filter:"alles"};
-let HPF=null;   // open formulier: {mid, sid, vuil, bevestig, post, terug, pkAlles, okZonder}
+let HPF=null;   // open formulier: {mid, sid, vuil, bevestig, post, terug, okZonder}
 const HP_STIL_DAGEN=365;      // zo lang geen shoot → vraag of het contact gewist mag worden
-const HP_POST_KEUZE=30;       // zoveel posts in de post-kiezer (na "Toon meer")
-const HP_POST_EERST=12;       // eerst zoveel (geen lijst-in-een-lijst die apart scrolt: lastig op de telefoon)
+const HP_POST_KEUZE=30;       // zoveel posts in de keuzelijst Post
 const HP_TZ="Europe/Amsterdam";
 const HP_DAG=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day:"numeric",month:"short"});
 const HP_DAGJ=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day:"numeric",month:"short",year:"numeric"});
@@ -98,33 +97,6 @@ function hpToestemming(naam){
     `Groetjes, Marnix (@the_hague_beachlife)`;
 }
 
-/* ---------- post-cijfers op een kaart ---------- */
-function hpPostCijfers(p){
-  const E=typeof pdEind==="function"?pdEind(p):null;
-  const N=igNormaalEind(p);
-  const x=E&&N.genoeg&&N.waarde>0?E.eind/N.waarde:null;
-  const rij=(k,v,norm,eind)=>{
-    if(v==null||isNaN(v))return `<span class="hpcijf"><b>—</b><small>${k}</small></span>`;
-    const keer=norm>0?v/norm:null;
-    const kl=keer==null?"":keer>=1.25?"goed":keer<=0.8?"laag":"";
-    return `<span class="hpcijf ${kl}"><b>${nf0.format(v)}</b><small>${k}${eind?" ≈":""}${keer!=null?` · ${HP_NF1.format(keer)}× normaal`:""}</small></span>`};
-  const lk=typeof pdNorm==="function"?pdNorm(p,q=>q.likes==null?null:+q.likes):{waarde:null};
-  const vg=typeof pdNorm==="function"?pdNorm(p,q=>q.nieuwe_volgers==null?null:+q.nieuwe_volgers):{waarde:null};
-  return `<div class="hpcijfers">`+
-    rij("bereik",E?Math.round(E.eind):null,N.genoeg?N.waarde:null,E&&!E.klaar)+
-    rij("likes",p.likes==null?null:+p.likes,lk.waarde)+
-    rij("nieuwe volgâhs",p.nieuwe_volgers==null?null:+p.nieuwe_volgers,vg.waarde)+`</div>`+
-    (x!=null?`<p class="sub hpx">${HP_NF1.format(x)}× je normaal${typeof pdFase==="function"&&pdFase(x)?": "+esc(pdFase(x).t):""}${E&&!E.klaar?" (verwacht, loopt nog)":""}</p>`:"");
-}
-function hpPostHTML(s){
-  if(!s||!s.media_id)return "";
-  const p=hpPost(s.media_id);
-  if(!p)return `<div class="hppost leeg"><span class="sub">Post ${esc(s.media_id)} nie (meâh) gevonden in je Insta-cijfâhs.</span></div>`;
-  return `<div class="hppost" data-pd="${esc(p.media_id)}" tabindex="0" role="button" aria-label="Post in detail bekijken">
-    <span class="igthumb hpthumb">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
-    <div class="hppostin"><div class="hppostkop">${esc(HP_DAG.format(new Date(p.gepost_om)))} · ${esc(IG_GROEPEN[soortGroep(p)].een)} <span class="hpkijk">Post in detail ›</span></div>${hpPostCijfers(p)}</div></div>`;
-}
-
 /* ---------- tekenen ---------- */
 async function renderPlekkies(){
   const el=$("hpInhoud");if(!el)return;
@@ -149,10 +121,10 @@ async function renderPlekkies(){
   // alle kaarten met filter
   const lijst=actief.filter(k=>HP.filter==="alles"||hpStatus(k)===HP.filter)
     .sort((a,b)=>(hpTijd(b)??Date.parse((b.s||b.m).aangemaakt_om))-(hpTijd(a)??Date.parse((a.s||a.m).aangemaakt_om)));
-  h+=`<div class="card"><div class="cardhead"><div><h2>Allâh plekkies</h2><p class="sub">Nieuwste bovenaan. Tik op de post voâh alle cijfâhs.</p></div>
+  h+=`<div class="card"><div class="cardhead"><div><h2>Allâh plekkies</h2><p class="sub">Eén regel per plekkie, nieuwste bovenaan. Tik op het postje voâh alle cijfâhs.</p></div>
     <div class="seg" id="hpFilter" role="group" aria-label="Filter plekkies">${["alles",...Object.keys(HP_STATUS)].map(k=>
       `<button type="button" data-v="${k}" aria-pressed="${HP.filter===k}">${k==="alles"?"Allâh":HP_STATUS[k]} <span class="seg-n">${tel[k]}</span></button>`).join("")}</div></div>`;
-  h+=lijst.length?`<div class="hpkaarten">${lijst.map(k=>hpKaart(k,nu)).join("")}</div>`:`<p class="sub">${actief.length?"Niks met deze status.":"Nog geen plekkies. Tik op <b>+ Plekkie</b>."}</p>`;
+  h+=lijst.length?`<div class="hplijst">${lijst.map(k=>hpKaart(k,nu)).join("")}</div>`:`<p class="sub">${actief.length?"Niks met deze status.":"Nog geen plekkies. Tik op <b>+ Plekkie</b>."}</p>`;
   h+=`</div>`;
 
   // archief
@@ -177,29 +149,35 @@ function hpRij(k,nu){
       ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(k.s.id)}">Geschoten ✓</button>`:""}
       ${hpBewerkKnop(k)}</div></div>`;
 }
+// één regel per plekkie: datum · plek + wie · statussen · (post-mini) · knoppen
 function hpKaart(k,nu){
   const s=k.s,m=k.m,st=hpStatus(k),t=hpTijd(k);
   const oud=st==="geschoten"&&t&&t<nu-7*864e5;
   const voorbij=st==="gepland"&&t&&t<nu-3*36e5;
   const stil=m&&(m.email||m.telefoon||m.notitie)&&nu-(t||Date.parse(m.aangemaakt_om))>HP_STIL_DAGEN*864e5;
-  const tekst=s?[s.caption&&"caption",s.story_tekst&&"storytekst"].filter(Boolean).join(" + "):"";
-  const kl=HP_STATUS_KL[st];
-  return `<div class="hpkaart"><div class="hpkaartkop"><div><b class="hpplek">${s?esc(s.plek):"<i>nog geen plek</i>"}</b>
-        <div class="sub">${hpWieHTML(k)}</div><div class="sub">${esc(hpDatum(s&&s.wanneer))}</div></div>
-      ${hpBewerkKnop(k)}</div>
-    <div class="hpchips"><span class="chip ${kl}">${HP_STATUS[st]}</span>${s?`<span class="chip mute">${HP_TEKST[s.tekst_status]}${tekst?" ("+tekst+")":""}</span>`:""}
-      ${m?(m.akkoord?`<span class="chip good">✓ akkoord</span>`:`<span class="chip warn">nog geen akkoord</span>`):""}
-      ${voorbij?`<span class="chip warn">datum voorbij: geschoten?</span>`:""}${oud?`<span class="chip warn">al een week geschoten, nog nie gepost</span>`:""}
-      ${st==="gepost"&&!(s&&s.media_id)?`<span class="chip warn">kies de post</span>`:""}${stil?`<span class="chip warn">al een jaar stil: contact wisse?</span>`:""}</div>
-    ${m&&m.notitie?`<div class="sub hpnotitie">${esc(m.notitie)}</div>`:""}
-    ${hpPostHTML(s)}
-    ${s&&st!=="gepost"?`<div class="hpformknop"><a class="btn hpklein" href="${esc(hpKaartUrl(s))}" target="_blank" rel="noopener">Route</a>${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}">Geschoten ✓</button>`:""}</div>`:""}</div>`;
+  const p=s&&hpPost(s.media_id);
+  let mini="";
+  if(p){const E=typeof pdEind==="function"?pdEind(p):null,N=igNormaalEind(p),x=E&&N.genoeg&&N.waarde>0?E.eind/N.waarde:null;
+    mini=`<div class="hpmini" data-pd="${esc(p.media_id)}" tabindex="0" role="button" aria-label="Post in detail bekijken" title="Post in detail">
+      <span class="igthumb hpthumb">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
+      <span><b>${E?nf0.format(Math.round(E.eind)):"—"}</b><small>bereik${x!=null?` · <span class="${x>=1.25?"goed":x<=0.8?"laag":""}">${HP_NF1.format(x)}×</span> normaal`:""}</small></span></div>`}
+  else if(s&&s.media_id)mini=`<div class="hpmini leeg"><small>post nie gevonden</small></div>`;
+  const t1=t?`<b>${esc(HP_DAG.format(new Date(t)))}</b><span>${esc(HP_TIJD.format(new Date(t)))}</span>`:`<b>—</b><span>geen datum</span>`;
+  return `<div class="hprij hpregel"><div class="hpdatum${voorbij?" voorbij":""}">${t1}</div>
+    <div class="hprijin"><b>${s?esc(s.plek):"<i>nog geen plek</i>"}</b> <span class="sub">${hpWieHTML(k)}</span>
+      <div class="hpchips"><span class="chip ${HP_STATUS_KL[st]}">${HP_STATUS[st]}</span>${s?`<span class="chip mute">${HP_TEKST[s.tekst_status]}</span>`:""}
+        ${m?(m.akkoord?`<span class="chip good">✓ akkoord</span>`:`<span class="chip warn">nog geen akkoord</span>`):""}
+        ${voorbij?`<span class="chip warn">datum voorbij: geschoten?</span>`:""}${oud?`<span class="chip warn">al een week geschoten, nog nie gepost</span>`:""}
+        ${st==="gepost"&&!(s&&s.media_id)?`<span class="chip warn">kies de post</span>`:""}${stil?`<span class="chip warn">al een jaar stil: contact wisse?</span>`:""}</div></div>
+    ${mini}
+    <div class="hpknoppen">${s&&st!=="gepost"?`<a class="btn hpklein" href="${esc(hpKaartUrl(s))}" target="_blank" rel="noopener">Route</a>`:""}
+      ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}">Geschoten ✓</button>`:""}${hpBewerkKnop(k)}</div></div>`;
 }
 
 /* ---------- formulier (pop-up #hpPop): één kaart = wie + toestemming + waar/wanneer + tekst + post ---------- */
 function hpOpen(sid,mid,terug){
   const k=sid||mid?hpKaartVan(mid,sid):null;
-  HPF={mid:k&&k.m?k.m.id:null,sid:k&&k.s?k.s.id:null,vuil:false,bevestig:null,terug:terug||document.activeElement,post:k&&k.s?k.s.media_id:null,pkAlles:false,okZonder:false};
+  HPF={mid:k&&k.m?k.m.id:null,sid:k&&k.s?k.s.id:null,vuil:false,bevestig:null,terug:terug||document.activeElement,post:k&&k.s?k.s.media_id:null,okZonder:false};
   $("hpPop").hidden=false;document.body.classList.add("popopen");
   hpFormTeken();
   const eerste=$("hpPop").querySelector("#hpF input[name=naam]");if(eerste)eerste.focus({preventScroll:true});
@@ -277,30 +255,30 @@ function hpAkkoordVelden(){
   ["akkoord_op","akkoord_hoe","email","telefoon"].forEach(k=>{f[k].disabled=!aan});
   $("hpZonder").hidden=aan;
 }
-// post kiezen: je laatste posts; posts met @insta van deze persoon in het bijschrift of als partnâh (na de shootdatum) bovenaan
+// post kiezen: keuzelijst met je laatste 30 posts (geen stories). Posts met @insta van deze persoon in het bijschrift
+// of als partnâh (vanaf de shootdatum) krijgen een ★. Staat er al een oudere post gekoppeld, dan staat die er ook bij.
 function hpPostKiesTeken(){
   const f=$("hpF"),el=$("hpPostKies");if(!f||!el)return;
   const m=HPF.mid&&HP.mensen.find(x=>x.id===HPF.mid);
   const insta=f.insta?hpInsta(f.insta.value):(m&&m.insta);
   const van=f.d.value?Date.parse(hpVanDelen(f.d.value,"00:00"))-864e5:null;
-  const posts=(IG.posts||[]).filter(p=>soortGroep(p)!=="story"&&p.gepost_om).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));
+  const alle=(IG.posts||[]).filter(p=>soortGroep(p)!=="story"&&p.gepost_om).sort((a,b)=>Date.parse(b.gepost_om)-Date.parse(a.gepost_om));
+  const lijst=alle.slice(0,HP_POST_KEUZE);
+  const gekozen=HPF.post?alle.find(p=>p.media_id===HPF.post):null;
+  if(gekozen&&!lijst.includes(gekozen))lijst.push(gekozen);
   const lijkt=p=>{if(!insta)return false;
     if(van&&Date.parse(p.gepost_om)<van)return false;
     const b=String(p.bijschrift||"").toLowerCase();
     return b.includes("@"+insta)||(typeof igPartnersVan==="function"&&igPartnersVan(p).includes(insta))};
-  const top=posts.filter(lijkt).slice(0,5);
-  const alleRest=posts.filter(p=>!top.includes(p)).slice(0,HP_POST_KEUZE),rest=HPF.pkAlles?alleRest:alleRest.slice(0,HP_POST_EERST);
-  const gekozen=HPF.post?posts.find(p=>p.media_id===HPF.post):null;
-  const knop=(p,tag)=>`<button type="button" class="hppk${HPF.post===p.media_id?" aan":""}" data-hppk="${esc(p.media_id)}" aria-pressed="${HPF.post===p.media_id}">
-      <span class="igthumb hpthumb">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
-      <span class="hppktxt"><b>${esc(HP_DAG.format(new Date(p.gepost_om)))}</b> · ${esc(IG_GROEPEN[soortGroep(p)].een)}${tag?` <span class="chip good">${tag}</span>`:""}<br><small>${esc(String(p.bijschrift||"").split("\n")[0].slice(0,70))}</small></span></button>`;
-  let h=HPF.post?`<p class="sub">Gekozen: ${gekozen?esc(HP_DAG.format(new Date(gekozen.gepost_om))):esc(HPF.post)} <button class="btn hpklein" type="button" id="hpGeenPost">Geen post</button></p>`
-    :`<p class="sub">Nog geen post gekoppeld. Kies hieronder als de post online staat${insta?` (posts met @${esc(insta)} erin of als partnâh staan bovenaan)`:""}.</p>`;
-  if(gekozen&&!top.includes(gekozen)&&!rest.includes(gekozen))h+=knop(gekozen);
-  h+=top.map(p=>knop(p,"lijkt deze")).join("")+rest.map(p=>knop(p)).join("");
-  if(rest.length<alleRest.length)h+=`<button class="btn hpklein" type="button" id="hpPkMeer">Toon meer posts (${alleRest.length-rest.length})</button>`;
-  if(!top.length&&!rest.length)h+=`<p class="sub">Nog geen Insta-posts geladen.</p>`;
-  el.innerHTML=`<div class="hppklijst">${h}</div>`;
+  const naam=p=>`${lijkt(p)?"★ ":""}${HP_DAG.format(new Date(p.gepost_om))} · ${IG_GROEPEN[soortGroep(p)].een} · ${String(p.bijschrift||"").split("\n")[0].slice(0,50)}`;
+  const n=lijst.filter(lijkt).length;
+  let h=`<label>Welke post? <small>je laatste ${HP_POST_KEUZE} posts${n?` · ★ = @${esc(insta)} staat erin of is partnâh`:""}</small>
+    <select name="post_sel"><option value="">— nog geen post —</option>${lijst.map(p=>`<option value="${esc(p.media_id)}" ${HPF.post===p.media_id?"selected":""}>${esc(naam(p))}</option>`).join("")}
+    ${HPF.post&&!gekozen?`<option value="${esc(HPF.post)}" selected>Post ${esc(HPF.post)} (nie meâh in je Insta-cijfâhs)</option>`:""}</select></label>`;
+  if(gekozen)h+=`<div class="hpgekozen"><span class="igthumb hpthumb">${gekozen.plaatje?`<img src="${esc(gekozen.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
+    <span class="sub">${esc(String(gekozen.bijschrift||"").split("\n")[0].slice(0,120))}</span></div>`;
+  if(!alle.length)h+=`<p class="sub">Nog geen Insta-posts geladen.</p>`;
+  el.innerHTML=h;
 }
 
 /* ---------- opslaan / wissen ---------- */
@@ -383,12 +361,6 @@ document.addEventListener("click",e=>{
   if(t.closest("#hpKopieer")){const txt=$("hpToestTekst").textContent;const b=t.closest("#hpKopieer");
     (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{b.textContent="Gekopieerd ✓"},()=>{b.textContent="Kopiëren lukte nie: selecteer de tekst"});return}
   const sk=t.closest("[data-hpst]");if(sk){hpZetStatus(sk.dataset.hpst);HPF.vuil=true;return}
-  if(t.closest("#hpPkMeer")){HPF.pkAlles=true;hpPostKiesTeken();return}
-  if(t.closest("#hpGeenPost")){HPF.post=null;HPF.vuil=true;hpPostKiesTeken();return}
-  const pk=t.closest("[data-hppk]");
-  if(pk){HPF.post=pk.dataset.hppk;HPF.vuil=true;const f=$("hpF");
-    if(f.status.value!=="gepost"){hpZetStatus("gepost");f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
-    hpPostKiesTeken();return}
 });
 // formulier opnieuw tekenen (bijv. voor de wis-bevestiging) zonder getypte tekst kwijt te raken
 function hpBewaarInvoer(){
@@ -405,6 +377,9 @@ document.addEventListener("input",e=>{
   if(n==="akkoord")hpAkkoordVelden();
   if(n==="naam"){const p=$("hpToestTekst");if(p)p.textContent=hpToestemming(e.target.value.trim())}
   if(n==="insta"||n==="d")hpPostKiesTeken();
+  if(n==="post_sel"){HPF.post=e.target.value||null;const f=$("hpF");
+    if(HPF.post&&f.status.value!=="gepost"){hpZetStatus("gepost");f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
+    hpPostKiesTeken()}
   if(n==="d"&&e.target.value){const f=$("hpF");if(f.status.value==="te_plannen"){hpZetStatus("gepland");hpMeld("Datum geprikt: status op Gepland gezet.")}}
 });
 document.addEventListener("keydown",e=>{

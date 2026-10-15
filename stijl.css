@@ -1034,3 +1034,29 @@ details.hparchief .sub{margin-bottom:10px}
 .seg.hpstatus button{justify-content:center;text-align:center;padding:6px 4px;min-height:38px}
 .seg.hpstatus button[aria-pressed=true]{background:var(--groen);color:#fff}
 @media (max-width:420px){.seg.hpstatus{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hpgekozen{display:flex;gap:10px;align-items:center;min-width:0}
+.hpgekozen .sub{margin:0;overflow-wrap:anywhere}
+/* Plekkies (15-10 avond): één regel per plekkie i.p.v. een blok */
+.hpregel{align-items:center}
+.hpregel .hprijin>.sub{margin:0}
+.hpmini{flex:none;display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 8px 4px 4px;cursor:pointer;line-height:1.15}
+.hpmini:hover,.hpmini:focus-visible{border-color:var(--hy)}
+.hpmini .igthumb.hpthumb{width:36px;height:36px}
+.hpmini b{display:block;font-family:var(--display);font-weight:400;font-size:15px}
+.hpmini small{font-size:11.5px;color:var(--muted)}
+.hpmini .goed{color:var(--good);font-weight:800}.hpmini .laag{color:var(--sc);font-weight:800}
+.hpmini.leeg{cursor:default}
+@media (max-width:560px){.hpregel .hpmini{order:3}.hpregel .hpknoppen{order:4}}
+/* Plekkies regels compact: knoppen naast elkaar, datum + plek op één lijn (ook op de telefoon) */
+.hprij .hpknoppen{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.hprij .hprijin{flex:1 1 0}
+.hprij .hpdatum{padding:4px;width:70px}
+.hprij .hpdatum b{font-size:13px}
+.hpregel .hpchips{margin-top:4px}
+@media (max-width:560px){
+  .hprij .hprijin{flex:1 1 calc(100% - 90px)}
+  .hprij .hpdatum{width:60px}
+  .hprij .hpknoppen{justify-content:flex-start;width:100%}
+  .hpregel .hpmini{margin-left:72px}
+}
+.hpchips .chip{white-space:normal;max-width:100%}
