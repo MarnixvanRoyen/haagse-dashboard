@@ -313,7 +313,7 @@ function kansenSneek(){
   const okZ=w0>=10&&w1<w0*0.7;
   if(okZ||kVolgt("sneek-insta-zakt"))out.push({id:"sneek-insta-zakt",stil:!okZ,bron:"sneek",impact:45,n:10,big:w0?(w1<w0?"−":"+")+pct(Math.abs(1-w1/w0)):nf0.format(w1),h:"Sneek-bezoekâhs via Insta/Facebook vergeleken met vorige week",
     p:`Deze week ${nf0.format(w1)}, vorige week ${nf0.format(w0)}.`,trend:kVs(w1,w0),
-    a:"<b>Doe:</b> tijd voor een nieuwe Sneek-story: laat de toppâh van de lèst zien (\"Wie pakt @… z'n plek?\") met een eigen link.",
+    a:`<b>Doe:</b> tijd voor een nieuwe Sneek-story: laat de toppâh van de lèst zien ("Wie pakt @… z'n plek?") of wat er nieuw is, met deze link in je link-sticker: <code>${esc(igNieuweLink("story"))}</code> <button class="btn" type="button" data-iglink="story">Kopieer link</button>`,
     meet:{naam:"bezoekâhs via Meta per week",waarde:w1,beter:"hoger"}});
   // 5. bezoekers spelen niet
   if(g.b30>=30||(g.b30>0&&kVolgt("sneek-speel-ratio"))){const r=Math.min(1,g.p30/g.b30);
