@@ -1254,3 +1254,15 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 .hpform input[type=date]::-webkit-datetime-edit,.hpform input[type=time]::-webkit-datetime-edit{padding:0}
 .hptwee{align-items:end}
 .hptwee>label{min-width:0}
+
+/* Voorspel-check (chat 17.2, insta.js renderIgVoorspel) */
+.igvckop{font-size:14px;margin:16px 0 6px;color:var(--ink-2)}
+.igvcdet{margin-top:14px}.igvcdet>summary{cursor:pointer;font-weight:800}
+.igvcdet .tablewrap{margin-top:8px}
+.igvcf{font-size:12px;color:var(--ink-2)}.igvcf.buiten{color:var(--warn);font-weight:800}
+#igVcPosts tr[data-pd]{cursor:pointer}
+#igVcPosts .igcap{display:block;max-width:260px}
+.pdvc{margin:8px 0 0}
+#igVcKaart td.igvcna{white-space:nowrap}
+@media (max-width:700px){#igVcKaart th,#igVcKaart td{padding-left:4px;padding-right:4px}#igVcKaart .chip{font-size:11px}
+  #igVcPosts .igcap{max-width:34vw}#igVcPosts td:first-child{font-size:13px}}

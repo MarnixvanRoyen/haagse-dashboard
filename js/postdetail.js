@@ -177,6 +177,16 @@ function pdMuziekHTML(x){
   return `<p>♪ <b>${esc(m)}</b></p>${eff?`<p class="pdeff">${igEffectHTML(eff)}</p><p class="sub">×2 = twee keer zoveel plays per dag as in de dagen vóór de post.</p>`:`<p class="sub">Nog geen plays-metingen van dit nummâh rond de post.</p>`}`;
 }
 
+// Voorspel-check (chat 17.2): bij een uitgegroeide post (≥ IG_GROEI.eindNa dagen) één regel "na 24 u verwacht ± X, echt Y".
+// Lopende post: niks (de verwachting staat al in de tegel Bereik). Bron: igVoorspelVan in insta.js (eerlijk: curve zónder deze post).
+function pdVoorspelHTML(p){
+  if(typeof igVoorspelVan!=="function"||p.bereik==null||pdLeeftijdMin(p)<IG_GROEI.eindNa*1440)return "";
+  const v=igVoorspelVan(p);
+  if(!v)return `<p class="sub pdvc"><b>Voorspel-check:</b> geen metingen uit de eerste dage van deze post (meten per uur en per dag bestaat pas sinds eind septembâh).</p>`;
+  const voorkeur=[1440,2880,5760,720,360],k=voorkeur.find(m=>v.pt[m]),x=v.pt[k],naam=IG_VC.leeftijden.find(([m])=>m===k)[1];
+  const pct=Math.round(Math.abs(x.fout)*100);
+  return `<p class="sub pdvc"><b>Voorspel-check:</b> na ${naam} verwacht ± ${pdF(x.verw)}, echt ${pdF(+p.bereik)} (${pct?`${pct}% ${x.fout>0?"te hoog":"te laag"}`:"precies goed"}).</p>`;
+}
 /* ---------- POST ---------- */
 function pdPostHTML(p){
   const g=soortGroep(p),G=IG_GROEPEN[g],m=pdLeeftijdMin(p),klaar=m>=PD_KLAAR_DAGEN*1440;
@@ -220,7 +230,7 @@ function pdPostHTML(p){
   // --- groei
   h+=pdBlok("Groei",`<div class="seg pdgroeikies" id="pdGroeiKies" role="group" aria-label="Groei bekijken per">
       <button type="button" data-v="uur">Eerste 48 uur</button><button type="button" data-v="dag">Per dag</button></div>
-    <div class="chart pdgroei" id="pdGroei"></div><p class="sub pdgroeisub" id="pdGroeiSub"></p>${pdHitteHTML(p)}`);
+    <div class="chart pdgroei" id="pdGroei"></div><p class="sub pdgroeisub" id="pdGroeiSub"></p>${pdVoorspelHTML(p)}${pdHitteHTML(p)}`);
   // --- partner
   h+=pdBlok("Partnâh",pdPartnerHTML(p,E,sit,partners));
   // --- tijdstip

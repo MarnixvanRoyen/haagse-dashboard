@@ -617,6 +617,9 @@ function renderInsta(){
       <td class="n">${r.kw==null?"—":nf0.format(r.kw)}</td><td class="n">${r.nv==null?"—":nf0.format(r.nv)}</td><td>${zeker(r.n)}</td></tr>`}).join("")+"</tbody>"
     :`<tbody><tr><td class="sub">${igKies==="muziek"?"Nog geen posts met een muziek-label. Kies hieronder per post welk nummâh eronder zat.":"Nog geen posts met cijfâhs."}</td></tr></tbody>`;
 
+  // 3b. voorspel-check (chat 17.2)
+  renderIgVoorspel();
+
   // 4. toppâhs (laatste 90 dagen of allâh tijde)
   renderIgTop();
   renderIgT5();   // 4b. Top 5 (alleen telefoon)
@@ -625,6 +628,41 @@ function renderInsta(){
   renderIgStories();
   renderIgMuziek();
   if(typeof renderIgDemo==="function")renderIgDemo();   // wie kijkt d'r? (js/demografie.js, alleen Mac/iPad)
+}
+
+/* ---------- kaart Voorspel-check (chat 17.2): leest ALLEEN igVoorspelCheck() ---------- */
+let IG_VC_WACHT=false;
+const igVcPct=f=>f==null?"—":(f>0.005?"+":f<-0.005?"−":"±")+nf0.format(Math.abs(f*100))+"%";
+function renderIgVoorspel(){
+  if(!$("igVc"))return;
+  // de dagmetingen (ig_media_dag) komen via Kansâh binnen; nog bezig? dan straks opnieuw tekenen
+  if(!IG_VC_WACHT&&typeof KM_LAADT!=="undefined"&&KM_LAADT){IG_VC_WACHT=true;KM_LAADT.then(()=>renderIgVoorspel())}
+  const V=igVoorspelCheck(),R=V.rijen;
+  $("igVcSub").innerHTML=`Hoe ver zat de verwachte eindstand d'rnaast? Elke post van ${IG_GROEI.eindNa} dage of oudâh met metingen uit z'n eerste dage telt mee `
+    +`(<b>${nf0.format(V.n)}</b> van ${nf0.format(V.klaar)}; meten per uur en per dag bestaat pas sinds eind septembâh, dus dit groeit vanzelf). `
+    +`Eerlijk gerekend: elke post is voorspeld met een groeicurve <b>zónder</b> die post zelf. <b>Echt</b> = het bereik van nu.`;
+  const o2=(c,pc,tel)=>`<span class="chip ${c}"><span class="pc">${pc}</span><span class="tel">${tel}</span></span>`;
+  const oord={past:o2("good","marge klopt","klopt"),krap:o2("warn","marge te krap","te krap"),ruim:o2("mute","marge ruim","ruim"),weinig:o2("mute","nog te weinig","weinig")};
+  $("igVc").innerHTML=`<thead><tr><th>Na</th><th class="n pc">Posts</th><th class="n">Meestal</th><th class="n"><span class="pc">8 op 10 binnen</span><span class="tel">8 v/d 10</span></th><th class="n pc">Te hoog · laag</th><th class="n"><span class="pc">Marge nu</span><span class="tel">Marge</span></th><th><span class="pc">Oordeel</span></th></tr></thead><tbody>`
+    +R.map(r=>`<tr><td class="igvcna">${r.naam}<span class="tel sub"> (${nf0.format(r.n)})</span></td><td class="n pc">${nf0.format(r.n)}</td><td class="n">${igVcPct(r.med)}</td>
+      <td class="n">${r.spreid==null?"—":"± "+nf0.format(r.spreid*100)+"%"}</td><td class="n pc">${r.n?`${r.hoog} · ${r.laag}`:"—"}</td>
+      <td class="n">± ${nf0.format(r.marge*100)}%</td><td>${oord[r.oordeel]}</td></tr>`).join("")+"</tbody>";
+  $("igVcDag").innerHTML=`<thead><tr><th>Na</th><th class="n"><span class="pc">Gepost overdag (05–17 u)</span><span class="tel">Overdag</span></th><th class="n"><span class="pc">Gepost 's avonds (17–05 u)</span><span class="tel">'s Avonds</span></th></tr></thead><tbody>`
+    +R.filter(r=>r.n).map(r=>{const c=g=>g.n?`${igVcPct(g.med)} <span class="sub">(${g.n})</span>`:"—";
+      return `<tr><td class="igvcna">${r.naam}</td><td class="n">${c(r.dag)}</td><td class="n">${c(r.avond)}</td></tr>`}).join("")
+    +(R.some(r=>r.n)?"":`<tr><td class="sub" colspan="3">Nog geen posts om te vergelijke.</td></tr>`)+"</tbody>";
+  const kol=IG_VC.leeftijden,tel=k=>k<1440?' class="n pc"':' class="n"';
+  $("igVcPosts").innerHTML=V.posts.length?`<thead><tr><th>Post</th><th class="n">Echt</th>${kol.map(([k,n])=>`<th${tel(k)}>${n}</th>`).join("")}</tr></thead><tbody>`
+    +V.posts.map(({p,pt,dagdeel,dagen})=>`<tr${pdAttr(p)}><td><div class="igtoprij"><span class="igthumb klein pc" aria-hidden="true">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`
+      +`<div style="min-width:0"><span class="pc">${igTijd(p.gepost_om)} · ${soortNaam(p)} <span class="igcap" title="${esc((p.bijschrift||"").trim())}">${esc(igEersteRegel(p.bijschrift))}</span></span>`
+      +`<span class="tel">${igTijd(p.gepost_om).replace(/^\S+\s/,"")}${soortGroep(p)==="reel"?" · reel":""}</span></div></div></td>`
+      +`<td class="n">${nf0.format(+p.bereik)}<br><span class="sub">${nf0.format(dagen)} <span class="pc">dage</span><span class="tel">d</span></span></td>`
+      +kol.map(([k])=>{const x=pt[k];return `<td${tel(k)}>${x?`${nf0.format(x.verw)}<br><span class="igvcf${Math.abs(x.fout)>igGroeiMarge(k)?" buiten":""}">${igVcPct(x.fout)}</span>`:"—"}</td>`}).join("")+"</tr>").join("")+"</tbody>"
+    :`<tbody><tr><td class="sub">Nog geen posts van ${IG_GROEI.eindNa} dage oud met metingen uit de eerste dage.</td></tr></tbody>`;
+  $("igVcNoot").innerHTML=`<b>Meestal</b> = de middelste fout (+ = te hoog geschat, − = te laag). <b>8 op 10 binnen</b> = zo ver zat 8 van de 10 posts d'r hooguit naast; `
+    +`dat hoort binnen de <b>marge</b> te valle die het dashboard nu bij een verwachting zet (± in de hittemetâh, Kansâh en Post in detail). `
+    +`Oordeel pas vanaf ${IG_VC.zeker} posts. Posts groeie na dag ${IG_GROEI.eindNa} nog wat door (meestal ± 3%), dus "echt" loopt nog een tikkie op. `
+    +`Curve en marges worre hier nie aangepast: dat gebeurt in chat 17.1. Tik op een post voor alle cijfâhs.`;
 }
 
 /* ---------- grafiek per post: likes per kijkâh of kwaliteit (knop) ---------- */
@@ -1135,30 +1173,48 @@ const IG_GROEI={
 };
 const igInterp=(c,x)=>{if(x<=c[0][0])return c[0][1];for(let i=1;i<c.length;i++)if(x<=c[i][0]){const [x0,y0]=c[i-1],[x1,y1]=c[i];return y0+(y1-y0)*(x-x0)/(x1-x0)}return c[c.length-1][1]};
 const igPctl=(a,p)=>{const s=[...a].sort((x,y)=>x-y);if(!s.length)return null;const i=(s.length-1)*p/100,l=Math.floor(i);return s[l]+(s[Math.min(l+1,s.length-1)]-s[l])*(i-l)};
-let IG_GROEI_C=null;   // cache: {sleutel, curve, eigen (aantal eigen knopen), n}
-function igGroeiCurve(){
+// stand van een post op leeftijd k (minuten): uurmeting (tot 48 u, ig_post_uur) of dagmeting (vanaf 24 u, ig_media_dag)
+// → {r, bron:"uur"/"dag"} of null. pu = metingen [{m, r}] (IG.pu), dg = dagmetingen [{m, r}] op leeftijd, oplopend (igDagRij).
+// Zelfde regel voor het eigen groeilijstje én de Voorspel-check (chat 17.2).
+function igStandOp(pu,dg,k){
+  if(k<=IG_LEKKER.kaartUur*60&&pu.length){const x=igPuStand(pu,k);if(x)return {r:x.r,bron:"uur"}}
+  if(k>=1440&&dg.length){let lo=null,hi=null;for(const x of dg){if(x.m<=k)lo=x;else{hi=x;break}}
+    if(lo&&Math.abs(k-lo.m)<=60)return {r:lo.r,bron:"dag"};
+    if(hi&&Math.abs(hi.m-k)<=60)return {r:hi.r,bron:"dag"};
+    if(lo&&hi&&hi.m-lo.m<=1500)return {r:lo.r+(hi.r-lo.r)*(k-lo.m)/(hi.m-lo.m),bron:"dag"}}
+  return null;
+}
+const igDagRij=(perDag,p,t0)=>(perDag.get(p.media_id)||[]).map(r=>({m:(Date.parse(r.om||r.dag+"T12:00:00Z")-t0)/6e4,r:r.reach})).filter(x=>x.m>0).sort((a,b)=>a.m-b.m);
+// per knoop van de curve: [{id, v}] = welk deel van z'n eindstand had elke uitgegroeide post (≥ eindNa dagen) op die leeftijd
+let IG_GROEI_P=null;
+function igGroeiPunten(){
   const dag=(typeof KM!=="undefined"&&KM&&KM.dag)||[];
-  if(IG_GROEI_C&&IG_GROEI_C.posts===IG.posts&&IG_GROEI_C.pu===IG.pu&&IG_GROEI_C.dag===dag)return IG_GROEI_C;
+  if(IG_GROEI_P&&IG_GROEI_P.posts===IG.posts&&IG_GROEI_P.pu===IG.pu&&IG_GROEI_P.dag===dag)return IG_GROEI_P;
   const nu=Date.now(),perDag=new Map();dag.forEach(r=>{if(!perDag.has(r.id))perDag.set(r.id,[]);perDag.get(r.id).push(r)});
   const klaar=(IG.posts||[]).filter(p=>p.gepost_om&&+p.bereik>0&&nu-Date.parse(p.gepost_om)>=IG_GROEI.eindNa*864e5);
   const per=IG_GROEI.std.map(()=>[]);
   for(const p of klaar){
     const t0=Date.parse(p.gepost_om),eind=+p.bereik/igInterp(IG_GROEI.std,(nu-t0)/6e4);   // stand nu ÷ wat hij op die leeftijd meestal heeft
-    const pu=(IG.pu&&IG.pu.get(p.media_id))||[];
-    const dg=(perDag.get(p.media_id)||[]).map(r=>({m:(Date.parse(r.om||r.dag+"T12:00:00Z")-t0)/6e4,r:r.reach})).filter(x=>x.m>0).sort((a,b)=>a.m-b.m);
+    const pu=(IG.pu&&IG.pu.get(p.media_id))||[],dg=igDagRij(perDag,p,t0);
     IG_GROEI.std.forEach(([k],i)=>{if(!k||k>=28800)return;
-      let s=null;
-      if(k<=IG_LEKKER.kaartUur*60&&pu.length){const x=igPuStand(pu,k);if(x)s=x.r}
-      if(s==null&&k>=1440&&dg.length){let lo=null,hi=null;for(const x of dg){if(x.m<=k)lo=x;else{hi=x;break}}
-        if(lo&&Math.abs(k-lo.m)<=60)s=lo.r;else if(hi&&Math.abs(hi.m-k)<=60)s=hi.r;
-        else if(lo&&hi&&hi.m-lo.m<=1500)s=lo.r+(hi.r-lo.r)*(k-lo.m)/(hi.m-lo.m)}
-      if(s!=null&&eind>0)per[i].push(Math.min(1,s/eind))});
+      const s=igStandOp(pu,dg,k);
+      if(s&&eind>0)per[i].push({id:p.media_id,v:Math.min(1,s.r/eind)})});
   }
+  return IG_GROEI_P={posts:IG.posts,pu:IG.pu,dag,perDag,klaar,per};
+}
+// curve uit de punten; zonder = media_id die nie mee mag tellen (Voorspel-check: eerlijk, de post voorspelt zichzelf nie)
+function igGroeiCurveVan(P,zonder=null){
   let vorig=0,eigen=0;
-  const curve=IG_GROEI.std.map(([k,v],i)=>{let w=v;
-    if(k&&k<28800&&per[i].length>=IG_GROEI.eigenMin){w=med(per[i]);eigen++}
+  const curve=IG_GROEI.std.map(([k,v],i)=>{let w=v;const a=zonder?P.per[i].filter(x=>x.id!==zonder):P.per[i];
+    if(k&&k<28800&&a.length>=IG_GROEI.eigenMin){w=med(a.map(x=>x.v));eigen++}
     w=Math.min(1,Math.max(vorig,w));vorig=w;return [k,w]});
-  return IG_GROEI_C={posts:IG.posts,pu:IG.pu,dag,curve,eigen,knopen:IG_GROEI.std.length-2,n:klaar.length};
+  return {curve,eigen,knopen:IG_GROEI.std.length-2,n:P.klaar.length};
+}
+let IG_GROEI_C=null;   // cache: {P (punten), curve, eigen (aantal eigen knopen), knopen, n}
+function igGroeiCurve(){
+  const P=igGroeiPunten();
+  if(IG_GROEI_C&&IG_GROEI_C.P===P)return IG_GROEI_C;
+  return IG_GROEI_C={P,...igGroeiCurveVan(P)};
 }
 function igGroeiDeel(p,m){return m<=0?0:igInterp(igGroeiCurve().curve,m)}
 function igGroeiMarge(m){return igInterp(IG_GROEI.marge,Math.max(0,m))}
@@ -1174,6 +1230,49 @@ function igVerwacht(p,r,m){
   const eind=deel>=.99?r:r/deel,marge=deel>=.99?0:igGroeiMarge(m);
   return {eind,laag:Math.max(r,eind*(1-marge)),hoog:eind*(1+marge),deel,marge};
 }
+/* ---------- Voorspel-check: hoe goed klopt de verwachte eindstand? (chat 17.2, 16-10-2026) ----------
+   Voor elke uitgegroeide post (≥ IG_GROEI.eindNa dagen): wat zou het dashboard voorspeld hebben na 6 u, 12 u, 24 u, 48 u en dag 4
+   (stand op die leeftijd ÷ groeicurve, precies als igVerwacht), naast het echte bereik van nu.
+   EERLIJK: elke post wordt voorspeld met een curve ZONDER die post (igGroeiCurveVan(P, id)), anders lijkt de check betâh dan hij is.
+   Zwaar? Nee: de punten van de curve worden één keer verzameld (igGroeiPunten), per post alleen een andere middelste waarde.
+   Rekent alleen, verandert niks: curve, marges (IG_GROEI.marge) en grenzen bijstellen = chat 17.1.
+   → igVoorspelCheck(): {posts:[{p, pt:{minuten:{stand, verw, fout, bron}}, dagdeel}], rijen:[per leeftijd], n}; igVoorspelVan(p) = één post. */
+const IG_VC={
+  leeftijden:[[360,"6 u"],[720,"12 u"],[1440,"24 u"],[2880,"48 u"],[5760,"dag 4"]],
+  dagVan:5,dagTot:17,   // "dag" = gepost 05:00–16:59 (Haagse tijd), "avond" = 17:00–04:59
+  zeker:5,              // minder posts op een leeftijd → nog geen oordeel over de marge
+  pct:80                // spreiding = zo ver zat 8 van de 10 posts d'r hooguit naast
+};
+const IG_VC_UUR=new Intl.DateTimeFormat("nl-NL",{timeZone:"Europe/Amsterdam",hour:"numeric",hourCycle:"h23"});
+const igDagdeel=p=>{const u=+IG_VC_UUR.format(new Date(p.gepost_om));return u>=IG_VC.dagVan&&u<IG_VC.dagTot?"dag":"avond"};
+let IG_VC_C=null;
+function igVoorspelCheck(){
+  const P=igGroeiPunten();
+  if(IG_VC_C&&IG_VC_C.P===P)return IG_VC_C;
+  const posts=[];
+  for(const p of P.klaar){
+    const t0=Date.parse(p.gepost_om),pu=(IG.pu&&IG.pu.get(p.media_id))||[],dg=igDagRij(P.perDag,p,t0);
+    const c=igGroeiCurveVan(P,p.media_id).curve,pt={};let heeft=false;
+    for(const [k] of IG_VC.leeftijden){
+      const s=igStandOp(pu,dg,k);if(!s)continue;
+      const deel=igInterp(c,k);if(!(deel>0))continue;
+      const verw=deel>=.99?s.r:s.r/deel;
+      pt[k]={stand:s.r,verw,fout:verw/+p.bereik-1,bron:s.bron};heeft=true;
+    }
+    if(heeft)posts.push({p,pt,dagdeel:igDagdeel(p),dagen:(Date.now()-t0)/864e5});
+  }
+  const rijen=IG_VC.leeftijden.map(([k,naam])=>{
+    const f=posts.filter(x=>x.pt[k]).map(x=>x.pt[k].fout),abs=f.map(Math.abs);
+    const groep=d=>{const g=posts.filter(x=>x.pt[k]&&x.dagdeel===d).map(x=>x.pt[k].fout);return {n:g.length,med:g.length?med(g):null}};
+    const marge=igGroeiMarge(k),spreid=abs.length?igPctl(abs,IG_VC.pct):null;
+    const oordeel=f.length<IG_VC.zeker?"weinig":spreid>marge*1.15?"krap":spreid<marge*.5?"ruim":"past";
+    return {k,naam,n:f.length,med:f.length?med(f):null,spreid,hoog:f.filter(x=>x>0).length,laag:f.filter(x=>x<0).length,
+      marge,oordeel,dag:groep("dag"),avond:groep("avond")};
+  });
+  return IG_VC_C={P,posts,rijen,n:posts.length,klaar:P.klaar.length};
+}
+function igVoorspelVan(p){return p&&igVoorspelCheck().posts.find(x=>x.p.media_id===p.media_id)||null}
+
 // partners die op tijd aannamen (Accepted, nie weggehaald, binnen 3 dagen na de post) — de enige regel; Kansâh gebruikt hem ook
 let IG_PI=null,IG_PI_BRON=null,IG_PC=null,IG_PC_BRON=null;
 function igPartnersVan(x){
