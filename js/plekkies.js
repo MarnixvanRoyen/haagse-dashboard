@@ -55,6 +55,7 @@ function hpFout(e){const m=(e&&e.message)||String(e);
   if(/email_check/.test(m))return "Dat e-mailadres klopt nie.";
   if(/telefoon_check/.test(m))return "Telefoonnummâh: alleen cijfers, spatie, + - ( ).";
   if(/kaart_link_check/.test(m))return "Kaart-link moet met https:// beginnen.";
+  if(/bedank/.test(m)&&/column|schema cache|Could not find/i.test(m))return "Draai eerst 34_plekkies_bedank.sql.";
   if(/status_check/.test(m))return "Status \"Te plannen\" kent de database nog nie: draai eerst 33_plekkies_te_plannen.sql.";
   if(/naam_check|plek_check/.test(m))return "Naam en plek mogen nie leeg zijn.";
   if(/Alleen voor Marnix|row-level security|permission denied/i.test(m))return "Geen toegang (alleen voor Marnix).";
@@ -161,7 +162,7 @@ function hpKaart(k,nu){
     <div class="hpdatum${voorbij?" voorbij":""}">${t?`<b>${esc(HP_DAGKORT.format(new Date(t)))}</b><span>${esc(HP_WD.format(new Date(t)))} ${esc(HP_TIJD.format(new Date(t)))}</span>`:`<b>—</b><span>geen datum</span>`}</div>
     <div class="hprijin"><div class="hpr1"><b>${naam}</b><span class="sub hpwie">${wie}</span></div>
       <div class="hpchips"><span class="chip ${HP_STATUS_KL[st]}">${HP_STATUS[st]}</span>
-        ${s?`<span class="chip mute pc">${HP_TEKST[s.tekst_status]}</span>`:""}${m&&m.akkoord?`<span class="chip good pc">✓ akkoord</span>`:""}
+        ${s?`<span class="chip mute pc">${HP_TEKST[s.tekst_status]}</span>`:""}${m&&m.akkoord?`<span class="chip good pc">✓ akkoord</span>`:""}${s&&s.bedank_status==="verstuurd"?`<span class="chip good pc">♥ bedankt</span>`:""}
         ${lo.map(w=>`<span class="chip warn pc">${w[0]}</span>`).join("")}
         ${lo.length?`<span class="chip warn tel">${lo[0][1]}${lo.length>1?` +${lo.length-1}`:""}</span>`:""}</div></div>
     <div class="hpacties">${mini}

@@ -1164,3 +1164,16 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 .pbknoppen .btn[hidden]{display:none}
 .pbknoppen .btn:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:640px){.pbgrid{grid-template-columns:1fr}#pbCanvas{max-width:240px;margin:0 auto}}
+.vnpopkaart.p48kaart{max-width:520px}
+.p48chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.p48wie{display:flex;gap:12px;align-items:center;margin-bottom:12px;min-width:0}
+.p48wie>div{min-width:0;overflow-wrap:anywhere}
+.p48wie .hpthumb{width:56px;height:56px;flex:none}
+.p48cijfers{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px}
+.p48cijfers span{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;display:flex;flex-direction:column}
+.p48cijfers b{font-family:var(--display);font-size:20px;color:var(--hy)}
+.p48cijfers small{color:var(--muted);font-size:12px}
+.p48vraag{font-weight:800;margin:4px 0 8px}
+.p48versie,.p48rest{display:flex;gap:8px}
+.p48versie .btn,.p48rest .btn{flex:1;min-height:44px}
+.p48rest{margin-top:8px}

@@ -29,6 +29,7 @@ async function loadData(){
   await kansNaLaden();                 // Kansâh: oude stand overzetten, meetwaarde van vandaag bewaren, klare rapporten maken
   setTab(state.tab);setSectie(sectie);
   kansPopBijStart();                   // nieuw kans-rapport? 1x per sessie een pop-up op Ovâhzicht
+  if(typeof pbBijStart==="function")pbBijStart();   // plekkie 48 uur gepost? vraag of je een bedankje stuurt (plekbedank.js, chat 50.3)
   if(!SC.length&&!LABEL.periods.length)showMsg("Je database is nog leeg. Klik op 'SoundCloud-CSV' of 'Label-PDF' en kies je rapport.",false,true);
 }
 function showScreen(which){$("login").hidden=which!=="login";$("app").hidden=which!=="app";$("loading").hidden=which!=="loading"}
