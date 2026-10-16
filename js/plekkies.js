@@ -107,23 +107,19 @@ async function renderPlekkies(){
   const komend=actief.filter(k=>hpStatus(k)==="gepland").sort((a,b)=>(hpTijd(a)??9e15)-(hpTijd(b)??9e15));
   const tel={alles:actief.length,te_plannen:0,gepland:komend.length,geschoten:0,gepost:0};
   actief.forEach(k=>{const st=hpStatus(k);if(st!=="gepland")tel[st]++});
-  $("hpStats").innerHTML=
-    `<div class="ytstat"><span class="k">Plekkies</span><span class="v">${actief.length}</span><span class="s">${actief.filter(k=>k.m&&k.m.akkoord).length} met akkoord${arch.length?` · ${arch.length} in archief`:""}</span></div>`+
-    `<div class="ytstat"><span class="k">Te plannen</span><span class="v">${tel.te_plannen}</span><span class="s">nog geen datum geprikt</span></div>`+
-    `<div class="ytstat"><span class="k">Gepland</span><span class="v">${tel.gepland}</span><span class="s">${komend[0]&&hpTijd(komend[0])?"eâhste: "+esc(HP_DAG.format(new Date(hpTijd(komend[0])))):"nog niks in de agenda"}</span></div>`+
-    `<div class="ytstat"><span class="k">Gepost</span><span class="v">${tel.gepost}</span><span class="s">${tel.geschoten} geschoten, nog nie gepost</span></div>`;
+  // tegeltjes = filter (tik = alleen die status; nog een keer tikken = weer allâh)
+  const komendTxt=komend[0]&&hpTijd(komend[0])?"eâhste: "+esc(HP_DAG.format(new Date(hpTijd(komend[0])))):"niks in de agenda";
+  const SUB={alles:`${actief.filter(k=>k.m&&k.m.akkoord).length} met akkoord${arch.length?` · ${arch.length} in archief`:""}`,te_plannen:"nog geen datum",gepland:komendTxt,geschoten:"nog nie gepost",gepost:"online"};
+  $("hpStats").innerHTML=["alles",...Object.keys(HP_STATUS)].map(k=>
+    `<button type="button" class="ytstat hptegel${HP.filter===k?" aan":""}" data-hpf="${k}" aria-pressed="${HP.filter===k}"><span class="k">${k==="alles"?"Allâh":HP_STATUS[k]}</span><span class="v">${tel[k]}</span><span class="s">${SUB[k]}</span></button>`).join("");
 
-  // komende shoots: kort lijstje, eerste bovenaan
-  let h=`<div class="card"><div class="cardhead"><div><h2>Komende shoots</h2><p class="sub">Alles met status gepland, eâhste bovenaan</p></div></div>`;
-  h+=komend.length?`<div class="hplijst">${komend.map(k=>hpRij(k,nu)).join("")}</div>`:`<p class="sub">Nog niks gepland. Tik op <b>+ Plekkie</b>.</p>`;
-  h+=`</div>`;
-
-  // alle kaarten met filter
-  const lijst=actief.filter(k=>HP.filter==="alles"||hpStatus(k)===HP.filter)
-    .sort((a,b)=>(hpTijd(b)??Date.parse((b.s||b.m).aangemaakt_om))-(hpTijd(a)??Date.parse((a.s||a.m).aangemaakt_om)));
-  h+=`<div class="card"><div class="cardhead"><div><h2>Allâh plekkies</h2><p class="sub">Eén regel per plekkie, nieuwste bovenaan. Tik op het postje voâh alle cijfâhs.</p></div>
-    <div class="seg" id="hpFilter" role="group" aria-label="Filter plekkies">${["alles",...Object.keys(HP_STATUS)].map(k=>
-      `<button type="button" data-v="${k}" aria-pressed="${HP.filter===k}">${k==="alles"?"Allâh":HP_STATUS[k]} <span class="seg-n">${tel[k]}</span></button>`).join("")}</div></div>`;
+  // één lijst: gepland (eerstvolgende bovenaan) · te plannen · geschoten · gepost (nieuwste bovenaan)
+  const VOLG={gepland:0,te_plannen:1,geschoten:2,gepost:3};
+  const wanneer=k=>hpTijd(k)??Date.parse((k.s||k.m).aangemaakt_om);
+  const lijst=actief.filter(k=>HP.filter==="alles"||hpStatus(k)===HP.filter).sort((a,b)=>{
+    const sa=hpStatus(a),sb=hpStatus(b);if(sa!==sb)return VOLG[sa]-VOLG[sb];
+    return sa==="gepland"?(hpTijd(a)??9e15)-(hpTijd(b)??9e15):wanneer(b)-wanneer(a)});
+  let h=`<div class="card hplijstkaart">`;
   h+=lijst.length?`<div class="hplijst">${lijst.map(k=>hpKaart(k,nu)).join("")}</div>`:`<p class="sub">${actief.length?"Niks met deze status.":"Nog geen plekkies. Tik op <b>+ Plekkie</b>."}</p>`;
   h+=`</div>`;
 
@@ -138,40 +134,39 @@ async function renderPlekkies(){
   }
   el.innerHTML=h;
 }
-const hpWieHTML=k=>k.m?`${esc(k.m.naam)} ${hpInstaLink(k.m.insta)}`:`<i>gewiste persoon</i>`;
-const hpBewerkKnop=k=>`<button class="btn hpklein" type="button" data-hpkaart="${esc(k.s?k.s.id:"")}" data-hpm="${esc(k.m?k.m.id:"")}">Bewerke</button>`;
-function hpRij(k,nu){
-  const t=hpTijd(k),voorbij=t&&t<nu-3*36e5;
-  return `<div class="hprij"><div class="hpdatum${voorbij?" voorbij":""}">${t?`<b>${esc(HP_DAG.format(new Date(t)))}</b><span>${esc(HP_TIJD.format(new Date(t)))}</span>`:`<b>?</b><span>geen datum</span>`}</div>
-    <div class="hprijin"><b>${k.s?esc(k.s.plek):"<i>nog geen plek</i>"}</b><div class="sub">${hpWieHTML(k)}</div>
-      ${voorbij?`<div class="hpchips"><span class="chip warn">datum voorbij: geschoten?</span></div>`:""}</div>
-    <div class="hpknoppen">${k.s?`<a class="btn hpklein" href="${esc(hpKaartUrl(k.s))}" target="_blank" rel="noopener">Route</a>`:""}
-      ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(k.s.id)}">Geschoten ✓</button>`:""}
-      ${hpBewerkKnop(k)}</div></div>`;
-}
-// één regel per plekkie: datum · plek + wie · statussen · (post-mini) · knoppen
+const HP_DAGKORT=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,day:"numeric",month:"short"});
+const HP_WD=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short"});
+// één regel per plekkie: datum · plek + wie + labels · (postje) · knoppen. Tik op de regel = bewerke.
+// Telefoon (< 700 px): alleen de status + één waarschuwing; de rest (tekst, akkoord) staat in het formulier.
 function hpKaart(k,nu){
   const s=k.s,m=k.m,st=hpStatus(k),t=hpTijd(k);
-  const oud=st==="geschoten"&&t&&t<nu-7*864e5;
   const voorbij=st==="gepland"&&t&&t<nu-3*36e5;
-  const stil=m&&(m.email||m.telefoon||m.notitie)&&nu-(t||Date.parse(m.aangemaakt_om))>HP_STIL_DAGEN*864e5;
+  const lo=[];   // waarschuwingen: [lang, kort]
+  if(voorbij)lo.push(["datum voorbij: geschoten?","geschoten?"]);
+  if(st==="geschoten"&&t&&t<nu-7*864e5)lo.push(["al een week geschoten, nog nie gepost","nog nie gepost"]);
+  if(st==="gepost"&&!(s&&s.media_id))lo.push(["kies de post","kies de post"]);
+  if(m&&(m.email||m.telefoon||m.notitie)&&nu-(t||Date.parse(m.aangemaakt_om))>HP_STIL_DAGEN*864e5)lo.push(["al een jaar stil: contact wisse?","contact wisse?"]);
+  if(m&&!m.akkoord&&st!=="gepost")lo.push(["nog geen akkoord","geen akkoord"]);
   const p=s&&hpPost(s.media_id);
   let mini="";
   if(p){const E=typeof pdEind==="function"?pdEind(p):null,N=igNormaalEind(p),x=E&&N.genoeg&&N.waarde>0?E.eind/N.waarde:null;
     mini=`<div class="hpmini" data-pd="${esc(p.media_id)}" tabindex="0" role="button" aria-label="Post in detail bekijken" title="Post in detail">
       <span class="igthumb hpthumb">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
-      <span><b>${E?nf0.format(Math.round(E.eind)):"—"}</b><small>bereik${x!=null?` · <span class="${x>=1.25?"goed":x<=0.8?"laag":""}">${HP_NF1.format(x)}×</span> normaal`:""}</small></span></div>`}
-  else if(s&&s.media_id)mini=`<div class="hpmini leeg"><small>post nie gevonden</small></div>`;
-  const t1=t?`<b>${esc(HP_DAG.format(new Date(t)))}</b><span>${esc(HP_TIJD.format(new Date(t)))}</span>`:`<b>—</b><span>geen datum</span>`;
-  return `<div class="hprij hpregel"><div class="hpdatum${voorbij?" voorbij":""}">${t1}</div>
-    <div class="hprijin"><b>${s?esc(s.plek):"<i>nog geen plek</i>"}</b> <span class="sub">${hpWieHTML(k)}</span>
-      <div class="hpchips"><span class="chip ${HP_STATUS_KL[st]}">${HP_STATUS[st]}</span>${s?`<span class="chip mute">${HP_TEKST[s.tekst_status]}</span>`:""}
-        ${m?(m.akkoord?`<span class="chip good">✓ akkoord</span>`:`<span class="chip warn">nog geen akkoord</span>`):""}
-        ${voorbij?`<span class="chip warn">datum voorbij: geschoten?</span>`:""}${oud?`<span class="chip warn">al een week geschoten, nog nie gepost</span>`:""}
-        ${st==="gepost"&&!(s&&s.media_id)?`<span class="chip warn">kies de post</span>`:""}${stil?`<span class="chip warn">al een jaar stil: contact wisse?</span>`:""}</div></div>
-    ${mini}
-    <div class="hpknoppen">${s&&st!=="gepost"?`<a class="btn hpklein" href="${esc(hpKaartUrl(s))}" target="_blank" rel="noopener">Route</a>`:""}
-      ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}">Geschoten ✓</button>`:""}${hpBewerkKnop(k)}</div></div>`;
+      <span><b>${E?nf0.format(Math.round(E.eind)):"—"}</b><small><span class="pc">bereik · </span>${x!=null?`<span class="${x>=1.25?"goed":x<=0.8?"laag":""}">${HP_NF1.format(x)}×</span><span class="pc"> normaal</span>`:""}</small></span></div>`}
+  else if(s&&s.media_id)mini=`<div class="hpmini leeg"><small>post?</small></div>`;
+  const wie=m?`${esc(m.naam)}${m.insta?` · @${esc(m.insta)}`:""}`:`<i>gewiste persoon</i>`;
+  const naam=s?esc(s.plek):"<i>nog geen plek</i>";
+  return `<div class="hprij hpregel" data-hpkaart="${esc(s?s.id:"")}" data-hpm="${esc(m?m.id:"")}" tabindex="0" role="button" aria-label="Plekkie ${naam.replace(/<[^>]+>/g,"")} bewerke">
+    <div class="hpdatum${voorbij?" voorbij":""}">${t?`<b>${esc(HP_DAGKORT.format(new Date(t)))}</b><span>${esc(HP_WD.format(new Date(t)))} ${esc(HP_TIJD.format(new Date(t)))}</span>`:`<b>—</b><span>geen datum</span>`}</div>
+    <div class="hprijin"><div class="hpr1"><b>${naam}</b><span class="sub hpwie">${wie}</span></div>
+      <div class="hpchips"><span class="chip ${HP_STATUS_KL[st]}">${HP_STATUS[st]}</span>
+        ${s?`<span class="chip mute pc">${HP_TEKST[s.tekst_status]}</span>`:""}${m&&m.akkoord?`<span class="chip good pc">✓ akkoord</span>`:""}
+        ${lo.map(w=>`<span class="chip warn pc">${w[0]}</span>`).join("")}
+        ${lo.length?`<span class="chip warn tel">${lo[0][1]}${lo.length>1?` +${lo.length-1}`:""}</span>`:""}</div></div>
+    <div class="hpacties">${mini}
+      ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}" title="Markeer als geschoten">✓<span class="pc">&nbsp;Geschoten</span></button>`:""}
+      ${s&&st!=="gepost"?`<a class="btn hpklein" href="${esc(hpKaartUrl(s))}" target="_blank" rel="noopener" title="Route naar ${esc(s.plek)}">Route</a>`:""}
+      <span class="hppijl" aria-hidden="true">›</span></div></div>`;
 }
 
 /* ---------- formulier (pop-up #hpPop): één kaart = wie + toestemming + waar/wanneer + tekst + post ---------- */
@@ -347,10 +342,12 @@ async function hpSnelGeschoten(id,knop){
 document.addEventListener("click",e=>{
   const t=e.target;if(!t.closest)return;
   if(t.closest("#hpNieuw"))return hpOpen(null,null,t.closest("button"));
-  const fb=t.closest("#hpFilter button");if(fb){HP.filter=fb.dataset.v;renderPlekkies();return}
-  const kb=t.closest("[data-hpkaart]");if(kb)return hpOpen(kb.dataset.hpkaart||null,kb.dataset.hpm||null,kb);
+  const fb=t.closest("[data-hpf]");if(fb){HP.filter=HP.filter===fb.dataset.hpf&&fb.dataset.hpf!=="alles"?"alles":fb.dataset.hpf;renderPlekkies();return}
   const ge=t.closest("[data-hpgeschoten]");if(ge)return hpSnelGeschoten(ge.dataset.hpgeschoten,ge);
   const al=t.closest("[data-hpalles]");if(al)return hpAllesWissen(al.dataset.hpalles,al);
+  const kb=t.closest("[data-hpkaart]");
+  if(kb&&!t.closest("#hpPop")){if(t.closest("a")&&!t.closest("a").matches("[data-hpkaart]"))return;   // Route-link doet z'n eigen ding
+    return hpOpen(kb.dataset.hpkaart||null,kb.dataset.hpm||null,kb)}
   if(!HPF)return;
   if(t.closest("#hpDicht")||t.closest("#hpAnnuleer"))return hpDicht(!!t.closest("#hpAnnuleer"));
   if(t.closest("#hpWisContact")){HPF.bevestig="contact";hpBewaarInvoer();return}
@@ -381,6 +378,11 @@ document.addEventListener("input",e=>{
     if(HPF.post&&f.status.value!=="gepost"){hpZetStatus("gepost");f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
     hpPostKiesTeken()}
   if(n==="d"&&e.target.value){const f=$("hpF");if(f.status.value==="te_plannen"){hpZetStatus("gepland");hpMeld("Datum geprikt: status op Gepland gezet.")}}
+});
+// Enter/spatie op een regel = bewerke
+document.addEventListener("keydown",e=>{
+  if(HPF||(e.key!=="Enter"&&e.key!==" "))return;const r=e.target.closest&&e.target.closest(".hpregel");
+  if(!r||e.target!==r)return;e.preventDefault();hpOpen(r.dataset.hpkaart||null,r.dataset.hpm||null,r);
 });
 document.addEventListener("keydown",e=>{
   if(!HPF||$("hpPop").hidden)return;

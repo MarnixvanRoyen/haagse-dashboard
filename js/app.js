@@ -11,6 +11,7 @@ function setSectie(s){
   sectie=s;
   document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.setAttribute("aria-current",b.dataset.s===s?"page":"false"));
   SECTIES.forEach(x=>$("s-"+x).hidden=x!==s);
+  menuInBeeld();
   if(s==="muziek")render();          // grafieken opnieuw tekenen nu ze zichtbaar zijn
   if(s==="ovahzicht")renderOvahzicht();
   if(s==="apps")renderSneek();
@@ -30,3 +31,16 @@ $("ververs").addEventListener("click",()=>{
   try{sessionStorage.setItem("hc_ververs",sectie)}catch(e){}
   location.reload();
 });
+
+// menu (15-10, chat 50): actieve knop in de schuifbalk in beeld schuiven (alleen de balk, nie de pagina) + vaagrandjes als er meer is
+function menuInBeeld(){
+  const st=$("menuStrook");if(!st)return;const b=st.querySelector('[aria-current="page"]');
+  if(b){const l=b.offsetLeft-st.offsetLeft,r=l+b.offsetWidth;
+    if(l<st.scrollLeft+8||r>st.scrollLeft+st.clientWidth-8)st.scrollLeft=Math.max(0,l-(st.clientWidth-b.offsetWidth)/2)}
+  menuRandjes();
+}
+function menuRandjes(){const st=$("menuStrook");if(!st)return;
+  st.classList.toggle("meer-l",st.scrollLeft>4);st.classList.toggle("meer-r",st.scrollLeft+st.clientWidth<st.scrollWidth-4)}
+if($("menuStrook")){$("menuStrook").addEventListener("scroll",menuRandjes,{passive:true});
+  // bij het opstarten is het menu nog onzichtbaar (breedte 0): zodra het in beeld komt of van breedte verandert opnieuw meten
+  if(window.ResizeObserver)new ResizeObserver(()=>menuInBeeld()).observe($("menuStrook"));else addEventListener("resize",menuInBeeld)}

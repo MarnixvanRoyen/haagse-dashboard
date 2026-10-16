@@ -1060,3 +1060,89 @@ details.hparchief .sub{margin-bottom:10px}
   .hpregel .hpmini{margin-left:72px}
 }
 .hpchips .chip{white-space:normal;max-width:100%}
+/* hoofdmenu (15-10 avond, chat 50): bovenaan Ovâhzicht, daaronder één schuifbalk met de pagina's.
+   Vervangt de 2-regels-opmaak hierboven. Op een breed scherm past alles naast elkaar (geen schuiven nodig). */
+nav.hoofdmenu{display:grid!important;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:4px;padding:4px;border-radius:999px;justify-self:stretch;overflow:visible;row-gap:4px}
+nav.hoofdmenu .menustrook{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;min-width:0;
+  --ml:0px;--mr:0px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 var(--ml),#000 calc(100% - var(--mr)),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 var(--ml),#000 calc(100% - var(--mr)),transparent 100%)}
+nav.hoofdmenu .menustrook::-webkit-scrollbar{display:none}
+nav.hoofdmenu .menustrook.meer-l{--ml:28px}
+nav.hoofdmenu .menustrook.meer-r{--mr:28px}
+nav.hoofdmenu .menustrook button{flex:none!important;scroll-snap-align:center}
+nav.hoofdmenu button{flex:none!important}
+@media (max-width:1100px){
+  nav.hoofdmenu{grid-template-columns:minmax(0,1fr);border-radius:20px}
+  nav.hoofdmenu .menu-ov{width:100%}
+}
+@media (max-width:560px){
+  nav.hoofdmenu{display:grid!important;grid-template-columns:minmax(0,1fr)!important;border-radius:18px;padding:4px}
+  nav.hoofdmenu button{padding:9px 14px;font-size:15px}
+  nav.hoofdmenu .menu-ov{padding:9px;font-size:16px}
+}
+@media (max-width:400px){nav.hoofdmenu button{padding:8px 12px;font-size:14px}}
+/* ---------- Plekkies strak (15-10 avond, chat 50): regel = datum · plek/wie/labels · acties; hele regel tikbaar ---------- */
+.hplijst{gap:6px}
+.hprij.hpregel{display:grid;grid-template-columns:62px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;flex-wrap:nowrap}
+.hprij.hpregel:hover,.hprij.hpregel:focus-visible{border-color:var(--hy);outline:none}
+.hpregel .hpdatum{width:auto;padding:5px 2px;border-radius:9px}
+.hpregel .hpdatum b{font-size:13px}
+.hpregel .hpdatum span{font-size:11.5px}
+.hpregel .hprijin{min-width:0}
+.hpr1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.hpr1 b{flex:none;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hpr1 .hpwie{margin:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hpregel .hpchips{margin-top:4px;gap:4px}
+.hpregel .hpchips .chip{font-size:11.5px;padding:1px 7px}
+.hpacties{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.hppijl{font-family:var(--display);font-size:20px;color:var(--muted);padding:0 2px}
+.seg.hpfilter{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+.seg.hpfilter::-webkit-scrollbar{display:none}
+.seg.hpfilter button{flex:none}
+@media (max-width:700px){
+  .hprij.hpregel{grid-template-columns:52px minmax(0,1fr) auto;gap:8px;padding:7px 8px}
+  .hpregel .hpdatum b{font-size:12px}
+  .hpregel .hpdatum span{font-size:10.5px}
+  .hpr1{display:block}
+  .hpr1 b{display:block;max-width:100%;font-size:14.5px}
+  .hpr1 .hpwie{display:block;font-size:12px}
+  .hpacties{gap:4px}
+  .hpacties .btn.hpklein{min-height:30px;padding:3px 8px;font-size:12px}
+  .hpregel .hpmini{margin-left:0;padding:2px 6px 2px 2px;gap:5px}
+  .hpregel .hpmini .igthumb.hpthumb{width:28px;height:28px}
+  .hpregel .hpmini b{font-size:13px}
+  .hpregel .hpacties a.btn{display:none}   /* Route zit in het formulier (Zoek plek op de kaart) en bij Gepland op de computer */
+  .hppijl{font-size:18px}
+  /* bovenste kaart: tegeltjes klein naast elkaar */
+  #s-plekkies .ooi-kaart .cardhead .sub{display:none}
+  #s-plekkies .ooi-kaart .cardhead{margin-bottom:8px}
+  .hpnieuw{margin-bottom:10px}
+  .hpnieuw .btn{min-height:36px}
+  #hpStats{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  #hpStats .ytstat{padding:7px 6px;border-radius:10px;text-align:center}
+  #hpStats .ytstat .k{font-size:9.5px;letter-spacing:.04em}
+  #hpStats .ytstat .v{font-size:20px}
+  #hpStats .ytstat .s{display:none}
+}
+/* Plekkies telefoon: fijnslijpen */
+#hpFilter.hpfilter{flex-wrap:nowrap}
+.hpregel .hpmini,.hpregel .hpknoppen{order:0!important}
+.hpregel .hpmini{margin-left:0!important}
+#hpStats .ytstat .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:700px){#hpStats .ytstat .k{font-size:9px;letter-spacing:.02em}}
+@media (max-width:700px){#hpStats .ytstat .k{text-transform:none;letter-spacing:0;font-size:11px;font-weight:700}}
+/* Plekkies (16-10): tegeltjes bovenaan zijn het filter; lijst zonder eigen kop */
+#hpStats{grid-template-columns:repeat(5,minmax(0,1fr))}
+.ytstat.hptegel{font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ytstat.hptegel:hover{border-color:var(--hg)}
+.ytstat.hptegel.aan{border-color:var(--hy);background:var(--warn-soft)}
+.ytstat.hptegel.aan .k{color:var(--hy)}
+.hplijstkaart{padding:10px}
+.hpacties a.btn{color:var(--ink)}
+@media (max-width:700px){
+  #hpStats{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+  #hpStats .ytstat{padding:6px 2px}
+  #hpStats .ytstat .k{font-size:10px}
+  .hplijstkaart{padding:6px;border-radius:14px}
+}
+@media (max-width:360px){#hpStats .ytstat .k{font-size:9px}#hpStats .ytstat .v{font-size:18px}}
+@media (max-width:360px){#s-plekkies .ooi-kaart{padding:12px}#hpStats{gap:3px}#hpStats .ytstat{padding:6px 1px}#hpStats .ytstat .k{font-size:9px;letter-spacing:-.01em}}
