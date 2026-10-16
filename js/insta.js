@@ -854,7 +854,7 @@ function igWachtStories(){return (IG.stories||[]).filter(s=>s.gepost_om&&Date.pa
   &&!labelsVan(s,"muziek").length)}
 function igWachtTekst(np,ns){const d=[];if(np)d.push(`${np} post${np>1?"s":""}`);if(ns)d.push(`${ns} ${ns>1?"stories":"story"}`);return d.join(" en ")}
 function igBadge(){const b=document.querySelector('nav.hoofdmenu button[data-s="insta"]');if(!b)return;
-  const k=igKoppeling(),n=igWachtend().length+igWachtStories().length;let s=b.querySelector(".badge");
+  const k=igKoppeling(),n=igWachtend().length+igWachtStories().length;let s=b.querySelector(".badge:not(.reac)");   // .reac = reacties-badge (reacties.js)
   if(!n&&!(k&&k.nivo==="kapot")){if(s)s.remove();return}
   if(!s){s=document.createElement("span");s.className="badge";b.appendChild(s)}
   if(k&&k.nivo==="kapot"){s.textContent="!";s.title="Insta-koppeling is stuk: maak een nieuwe sleutel";return}   // gaat voor de wachtkamer

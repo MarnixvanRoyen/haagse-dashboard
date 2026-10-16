@@ -1273,3 +1273,34 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 /* Sneek: seizoenknoppen (chat 54.3) */
 .seg.snseizoen{flex-wrap:wrap;margin:0 0 14px}
 .seg.snseizoen .seg-n{opacity:.8;font-weight:600;font-size:12px;margin-left:2px}
+
+/* ---------- reacties die op je wachten (17-10, chat 48, js/reacties.js) ---------- */
+#ovAlarm:not(:has(>:not([hidden]))){display:none}
+nav.hoofdmenu .badge.reac{background:var(--groen);color:#fff}
+.alarm.reac{border-color:var(--groen);background:color-mix(in srgb,var(--groen) 14%,var(--surface))}
+.alarm.reac .alarmicoon{background:var(--groen);font-size:13px}
+.alarm.reac>.sub{margin:-4px 0 0}
+.reaclijst{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:8px}
+.reacrij{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border-radius:12px;background:color-mix(in srgb,var(--bg) 45%,transparent)}
+.reactxt{min-width:0}
+.reactxt p{margin:2px 0 0;line-height:1.4;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.reacwie{display:flex;flex-wrap:wrap;gap:0 8px;align-items:baseline;min-width:0}
+.reacwie b{overflow-wrap:anywhere}
+.reactijd{font-size:12.5px;color:var(--muted)}
+.reacknop{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.reacknop .btn{min-height:36px;padding:6px 10px;font-size:13.5px;text-decoration:none;display:inline-flex;align-items:center;color:inherit;white-space:nowrap}
+.reacvoet{display:flex;gap:8px;flex-wrap:wrap}
+.reacvoet:empty{display:none}
+.reaclink{background:none;border:0;padding:4px 2px;margin:-4px 0;color:var(--hy);font-weight:800;text-decoration:underline;text-underline-offset:2px;cursor:pointer;min-height:32px}
+.reaclink:disabled{color:var(--muted);text-decoration:none;cursor:default}
+.reacuitslag{color:var(--ink-2)}
+.reacklaar{margin:0;padding:8px 14px;border-radius:12px;border:1px dashed var(--line);font-size:14px;line-height:1.5}
+.reacundo{margin:0;font-size:14px}
+.reacstoring{margin:0;font-size:13.5px;color:var(--hy)}
+@media (max-width:620px){
+  .reacrij{grid-template-columns:44px minmax(0,1fr);gap:8px 10px;align-items:start}
+  .reacrij .igthumb.klein{width:44px;height:44px}
+  .reacknop{grid-column:1/-1;justify-content:stretch}
+  .reacknop .btn{flex:1 1 0;justify-content:center}
+}
+#igReac:empty{display:none}
