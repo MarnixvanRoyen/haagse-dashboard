@@ -1182,3 +1182,69 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 .hpagenda .sub{margin:6px 0 0;font-size:12.5px}
 .hpagendaknop{display:flex;flex-wrap:wrap;gap:8px}
 
+
+/* ---------- Events (chat 53, events.js): zelfde bouwstenen als Plekkies ---------- */
+.hprij.evregel{display:grid;grid-template-columns:62px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 10px;cursor:pointer}
+.hprij.evregel:hover,.hprij.evregel:focus-visible{border-color:var(--hy);outline:none}
+.evregel .hpdatum{width:auto;padding:5px 2px;border-radius:9px}
+.evregel .hpdatum b{font-size:13px}
+.evregel .hpdatum span{font-size:11.5px}
+.hpdatum.evvoorbij{background:var(--surface);border:1px solid var(--line)}
+.hpdatum.evvoorbij b{color:var(--ink-2)}
+.evregel .hpchips{margin-top:4px;gap:4px}
+.evregel .hpchips .chip{font-size:11.5px;padding:1px 7px}
+.chip.evvol{background:var(--weg);color:#fff;font-weight:800}
+#evStats{grid-template-columns:repeat(4,minmax(0,1fr))}
+#evStats .ytstat .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vnpopkaart.evkaartpop{max-width:660px}
+.seg.hpstatus.evstatus{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:420px){.seg.hpstatus.evstatus{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.hptwee.evdrie{grid-template-columns:repeat(3,minmax(0,1fr))}
+.evteller{display:grid;gap:8px}
+.evteltxt{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:15px}
+.evteltxt b{font-family:var(--display);font-weight:400;font-size:22px;color:var(--hy)}
+.evteltxt .sub{margin:0;width:100%;font-size:12.5px}
+.evbalk{height:10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.evbalk i{display:block;height:100%;background:var(--groen);border-radius:999px}
+.evbalk.vol i{background:var(--weg)}
+.evvolmeld{border:1px solid var(--weg);background:color-mix(in srgb,var(--weg) 12%,var(--surface));border-radius:12px;padding:8px 10px;font-size:13.5px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.evgasten{display:grid;gap:6px}
+.evgast{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+.evgast.bewerk{border-color:var(--hy)}
+.evgastwie{min-width:0;overflow-wrap:anywhere;font-size:14px}
+.evgastwie a{color:var(--ink-2);font-size:13px}
+.evgastwie .chip{padding:0 6px}
+.seg.evgaststatus{flex-wrap:nowrap}
+.seg.evgaststatus button{padding:4px 8px;font-size:12.5px;min-height:32px}
+.seg.evgaststatus button[aria-pressed=true]{background:var(--groen);color:#fff}
+.seg.evgaststatus button[data-evgst=kan_nie][aria-pressed=true]{background:var(--surface);color:var(--ink-2);outline:1px solid var(--line)}
+.evgastknop{display:flex;gap:4px}
+.evgastknop .btn.hpklein{min-width:34px;padding:4px 8px}
+.evgastnieuw{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.evkop{margin:0;font-weight:800;font-size:13.5px;color:var(--ink-2)}
+.hpform label.hpvink small{font-weight:600;color:var(--muted)}
+.evwis{border-top:1px dashed var(--line);padding-top:10px}
+.evwis .sub{margin:6px 0 0;font-size:12.5px}
+.seg.evtaal{margin-bottom:8px}
+.evtekst pre{max-height:240px;overflow:auto}
+.evuitknop{margin:8px 0 0}
+.evuitknop a.btn{color:var(--ink)}
+#evUit>.sub{margin:8px 0 0;font-size:12.5px}
+#evsCanvas{width:100%;height:auto;border-radius:12px;display:block;border:2px solid var(--line)}
+@media (max-width:640px){#evsCanvas{max-width:240px;margin:0 auto}}
+@media (max-width:700px){
+  .hprij.evregel{grid-template-columns:52px minmax(0,1fr) auto;gap:8px;padding:7px 8px}
+  .evregel .hpdatum b{font-size:12px}
+  .evregel .hpdatum span{font-size:10.5px}
+  #s-events .ooi-kaart .cardhead .sub{display:none}
+  #s-events .ooi-kaart .cardhead{margin-bottom:8px}
+  #evStats{gap:4px}
+  #evStats .ytstat{padding:6px 2px;border-radius:10px;text-align:center}
+  #evStats .ytstat .k{font-size:11px;text-transform:none;letter-spacing:0;font-weight:700}
+  #evStats .ytstat .v{font-size:20px}
+  #evStats .ytstat .s{display:none}
+  .evgast{grid-template-columns:minmax(0,1fr) auto}
+  .evgast .seg.evgaststatus{grid-column:1 / -1;order:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hptwee.evdrie{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hptwee.evdrie label:first-child{grid-column:1 / -1}
+}

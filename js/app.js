@@ -1,7 +1,7 @@
-// app.js — het hoofdmenu: Ovâhzicht · Insta · Threads · Muziek · Apps · Kansâh · Plekkies · Partnâhs (Partnâhs alleen op Mac/iPad)
+// app.js — het hoofdmenu: Ovâhzicht · Insta · Threads · Muziek · Apps · Kansâh · Plekkies · Events (chat 53) · Partnâhs (Partnâhs alleen op Mac/iPad)
 // Telefoon/iPad: Ovâhzicht + keuzemenu (menuKies) dat de andere pagina's openklapt; computer: alles op één regel.
 
-const SECTIES=["ovahzicht","insta","threads","muziek","apps","kansen","plekkies","partners"];
+const SECTIES=["ovahzicht","insta","threads","muziek","apps","kansen","plekkies","events","partners"];
 let sectie="ovahzicht";                            // bij openen altijd op het Ovâhzicht beginnen
 store.del("hc_sectie");                            // oude "laatste plek" opruimen
 // na de Ververse-knop: terug naar het onderdeel waar je was (alleen voor die ene keer, niet bij gewoon openen)
@@ -21,6 +21,7 @@ function setSectie(s){
   if(s==="kansen")renderKansen();
   if(s==="partners")renderPartners();
   if(s==="plekkies")renderPlekkies();
+  if(s==="events")renderEvents();
 }
 document.querySelectorAll("nav.hoofdmenu button[data-s]").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));
 // knoppen op de tegels ("Kèk bè Muziek") springen naar dat onderdeel

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Haagse Content Performance Dashboard</title>
-<link rel="stylesheet" href="stijl.css?v=20261016i">
+<link rel="stylesheet" href="stijl.css?v=20261016j">
 </head>
 <body>
 
@@ -51,6 +51,7 @@
     <button type="button" data-s="apps">Apps</button>
     <button type="button" data-s="kansen">Kansâh</button>
     <button type="button" data-s="plekkies">Plekkies</button>
+    <button type="button" data-s="events">Events</button>
     <button type="button" data-s="partners" class="pc">Partnâhs</button>
     </div>
   </nav>
@@ -505,6 +506,17 @@
     <div id="hpInhoud" class="hpinhoud"></div>
   </section>
 
+  <!-- Events: events plannen voor The Hague Beachlife / Marreman Rojas (events.js, chat 53): één regel per event, gastenlijst, uitnodigen.
+       Gastgegevens alleen in Supabase (ev_events, ev_gasten; 36_events.sql), nooit in de browser bewaard. -->
+  <section class="sectie" id="s-events" hidden>
+    <div class="card ooi-kaart">
+      <div class="cardhead"><div><h2>Events</h2><p class="sub">Plan je event, hou de gastenlèst bè, en nodig uit via WhatsApp, agenda of story.</p></div></div>
+      <div class="hpnieuw"><button class="btn yellow" type="button" id="evNieuw">+ Event</button></div>
+      <div class="ytstats" id="evStats"></div>
+    </div>
+    <div id="evInhoud" class="hpinhoud"></div>
+  </section>
+
   <!-- Partnâhs: alle partner-performance (samenwerking.js, bedankkaart.js). Nu alleen Insta; later meer kanalen. Alleen Mac/iPad. -->
   <section class="sectie" id="s-partners" hidden>
     <nav class="appkeuze" id="ptTabs" aria-label="Partnâhs per kanaal">
@@ -534,7 +546,7 @@
 
   <!-- logo onderaan elke tab (chat 40): klik = Insta @the_hague_beachlife; witte SVG met geel/groene gloed (stijl.css .merk) -->
   <footer class="eind">
-    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261016i" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
+    <a class="merk" href="https://www.instagram.com/the_hague_beachlife/" target="_blank" rel="noopener" aria-label="The Hague Beachlife op Instagram (opent nieuw venster)"><img src="img/beachlife-logo.svg?v=20261016j" alt="The Hague Beachlife" width="1020" height="184" decoding="async"></a>
     <span class="sig">Gemaakt in 070, âhwe!</span>
   </footer>
 </div>
@@ -630,26 +642,56 @@
     </div>
   </div>
 </div>
+<!-- pop-up Events: event toevoegen/bewerken + gastenlijst + uitnodigen (events.js, evOpen; chat 53) -->
+<div class="vnpop" id="evPop" hidden>
+  <div class="vnpopkaart card hpkaartpop evkaartpop" role="dialog" aria-modal="true" aria-labelledby="evTitel">
+    <div class="cardhead"><div><h2 id="evTitel">Event</h2><p class="sub" id="evSub"></p></div>
+      <button class="btn" type="button" id="evDicht" aria-label="Sluite">✕</button></div>
+    <div id="evForm"></div>
+  </div>
+</div>
+<!-- pop-up Story voor een event: 1080×1920 (events.js, evsOpen; chat 53) -->
+<div class="vnpop" id="evsPop" hidden>
+  <div class="vnpopkaart card pbkaart" role="dialog" aria-modal="true" aria-labelledby="evsTitel">
+    <div class="cardhead"><div><h2 id="evsTitel">Story</h2><p class="sub">1080×1920 · onderin is ruimte vrij voâh je link-sticker</p></div>
+      <button class="btn" type="button" id="evsDicht" aria-label="Sluite">✕</button></div>
+    <div class="pbgrid">
+      <canvas id="evsCanvas" width="1080" height="1920" aria-label="Voorbeeld van de story"></canvas>
+      <div class="pbkeuze">
+        <div class="seg" id="evsTaal" role="group" aria-label="Taal van de story">
+          <button type="button" data-v="haags" aria-pressed="true">Haags</button>
+          <button type="button" data-v="netjes" aria-pressed="false">Netjes</button>
+          <button type="button" data-v="en" aria-pressed="false">English</button>
+        </div>
+        <label class="pbvink"><input type="checkbox" id="evsVrij" checked> <span id="evsVrijTxt">Plekke vrè erop</span></label>
+        <p class="sub">Op de story staat alleen het event zelf: titel, datum, tijd, plek en omschrijving. Geen gaste.</p>
+        <p class="sub pbstatus" id="evsStatus" role="status"></p>
+        <div class="pbknoppen"><button class="btn yellow" type="button" id="evsDeel">Deel</button><button class="btn" type="button" id="evsDownload">Downloade</button></div>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <!-- ?v=… = versie (06-10, chat 14): bij elke wijziging in een .js/.css hier ALLE ?v= ophogen (zoek-en-vervang), anders gebruikt de browser tot ± 10 min de oude versie uit de cache (GitHub Pages) -->
-<script src="config.js?v=20261016i"></script>
-<script src="js/basis.js?v=20261016i"></script>
-<script src="js/live.js?v=20261016i"></script>
-<script src="js/muziek.js?v=20261016i"></script>
-<script src="js/verschil.js?v=20261016i"></script>
-<script src="js/apps.js?v=20261016i"></script>
-<script src="js/insta.js?v=20261016i"></script>
-<script src="js/samenwerking.js?v=20261016i"></script>
-<script src="js/bedankkaart.js?v=20261016i"></script>
-<script src="js/threads.js?v=20261016i"></script>
-<script src="js/demografie.js?v=20261016i"></script>
-<script src="js/postdetail.js?v=20261016i"></script>
-<script src="js/agenda.js?v=20261016i"></script>
-<script src="js/plekkies.js?v=20261016i"></script>
-<script src="js/plekbedank.js?v=20261016i"></script>
-<script src="js/kansen.js?v=20261016i"></script>
-<script src="js/ovahzicht.js?v=20261016i"></script>
-<script src="js/app.js?v=20261016i"></script>
-<script src="js/start.js?v=20261016i"></script>
+<script src="config.js?v=20261016j"></script>
+<script src="js/basis.js?v=20261016j"></script>
+<script src="js/live.js?v=20261016j"></script>
+<script src="js/muziek.js?v=20261016j"></script>
+<script src="js/verschil.js?v=20261016j"></script>
+<script src="js/apps.js?v=20261016j"></script>
+<script src="js/insta.js?v=20261016j"></script>
+<script src="js/samenwerking.js?v=20261016j"></script>
+<script src="js/bedankkaart.js?v=20261016j"></script>
+<script src="js/threads.js?v=20261016j"></script>
+<script src="js/demografie.js?v=20261016j"></script>
+<script src="js/postdetail.js?v=20261016j"></script>
+<script src="js/agenda.js?v=20261016j"></script>
+<script src="js/plekkies.js?v=20261016j"></script>
+<script src="js/plekbedank.js?v=20261016j"></script>
+<script src="js/events.js?v=20261016j"></script>
+<script src="js/kansen.js?v=20261016j"></script>
+<script src="js/ovahzicht.js?v=20261016j"></script>
+<script src="js/app.js?v=20261016j"></script>
+<script src="js/start.js?v=20261016j"></script>
 </body>
 </html>
