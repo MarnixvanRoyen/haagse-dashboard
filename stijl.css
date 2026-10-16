@@ -1248,3 +1248,9 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
   .hptwee.evdrie{grid-template-columns:repeat(2,minmax(0,1fr))}
   .hptwee.evdrie label:first-child{grid-column:1 / -1}
 }
+/* iPhone/Safari (16-10, chat 53): datum- en tijdvelden niet breder dan hun vak, tekst links; velden naast elkaar onderaan op één lijn (Events + Plekkies) */
+.hpform input[type=date],.hpform input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;min-height:44px;line-height:1.3;text-align:left}
+.hpform input[type=date]::-webkit-date-and-time-value,.hpform input[type=time]::-webkit-date-and-time-value{text-align:left;margin:0}
+.hpform input[type=date]::-webkit-datetime-edit,.hpform input[type=time]::-webkit-datetime-edit{padding:0}
+.hptwee{align-items:end}
+.hptwee>label{min-width:0}
