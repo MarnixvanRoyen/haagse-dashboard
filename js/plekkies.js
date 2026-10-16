@@ -13,6 +13,7 @@
 //  * Archief → "Alles wisse" (rpc hp_alles_wissen): persoon helemaal weg; een geposte shoot blijft als "gewiste persoon".
 // Post-cijfers: alleen bestaande functies (pdEind uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
 // Tik op het postje in een regel = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
+// Route/kaart-link weggehaald (16-10-2026, chat 50.1). De kolom kaart_link blijft in hp_shoots staan, maar het dashboard leest en schrijft hem nie meer.
 
 let HP={mensen:[],shoots:[],geladen:false,laden:null,err:null,filter:"alles"};
 let HPF=null;   // open formulier: {mid, sid, vuil, bevestig, post, terug, okZonder}
@@ -85,7 +86,6 @@ function hpVanDelen(d,t){   // datum + tijd (Haagse tijd) → ISO; zonder tijd =
 const hpVandaag=()=>hpDelen(new Date().toISOString()).d;
 const hpInsta=s=>String(s||"").trim().replace(/^@+/,"").toLowerCase();
 const hpInstaLink=i=>i?`<a href="https://www.instagram.com/${encodeURIComponent(i)}/" target="_blank" rel="noopener">@${esc(i)}</a>`:"";
-const hpKaartUrl=s=>s.kaart_link||("https://maps.apple.com/?q="+encodeURIComponent(s.plek+", Den Haag"));
 const hpUuid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
 
 /* ---------- toestemmingstekst (om te sturen, plat Haags) ---------- */
@@ -165,7 +165,6 @@ function hpKaart(k,nu){
         ${lo.length?`<span class="chip warn tel">${lo[0][1]}${lo.length>1?` +${lo.length-1}`:""}</span>`:""}</div></div>
     <div class="hpacties">${mini}
       ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}" title="Markeer als geschoten">✓<span class="pc">&nbsp;Geschoten</span></button>`:""}
-      ${s&&st!=="gepost"?`<a class="btn hpklein" href="${esc(hpKaartUrl(s))}" target="_blank" rel="noopener" title="Route naar ${esc(s.plek)}">Route</a>`:""}
       <span class="hppijl" aria-hidden="true">›</span></div></div>`;
 }
 
@@ -217,8 +216,6 @@ function hpFormTeken(){
     </fieldset>`:""}
     <fieldset><legend>Waâh en wanneer</legend>
       <label>Plek <input name="plek" required maxlength="200" autocomplete="off" placeholder="bijv. Pier, Kurhaus, Westbroekpark" value="${esc(s?s.plek:"")}"></label>
-      <label>Kaart-link <small>mag leeg: dan zoekt Route op de naam van de plek</small><input name="kaart_link" type="url" maxlength="1000" autocomplete="off" placeholder="https://maps.apple.com/…" value="${esc(s&&s.kaart_link||"")}"></label>
-      <button class="btn hpklein" type="button" id="hpZoekKaart">Zoek plek op de kaart ↗</button>
       <div class="hptwee"><label>Datum <input type="date" name="d" value="${esc(w.d)}"></label><label>Tijd <input type="time" name="t" value="${esc(w.t)}"></label></div>
     </fieldset>
     <fieldset><legend>Tekst</legend>
@@ -293,10 +290,9 @@ async function hpOpslaan(){
     const oud=HPF.mid&&HP.mensen.find(x=>x.id===HPF.mid);
     if(oud&&!ak&&(oud.email||oud.telefoon)&&!HPF.okZonder){HPF.okZonder=true;return hpMeld("Vinkje akkoord staat uit: e-mail en telefoon worden dan gewist. Tik nog een keer op Opslaan om door te gaan.",true)}
   }
-  const srij={plek:leeg(f.plek.value),kaart_link:leeg(f.kaart_link.value),wanneer:hpVanDelen(f.d.value,f.t.value),status:f.status.value,
+  const srij={plek:leeg(f.plek.value),wanneer:hpVanDelen(f.d.value,f.t.value),status:f.status.value,
     caption:leeg(f.caption.value),story_tekst:leeg(f.story_tekst.value),tekst_status:f.tekst_status.value,media_id:HPF.post||null};
   if(!srij.plek)return hpMeld("Vul de plek in.",true);
-  if(srij.kaart_link&&!/^https:\/\//.test(srij.kaart_link))return hpMeld("Kaart-link moet met https:// beginnen.",true);
   hpMeld("Effe opslaan…");
   const knop=f.querySelector("button[type=submit]");knop.disabled=true;
   try{
@@ -346,7 +342,7 @@ document.addEventListener("click",e=>{
   const ge=t.closest("[data-hpgeschoten]");if(ge)return hpSnelGeschoten(ge.dataset.hpgeschoten,ge);
   const al=t.closest("[data-hpalles]");if(al)return hpAllesWissen(al.dataset.hpalles,al);
   const kb=t.closest("[data-hpkaart]");
-  if(kb&&!t.closest("#hpPop")){if(t.closest("a")&&!t.closest("a").matches("[data-hpkaart]"))return;   // Route-link doet z'n eigen ding
+  if(kb&&!t.closest("#hpPop")){if(t.closest("a")&&!t.closest("a").matches("[data-hpkaart]"))return;   // een gewone link (bijv. Insta) doet z'n eigen ding
     return hpOpen(kb.dataset.hpkaart||null,kb.dataset.hpm||null,kb)}
   if(!HPF)return;
   if(t.closest("#hpDicht")||t.closest("#hpAnnuleer"))return hpDicht(!!t.closest("#hpAnnuleer"));
@@ -354,7 +350,6 @@ document.addEventListener("click",e=>{
   if(t.closest("#hpWisKaart")){HPF.bevestig="kaart";hpBewaarInvoer();return}
   if(t.closest("#hpNeeWis")){HPF.bevestig=null;hpBewaarInvoer();return}
   if(t.closest("#hpJaWis"))return hpWis(HPF.bevestig==="contact"?"contact":"kaart");
-  if(t.closest("#hpZoekKaart")){const f=$("hpF");const q=(f.plek.value.trim()||"Den Haag")+", Den Haag";window.open("https://maps.apple.com/?q="+encodeURIComponent(q),"_blank","noopener");return}
   if(t.closest("#hpKopieer")){const txt=$("hpToestTekst").textContent;const b=t.closest("#hpKopieer");
     (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{b.textContent="Gekopieerd ✓"},()=>{b.textContent="Kopiëren lukte nie: selecteer de tekst"});return}
   const sk=t.closest("[data-hpst]");if(sk){hpZetStatus(sk.dataset.hpst);HPF.vuil=true;return}

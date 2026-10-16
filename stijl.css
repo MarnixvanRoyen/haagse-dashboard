@@ -1111,7 +1111,6 @@ nav.hoofdmenu .menu-kies{display:none}
   .hpregel .hpmini{margin-left:0;padding:2px 6px 2px 2px;gap:5px}
   .hpregel .hpmini .igthumb.hpthumb{width:28px;height:28px}
   .hpregel .hpmini b{font-size:13px}
-  .hpregel .hpacties a.btn{display:none}   /* Route zit in het formulier (Zoek plek op de kaart) en bij Gepland op de computer */
   .hppijl{font-size:18px}
   /* bovenste kaart: tegeltjes klein naast elkaar */
   #s-plekkies .ooi-kaart .cardhead .sub{display:none}
@@ -1138,7 +1137,6 @@ nav.hoofdmenu .menu-kies{display:none}
 .ytstat.hptegel.aan{border-color:var(--hy);background:var(--warn-soft)}
 .ytstat.hptegel.aan .k{color:var(--hy)}
 .hplijstkaart{padding:10px}
-.hpacties a.btn{color:var(--ink)}
 @media (max-width:700px){
   #hpStats{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
   #hpStats .ytstat{padding:6px 2px}
