@@ -1270,3 +1270,6 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 #igVcKaart td.igvcna{white-space:nowrap}
 @media (max-width:700px){#igVcKaart th,#igVcKaart td{padding-left:4px;padding-right:4px}#igVcKaart .chip{font-size:11px}
   #igVcPosts .igcap{max-width:34vw}#igVcPosts td:first-child{font-size:13px}}
+/* Sneek: seizoenknoppen (chat 54.3) */
+.seg.snseizoen{flex-wrap:wrap;margin:0 0 14px}
+.seg.snseizoen .seg-n{opacity:.8;font-weight:600;font-size:12px;margin-left:2px}

@@ -1,34 +1,64 @@
 // apps.js — onderdeel Apps. Eerste app: Haagse Sneek (www.haagsesneek.nl)
 // De scores staan in hetzelfde Supabase-project, tabel "scores" (1 regel per Insta-naam, alleen de beste score).
+// Seizoenen (chat 54.3): oude seizoenen in scores_archief, samen in de view sneek_scores_seizoenen (SQL 37).
 
-let SNEEK={rows:[],err:null,metEerst:true};
+let SNEEK={rows:[],uniek:[],huidig:null,seizoenen:[],err:null,metEerst:true,metSeizoen:false};
+let snKeuze=null;   // gekozen seizoen; null = altijd het huidige (blijft staan als het dashboard ververst)
 
 async function loadSneek(){
   try{
-    let rows;
-    // eerst_gezien = wanneer iemand vóór het eerst op de lèst kwam (kolom uit 05_sneek.sql)
-    try{rows=await fetchAll("scores","id,insta,score,created_at,eerst_gezien");SNEEK.metEerst=true}
-    catch(e){rows=await fetchAll("scores","id,insta,score,created_at");SNEEK.metEerst=false}
-    SNEEK.rows=rows.map(r=>({insta:r.insta,score:+r.score,beste:r.created_at,eerst:r.eerst_gezien||r.created_at}));
-    SNEEK.err=null;
-  }catch(e){SNEEK={rows:[],err:e.message,metEerst:false}}
+    let rows,huidig=null,metSeizoen=true,metEerst=true;
+    // Chat 54.3: alle seizoenen uit de view sneek_scores_seizoenen (SQL 37). Huidig seizoen = sneek_seizoen() in de database.
+    const v=await sb.from("sneek_scores_seizoenen").select("seizoen,insta,score,created_at,eerst_gezien,in_seizoen").order("seizoen").order("insta").range(0,9999);
+    if(!v.error){
+      rows=v.data.map(r=>({sz:+r.seizoen,insta:r.insta,score:+r.score,beste:r.created_at,eerst:r.eerst_gezien||r.created_at,inSz:r.in_seizoen||r.eerst_gezien||r.created_at}));
+      const h=await sb.rpc("sneek_seizoen");
+      if(!h.error&&h.data!=null)huidig=+h.data;
+    }else{
+      // SQL 37 nog niet gedraaid: zoals vroeger, alles samen
+      metSeizoen=false;
+      let r0;
+      try{r0=await fetchAll("scores","id,insta,score,created_at,eerst_gezien")}
+      catch(e){r0=await fetchAll("scores","id,insta,score,created_at");metEerst=false}
+      rows=r0.map(r=>({sz:0,insta:r.insta,score:+r.score,beste:r.created_at,eerst:r.eerst_gezien||r.created_at,inSz:r.eerst_gezien||r.created_at}));
+    }
+    const seizoenen=[...new Set(rows.map(r=>r.sz))].sort((a,b)=>a-b);
+    if(huidig==null)huidig=seizoenen.length?seizoenen[seizoenen.length-1]:0;
+    if(metSeizoen&&!seizoenen.includes(huidig))seizoenen.push(huidig);   // nieuw seizoen, nog niemand gespeeld: toch een knop
+    // elke speler 1 keer (voor "nieuw op de lèst" bij GoatCounter): eerste keer ooit gezien
+    const m=new Map();rows.forEach(r=>{const o=m.get(r.insta);if(!o||String(r.eerst)<String(o.eerst))m.set(r.insta,r)});
+    SNEEK={rows,uniek:[...m.values()],huidig,seizoenen,err:null,metEerst,metSeizoen};
+  }catch(e){SNEEK={rows:[],uniek:[],huidig:null,seizoenen:[],err:e.message,metEerst:false,metSeizoen:false}}
 }
+const snGekozen=()=>SNEEK.metSeizoen&&snKeuze!=null&&SNEEK.seizoenen.includes(snKeuze)?snKeuze:SNEEK.huidig;
 
 // datum als JJJJ-MM-DD in Nederlandse tijd
 const dagNL=t=>new Date(t).toLocaleDateString("sv-SE",{timeZone:"Europe/Amsterdam"});
 
 const GROEPJES=[[1,9,"1 – 9"],[10,24,"10 – 24"],[25,49,"25 – 49"],[50,99,"50 – 99"],[100,1000,"100 of meer"]];
 
-function sneekCompute(){
-  const r=SNEEK.rows;
-  const dagen=[];for(let i=29;i>=0;i--)dagen.push(dagNL(Date.now()-i*864e5));
+function sneekCompute(sz){
+  const alle=SNEEK.rows, r=alle.filter(x=>x.sz===sz);
+  const isNu=sz===SNEEK.huidig;
+  // begin en eind van het seizoen: eerste speler van dit seizoen t/m eerste speler van het volgende
+  const begin=r.length?r.reduce((a,x)=>String(x.inSz)<a?String(x.inSz):a,String(r[0].inSz)):null;
+  const volg=alle.filter(x=>x.sz>sz);
+  const eind=!isNu&&volg.length?volg.reduce((a,x)=>String(x.inSz)<a?String(x.inSz):a,String(volg[0].inSz)):null;
+  // grafiek: huidig seizoen = laatste 30 dagen; oud seizoen = de dagen van dat seizoen (max 90)
+  const dagen=[];
+  if(isNu||!begin){for(let i=29;i>=0;i--)dagen.push(dagNL(Date.now()-i*864e5))}
+  else{const d0=dagNL(begin),d1=eind?dagNL(eind):dagNL(Date.now());   // wisseldag telt bij allebei
+    for(let t=new Date(d0+"T12:00:00");dagNL(t)<=d1&&dagen.length<90;t=new Date(+t+864e5))dagen.push(dagNL(t))}
   const perDag=Object.fromEntries(dagen.map(d=>[d,0]));
-  r.forEach(x=>{const d=dagNL(x.eerst);if(d in perDag)perDag[d]++});
+  r.forEach(x=>{const d=dagNL(x.inSz);if(d in perDag)perDag[d]++});
   const som=a=>a.reduce((s,d)=>s+perDag[d],0);
   const scores=r.map(x=>x.score).sort((a,b)=>a-b);
   const mediaan=scores.length?scores[Math.floor((scores.length-1)/2)]:0;
+  // terug = stond al op de lèst van een eerder seizoen
+  const eerder=new Set(alle.filter(x=>x.sz<sz).map(x=>x.insta));
+  const terug=r.filter(x=>eerder.has(x.insta)).length;
   return {
-    spelers:r.length,
+    sz,isNu,begin,eind,spelers:r.length,terug,nieuw:r.length-terug,
     nieuw7:som(dagen.slice(-7)), vorige7:som(dagen.slice(-14,-7)),
     dagen:dagen.map(d=>({d,v:perDag[d]})),
     top:[...r].sort((a,b)=>b.score-a.score||String(a.beste).localeCompare(String(b.beste))).slice(0,10),
@@ -54,20 +84,35 @@ function kolommen(el,data,kleur,aria="Nieuwe spelers per dag",eenheid="nieuw"){
 function renderSneek(){
   renderGC();
   if(SNEEK.err){$("snStats").innerHTML=`<p class="sub">Sneek-cijfâhs ophale lukte nie: ${esc(SNEEK.err)}</p>`;return}
-  const n=sneekCompute();
+  const sz=snGekozen(), n=sneekCompute(sz), szNaam=SNEEK.metSeizoen?"seizoen "+sz:"";
+  // seizoenknoppen (vanzelf een knop erbij als er een nieuw seizoen is)
+  const kies=$("snSeizoen");
+  if(kies){kies.hidden=!SNEEK.metSeizoen||!SNEEK.seizoenen.length;
+    kies.innerHTML=SNEEK.seizoenen.map(s=>`<button type="button" data-v="${s}" aria-pressed="${s===sz}">Seizoen ${s}${s===SNEEK.huidig?' <span class="seg-n">nu</span>':""}</button>`).join("");
+    kies.onclick=e=>{const b=e.target.closest("button");if(!b)return;const v=+b.dataset.v;snKeuze=v===SNEEK.huidig?null:v;renderSneek()}}
+  if($("snTopSub"))$("snTopSub").textContent=szNaam?"De top 10 van "+szNaam:"De top 10 van de lèst";
   if(!n.spelers){
-    $("snStats").innerHTML='<p class="sub">Nog niks te zien. Staat er wél iemand op de lèst? Dan mag het dashboard de tabel nog niet lezen: draai eerst de SQL uit <code>supabase/05_sneek.sql</code>.</p>';
+    $("snStats").innerHTML=SNEEK.metSeizoen
+      ?`<p class="sub">Nog niemand op de lèst van ${szNaam}.</p>`
+      :'<p class="sub">Nog niks te zien. Staat er wél iemand op de lèst? Dan mag het dashboard de tabel nog niet lezen: draai eerst de SQL uit <code>supabase/05_sneek.sql</code>.</p>';
     ["snChart","snTop","snVerdeling"].forEach(id=>$(id).innerHTML="");return}
   const verschil=n.nieuw7-n.vorige7;
+  const periode=n.begin?dLabel(dagNL(n.begin),1)+(n.eind?" t/m "+dLabel(dagNL(n.eind),1):" t/m nu"):"";
   $("snStats").innerHTML=[
-    ["Spelâhs op de lèst",nf0.format(n.spelers),"elke Insta-naam telt 1 keer"],
-    ["Nieuwe spelâhs",(n.nieuw7?"+":"")+nf0.format(n.nieuw7),`laatste 7 dagen · vorige week ${nf0.format(n.vorige7)}${verschil>0?' <span class="up">↑</span>':""}`],
+    [SNEEK.metSeizoen?"Spelâhs in "+szNaam:"Spelâhs op de lèst",nf0.format(n.spelers),
+      SNEEK.metSeizoen&&n.terug?`${nf0.format(n.nieuw)} nieuw · ${nf0.format(n.terug)} kwamme terug`:"elke Insta-naam telt 1 keer"],
+    n.isNu||!SNEEK.metSeizoen
+      ?[SNEEK.metSeizoen?"Erbij gekomme":"Nieuwe spelâhs",(n.nieuw7?"+":"")+nf0.format(n.nieuw7),`laatste 7 dagen · vorige week ${nf0.format(n.vorige7)}${verschil>0?' <span class="up">↑</span>':""}`]
+      :["Seizoen liep",nf0.format(n.dagen.length)+" dagen",periode],
     ["Hoogste scoâh",nf0.format(n.top[0].score),"@"+esc(n.top[0].insta)],
     ["Gemiddelde scoâh",nf0.format(n.gem),`de helft haalt ${nf0.format(n.mediaan)} of meer`]
   ].map(([k,v,s])=>`<div class="ytstat"><span class="k">${k}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join("");
-  $("snDagSub").textContent=SNEEK.metEerst?"Laatste 30 dagen: wanneer iemand vóór het eerst op de lèst kwam"
-    :"Laatste 30 dagen. Let op: nu nog de datum van iemands beste scoâh (kolom eerst_gezien ontbreekt)";
-  kolommen($("snChart"),n.dagen,"hy");
+  $("snDagSub").textContent=!SNEEK.metSeizoen
+    ?(SNEEK.metEerst?"Laatste 30 dagen: wanneer iemand vóór het eerst op de lèst kwam"
+      :"Laatste 30 dagen. Let op: nu nog de datum van iemands beste scoâh (kolom eerst_gezien ontbreekt)")
+    :(n.isNu?`Laatste 30 dagen: wanneer iemand vóór het eerst op de lèst van ${szNaam} kwam`
+      :`${periode[0].toUpperCase()+periode.slice(1)}: wanneer iemand vóór het eerst op de lèst van ${szNaam} kwam`);
+  kolommen($("snChart"),n.dagen,"hy",SNEEK.metSeizoen?"Spelâhs per dag in "+szNaam:"Nieuwe spelers per dag","erbij");
   $("snTop").innerHTML=`<thead><tr><th class="n">#</th><th>Spelâh</th><th class="n">Scoâh</th><th class="n">Record sinds</th></tr></thead><tbody>`+
     n.top.map((x,i)=>`<tr><td class="n">${i+1}</td><td><a href="https://www.instagram.com/${encodeURIComponent(x.insta)}/" target="_blank" rel="noopener">@${esc(x.insta)}</a></td><td class="n">${nf0.format(x.score)}</td><td class="n">${dLabel(dagNL(x.beste),1)}</td></tr>`).join("")+"</tbody>";
   const max=Math.max(...n.groepjes.map(g=>g.n));
@@ -113,7 +158,7 @@ function gcCompute(){
   const som=(o,a,b)=>dagen.slice(a,b).reduce((s,d)=>s+o[d],0);
   const bron=new Map();GC.bronnen.forEach(r=>{if(!dagen.includes(String(r.dag).slice(0,10)))return;const k=bronNaam(r.bron);bron.set(k,(bron.get(k)||0)+ +r.aantal)});  // facebook.com + www.facebook.com = Facebook
   const bronnen=[...bron].map(([naam,n])=>({naam,n})).sort((a,b)=>b.n-a.n);
-  const nieuw30=SNEEK.rows.filter(x=>dagen.includes(dagNL(x.eerst))).length;
+  const nieuw30=SNEEK.uniek.filter(x=>dagen.includes(dagNL(x.eerst))).length;   // echt nieuw, over alle seizoenen
   return {dagen:dagen.map(d=>({d,v:bezoek[d]})),
     b7:som(bezoek,-7),b7v:som(bezoek,-14,-7),p7:som(potjes,-7),p7v:som(potjes,-14,-7),g7:som(gedeeld,-7),g7v:som(gedeeld,-14,-7),
     b30:som(bezoek,0),p30:som(potjes,0),g30:som(gedeeld,0),nieuw30,bronnen,
