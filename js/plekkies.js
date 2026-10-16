@@ -160,7 +160,7 @@ function hpKaart(k,nu){
   if(p){const E=typeof pdEind==="function"?pdEind(p):null,N=igNormaalEind(p),x=E&&N.genoeg&&N.waarde>0?E.eind/N.waarde:null;
     mini=`<div class="hpmini" data-pd="${esc(p.media_id)}" tabindex="0" role="button" aria-label="Post in detail bekijken" title="Post in detail">
       <span class="igthumb hpthumb">${p.plaatje?`<img src="${esc(p.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
-      <span><b>${E?nf0.format(Math.round(E.eind)):"—"}</b><small><span class="pc">bereik · </span>${x!=null?`<span class="${x>=1.25?"goed":x<=0.8?"laag":""}">${HP_NF1.format(x)}×</span><span class="pc"> normaal</span>`:""}</small></span></div>`}
+      <span><b>${p.bereik!=null?nf0.format(Math.round(+p.bereik)):"—"}</b><small><span class="pc">bereik · </span>${x!=null?`<span class="${x>=1.25?"goed":x<=0.8?"laag":""}">${E.schat?"~":""}${HP_NF1.format(x)}×</span><span class="pc"> ${E.schat?"verwacht":"normaal"}</span>`:""}</small></span></div>`}
   else if(s&&s.media_id)mini=`<div class="hpmini leeg"><small>post?</small></div>`;
   const wie=m?`${esc(m.naam)}${m.insta?` · @${esc(m.insta)}`:""}`:`<i>gewiste persoon</i>`;
   const naam=s?esc(s.plek):"<i>nog geen plek</i>";

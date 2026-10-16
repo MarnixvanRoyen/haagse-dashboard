@@ -55,9 +55,9 @@ function pdStoryNorm(s,f){
 function pdEind(p){
   if(p.bereik==null)return null;
   const m=pdLeeftijdMin(p),r=+p.bereik;
-  if(m>=PD_KLAAR_DAGEN*1440){const V=igVerwacht(p,r,m);return {eind:V?V.eind:r,klaar:true,V}}
-  const V=igVerwacht(p,r,m);
-  return V?{eind:V.eind,klaar:false,V}:{eind:r,klaar:false,V:null};
+  const V=igVerwacht(p,r,m),klaar=m>=PD_KLAAR_DAGEN*1440;
+  // schat = de eindstand is (nog) een verwachting, nie het echte bereik — ook na 2 dagen als de groeicurve zegt dat er nog wat bijkomt
+  return {eind:V?V.eind:r,klaar,schat:!!(V&&V.deel<.99),V:V||null};
 }
 // hoe uitzonderlijk: woord bij "× normaal" (zelfde grenzen als de hittemetâh)
 function pdFase(x){
@@ -188,7 +188,7 @@ function pdPostHTML(p){
   const vPk=q=>q.nieuwe_volgers!=null&&+q.bereik>0?q.nieuwe_volgers*1000/q.bereik:null;
   const nVp=pdNorm(p,vPk),xVp=klaar?pdX(vPk(p),nVp.waarde):null;
   const zin=[];
-  if(xE!=null)zin.push(`<b class="${pdXcls(xE)}">${igNf1.format(xE)}×</b> je normaal${E.klaar?"":" (verwacht)"}: <b>${F.t}</b>`);
+  if(xE!=null)zin.push(`<b class="${pdXcls(xE)}">${igNf1.format(xE)}×</b> je normaal${E.schat?" (verwacht)":""}: <b>${F.t}</b>`);
   else if(p.bereik==null)zin.push("nog geen cijfâhs van Meta");
   if(sit==="partner")zin.push(`met partnâh ${partners.map(n=>"@"+esc(n)).join(", ")}`);
   if(xKw!=null&&xKw>=1.25)zin.push("gedeeld + bewaard hoog");else if(xKw!=null&&xKw<=0.8)zin.push("gedeeld + bewaard laag");
@@ -201,7 +201,7 @@ function pdPostHTML(p){
   // --- tegels
   const n=f=>pdNorm(p,f).waarde;
   const bereikTegel=p.bereik==null?"":`<div class="ytstat"><span class="k">Bereik</span><span class="v">${pdF(+p.bereik)}</span><span class="s">${
-    E&&!E.klaar?`verwacht ± ${pdF(E.eind)}${xE!=null?` = ${pdXtxt(xE)}`:""} · `:xE!=null?`${pdXtxt(xE)} · `:""}normaal ${NE.genoeg?pdF(NE.waarde):"?"}${NE.genoeg&&!NE.gemengd?(sit==="partner"?" mét partner":" zonder partner"):""}</span></div>`;
+    E&&E.schat?`verwacht ± ${pdF(E.eind)}${xE!=null?` = ${pdXtxt(xE)}`:""} · `:xE!=null?`${pdXtxt(xE)} · `:""}normaal ${NE.genoeg?pdF(NE.waarde):"?"}${NE.genoeg&&!NE.gemengd?(sit==="partner"?" mét partner":" zonder partner"):""}</span></div>`;
   h+=`<div class="ytstats pdtegels">${bereikTegel}
     ${pdTegel("Weergaven",p.weergaven,n(q=>q.weergaven),{klaar})}
     ${pdTegel("Likes",p.likes,n(q=>q.likes),{klaar})}
@@ -242,7 +242,7 @@ function pdPostHTML(p){
   // --- plek
   const posts=igPostsVan(g).filter(q=>q===p||Date.parse(q.gepost_om)<Date.now()-PD_KLAAR_DAGEN*864e5);
   h+=pdBlok("Plek tussen je andere posts",pdRangHTML([
-      pdRang(p,posts,q=>q===p&&E?E.eind:q.bereik,E&&!E.klaar?"bereik (verwachte eindstand)":"bereik"),
+      pdRang(p,posts,q=>q===p&&E?E.eind:q.bereik,E&&E.schat?"bereik (verwachte eindstand)":"bereik"),
       pdRang(p,posts.filter(q=>+q.bereik>=100),kw,"kwaliteit"),
       g!=="reel"?pdRang(p,posts,q=>q.nieuwe_volgers,"nieuwe volgâhs"):null,
       pdRang(p,posts,q=>q.likes,"likes")],G.kort)
@@ -281,7 +281,7 @@ function pdPartnerHTML(p,E,sit,partners){
       <br><span class="sub">${eerder.length?`${eerder.length} eerdere ${eerder.length===1?"post":"posts"} samen${eMed!=null?`, middelste bereik ${pdF(eMed)}${E?` → deze: ${pdXtxt(pdX(E.eind,eMed))}`:""}`:" (te weinig om te vergelijken)"}`:"eerste keer samen"}</span></li>`}).join("")}</ul>`;
   if(F&&E&&soortGroep(p)!=="reel"){
     const zonder=E.eind/F,erbij=E.eind-zonder;
-    h+=`<p><b>Schatting:</b> zonder partnâh ± <b>${pdF(zonder)}</b> bereik, dus de partnâh leverde ± <b>${pdF(erbij)}</b> kijkâhs op${E.klaar?"":" (verwacht)"}.</p>
+    h+=`<p><b>Schatting:</b> zonder partnâh ± <b>${pdF(zonder)}</b> bereik, dus de partnâh leverde ± <b>${pdF(erbij)}</b> kijkâhs op${E.schat?" (verwacht)":""}.</p>
       <p class="sub">± schatting: Meta geeft bij een samenwerking één set cijfâhs voor de hele post, nie per account. Gerekend met je vaste partner-factor ±&nbsp;${igNf1.format(F)}× (middelste post mét partner ÷ zonder, ${PF.met} en ${PF.zonder} posts).</p>`;
   }else h+=`<p class="sub">Nog te weinig posts met én zonder partnâh om het effect te schatten.</p>`;
   return h;
