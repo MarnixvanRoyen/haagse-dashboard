@@ -1,4 +1,5 @@
 // app.js — het hoofdmenu: Ovâhzicht · Insta · Threads · Muziek · Apps · Kansâh · Plekkies · Partnâhs (Partnâhs alleen op Mac/iPad)
+// Telefoon/iPad: Ovâhzicht + keuzemenu (menuKies) dat de andere pagina's openklapt; computer: alles op één regel.
 
 const SECTIES=["ovahzicht","insta","threads","muziek","apps","kansen","plekkies","partners"];
 let sectie="ovahzicht";                            // bij openen altijd op het Ovâhzicht beginnen
@@ -9,9 +10,9 @@ try{const v=sessionStorage.getItem("hc_ververs");sessionStorage.removeItem("hc_v
 
 function setSectie(s){
   sectie=s;
-  document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.setAttribute("aria-current",b.dataset.s===s?"page":"false"));
+  document.querySelectorAll("nav.hoofdmenu button[data-s]").forEach(b=>b.setAttribute("aria-current",b.dataset.s===s?"page":"false"));
   SECTIES.forEach(x=>$("s-"+x).hidden=x!==s);
-  menuInBeeld();
+  menuLabel();menuDicht();
   if(s==="muziek")render();          // grafieken opnieuw tekenen nu ze zichtbaar zijn
   if(s==="ovahzicht")renderOvahzicht();
   if(s==="apps")renderSneek();
@@ -21,7 +22,7 @@ function setSectie(s){
   if(s==="partners")renderPartners();
   if(s==="plekkies")renderPlekkies();
 }
-document.querySelectorAll("nav.hoofdmenu button").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));
+document.querySelectorAll("nav.hoofdmenu button[data-s]").forEach(b=>b.addEventListener("click",()=>setSectie(b.dataset.s)));
 // knoppen op de tegels ("Kèk bè Muziek") springen naar dat onderdeel
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ga]");if(b)setSectie(b.dataset.ga)});
 // Ververse-knop in de kop: de hele app opnieuw laden, net als sluiten en weer openen
@@ -32,15 +33,20 @@ $("ververs").addEventListener("click",()=>{
   location.reload();
 });
 
-// menu (15-10, chat 50): actieve knop in de schuifbalk in beeld schuiven (alleen de balk, nie de pagina) + vaagrandjes als er meer is
-function menuInBeeld(){
-  const st=$("menuStrook");if(!st)return;const b=st.querySelector('[aria-current="page"]');
-  if(b){const l=b.offsetLeft-st.offsetLeft,r=l+b.offsetWidth;
-    if(l<st.scrollLeft+8||r>st.scrollLeft+st.clientWidth-8)st.scrollLeft=Math.max(0,l-(st.clientWidth-b.offsetWidth)/2)}
-  menuRandjes();
+// menu (16-10, chat 50): op telefoon/iPad klapt "Kies een pagina ▾" een lijst open met de andere pagina's.
+// De knop toont de pagina waar je bent; een rood stipje als er in de lijst een melding (badge) staat.
+function menuLabel(){
+  const t=$("menuKiesTxt");if(!t)return;
+  const b=document.querySelector('#menuLijst button[data-s="'+sectie+'"]');
+  t.textContent=b?b.childNodes[0].textContent.trim():"Kies een pagina";
+  $("menuKies").classList.toggle("aan",!!b);
+  $("menuStip").hidden=!document.querySelector("#menuLijst .badge");
 }
-function menuRandjes(){const st=$("menuStrook");if(!st)return;
-  st.classList.toggle("meer-l",st.scrollLeft>4);st.classList.toggle("meer-r",st.scrollLeft+st.clientWidth<st.scrollWidth-4)}
-if($("menuStrook")){$("menuStrook").addEventListener("scroll",menuRandjes,{passive:true});
-  // bij het opstarten is het menu nog onzichtbaar (breedte 0): zodra het in beeld komt of van breedte verandert opnieuw meten
-  if(window.ResizeObserver)new ResizeObserver(()=>menuInBeeld()).observe($("menuStrook"));else addEventListener("resize",menuInBeeld)}
+function menuDicht(){const n=$("hoofdmenu");if(!n)return;n.classList.remove("open");$("menuKies").setAttribute("aria-expanded","false")}
+$("menuKies").addEventListener("click",()=>{const n=$("hoofdmenu"),open=!n.classList.contains("open");
+  n.classList.toggle("open",open);$("menuKies").setAttribute("aria-expanded",String(open));
+  if(open){const a=document.querySelector('#menuLijst button[aria-current="page"]')||document.querySelector("#menuLijst button");if(a)a.focus({preventScroll:true})}});
+document.addEventListener("click",e=>{if($("hoofdmenu").classList.contains("open")&&!e.target.closest("#hoofdmenu"))menuDicht()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("hoofdmenu").classList.contains("open")){menuDicht();$("menuKies").focus()}});
+// badges (Insta, Threads, Kansâh) komen later binnen: stipje en label dan bijwerken
+if(window.MutationObserver)new MutationObserver(()=>menuLabel()).observe($("menuLijst"),{childList:true,subtree:true});
