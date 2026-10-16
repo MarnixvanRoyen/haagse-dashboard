@@ -14,12 +14,17 @@
 // Post-cijfers: alleen bestaande functies (pdEind uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
 // Tik op het postje in een regel = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
 // Knop ♥ Bedankje bij een geposte kaart (16-10-2026, chat 50.3): story-bedankkaart, zie js/plekbedank.js.
+// Agenda (16-10-2026, chat 50.2): onder Datum/Tijd "📅 In mèn agenda" (Google Agenda, jouw account), "✉️ Uitnodige" (alleen met
+//  e-mail + akkoord: Google Agenda van HP_UITNODIG_VAN met de deelnemer + jou als gast; Google vraagt bij Opslaan of hij de uitnodiging stuurt)
+//  en ".ics" als reserve. Zie js/agenda.js. Telefoon, e-mail en verhaal gaan nooit in je eigen afspraak.
 // Route/kaart-link weggehaald (16-10-2026, chat 50.1). De kolom kaart_link blijft in hp_shoots staan, maar het dashboard leest en schrijft hem nie meer.
 
 let HP={mensen:[],shoots:[],geladen:false,laden:null,err:null,filter:"alles"};
 let HPF=null;   // open formulier: {mid, sid, vuil, bevestig, post, terug, okZonder}
 const HP_STIL_DAGEN=365;      // zo lang geen shoot → vraag of het contact gewist mag worden
 const HP_POST_KEUZE=30;       // zoveel posts in de keuzelijst Post
+const HP_SHOOT_MIN=60;        // zo lang duurt een shoot in de agenda (minuten)
+const HP_UITNODIG_VAN="marremanrojas@gmail.com";   // uitnodigingen gaan vanaf dit Google-account
 const HP_TZ="Europe/Amsterdam";
 const HP_DAG=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day:"numeric",month:"short"});
 const HP_DAGJ=new Intl.DateTimeFormat("nl-NL",{timeZone:HP_TZ,weekday:"short",day:"numeric",month:"short",year:"numeric"});
@@ -41,6 +46,7 @@ async function hpLaden(){
         sb.from("hp_shoots").select("*").order("wanneer",{ascending:true,nullsFirst:false})]);
       if(m.error)throw m.error;if(s.error)throw s.error;
       HP.mensen=m.data||[];HP.shoots=s.data||[];HP.err=null;
+      try{const {data:{session}}=await sb.auth.getSession();HP.ik=session&&session.user&&session.user.email||null}catch(e){HP.ik=null}   // jouw e-mail: eigen agenda + gast bij uitnodiging
     }catch(e){HP.err=hpFout(e)}
     HP.geladen=true;HP.laden=null;
   })();
@@ -220,6 +226,7 @@ function hpFormTeken(){
     <fieldset><legend>Waâh en wanneer</legend>
       <label>Plek <input name="plek" required maxlength="200" autocomplete="off" placeholder="bijv. Pier, Kurhaus, Westbroekpark" value="${esc(s?s.plek:"")}"></label>
       <div class="hptwee"><label>Datum <input type="date" name="d" value="${esc(w.d)}"></label><label>Tijd <input type="time" name="t" value="${esc(w.t)}"></label></div>
+      <div class="hpagenda" id="hpAgenda"></div>
     </fieldset>
     <fieldset><legend>Tekst</legend>
       <label>Caption <small>tekst onder de post</small><textarea name="caption" rows="4" maxlength="5000">${esc(s&&s.caption||"")}</textarea></label>
@@ -240,7 +247,34 @@ function hpFormTeken(){
     <div class="hpformknop"><button class="btn yellow" type="submit">Opslaan</button><button class="btn" type="button" id="hpAnnuleer">Annulere</button>
       ${!nieuw&&!HPF.bevestig?`<span class="hprechts">${m?`<button class="btn rood" type="button" id="hpWisContact">Contact wisse…</button> `:""}<button class="btn rood" type="button" id="hpWisKaart">Kaart wisse…</button></span>`:""}</div></form>`;
   $("hpForm").innerHTML=h;
-  hpAkkoordVelden();hpPostKiesTeken();
+  hpAkkoordVelden();hpPostKiesTeken();hpAgendaTeken();
+}
+/* ---------- agenda (chat 50.2) ---------- */
+// afspraken uit wat NU in het formulier staat (ook als je nog nie opsloeg)
+function hpAfspraken(){
+  const f=$("hpF");if(!f)return null;
+  const plek=f.plek.value.trim();if(!plek||!f.d.value||!f.t.value)return null;
+  const start=hpVanDelen(f.d.value,f.t.value),eind=new Date(Date.parse(start)+HP_SHOOT_MIN*6e4).toISOString();
+  const naam=f.naam?f.naam.value.trim():"",insta=f.insta?hpInsta(f.insta.value):"";
+  const mail=f.akkoord&&f.akkoord.checked&&f.email&&agMail(f.email.value)?f.email.value.trim():null;
+  const wie=[naam,insta?"@"+insta:""].filter(Boolean).join(" ");
+  const eigen={titel:`📸 Plekkie: ${plek}${naam?" · "+naam:""}`,start,eind,plek,account:HP.ik,uid:(HPF.sid||"nieuw")+"@plekkies.haagsecontent",
+    tekst:`Haagse plekjes door Haagse mensen${wie?"\nMet: "+wie:""}\nContactgegevens: dashboard, tab Plekkies`};
+  const uit=mail?{titel:`📸 Shoot Haagse plekjes: ${plek}`,start,eind,plek,account:HP_UITNODIG_VAN,gasten:[mail,HP.ik],
+    tekst:`Hoi ${naam||"daar"}! 👋\nHier is de afspraak voor je plekje in de serie Haagse plekjes door Haagse mensen.\n📍 ${plek}\n⏱️ Reken op ongeveer 1 uur. Het kan ook wat langer duren, afhankelijk van de ideeën die we op locatie krijgen. We maken het samen, en jij bent de drijvende kracht!\nKun je niet? Laat het even weten, dan prikken we een andere dag.\nTot dan! 💛💚\nMarnix (@the_hague_beachlife)`}:null;
+  return {eigen,uit,naam,mail};
+}
+function hpAgendaTeken(){
+  const el=$("hpAgenda");if(!el)return;
+  if(typeof agGoogleLink!=="function"){el.innerHTML="";return}
+  const a=hpAfspraken();
+  if(!a){el.innerHTML=`<p class="sub">📅 Vul plek, datum én tijd in, dan zet je de shoot met één tik in je agenda.</p>`;return}
+  let h=`<div class="hpagendaknop"><a class="btn hpklein" id="hpAgEigen" target="_blank" rel="noopener" href="${esc(agGoogleLink(a.eigen))}">📅 In mèn agenda</a>`;
+  if(a.uit)h+=`<a class="btn hpklein" id="hpAgUit" target="_blank" rel="noopener" href="${esc(agGoogleLink(a.uit))}">✉️ Uitnodige</a>`;
+  h+=`<button class="btn hpklein hpics" type="button" id="hpIcs" title="Agenda-bestandje (als de Google-link nie werkt)">.ics</button></div>`;
+  h+=`<p class="sub">${a.uit?`✉️ opent Google Agenda van ${esc(HP_UITNODIG_VAN)} met ${esc(a.naam||"de deelnemer")} als gast (en jij ook, dus dan hoef je 📅 nie meer). Tik daar op <b>Opslaan</b> en dan op <b>Versturen</b>.`
+    :`Google Agenda opent met alles ingevuld: tik daar op <b>Opslaan</b>.${HPF.mid||$("hpF").naam?` Uitnodige kan als er een e-mail + akkoord is.`:""}`} Shoot = ${HP_SHOOT_MIN} min.</p>`;
+  el.innerHTML=h;
 }
 // status zetten (knoppen bovenaan + verborgen veld dat wordt opgeslagen)
 function hpZetStatus(st){const f=$("hpF");if(!f)return;f.status.value=st;
@@ -360,13 +394,14 @@ document.addEventListener("click",e=>{
   if(t.closest("#hpKopieer")){const txt=$("hpToestTekst").textContent;const b=t.closest("#hpKopieer");
     (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{b.textContent="Gekopieerd ✓"},()=>{b.textContent="Kopiëren lukte nie: selecteer de tekst"});return}
   const sk=t.closest("[data-hpst]");if(sk){hpZetStatus(sk.dataset.hpst);HPF.vuil=true;return}
+  if(t.closest("#hpIcs")){const a=hpAfspraken();if(a)agIcs(a.eigen,"shoot-"+a.eigen.plek);return}
 });
 // formulier opnieuw tekenen (bijv. voor de wis-bevestiging) zonder getypte tekst kwijt te raken
 function hpBewaarInvoer(){
   const f=$("hpF"),w={};if(f)[...f.elements].forEach(x=>{if(x.name)w[x.name]=x.type==="checkbox"?x.checked:x.value});
   hpFormTeken();const g=$("hpF");if(!g)return;
   [...g.elements].forEach(x=>{if(x.name&&x.name in w){if(x.type==="checkbox")x.checked=w[x.name];else x.value=w[x.name]}});
-  hpZetStatus(g.status.value);hpAkkoordVelden();hpPostKiesTeken();
+  hpZetStatus(g.status.value);hpAkkoordVelden();hpPostKiesTeken();hpAgendaTeken();
   const b=$("hpPop").querySelector(".hpbevestig");if(b)b.scrollIntoView({block:"nearest"});
 }
 document.addEventListener("submit",e=>{if(e.target.id==="hpF"){e.preventDefault();hpOpslaan()}});
@@ -376,6 +411,7 @@ document.addEventListener("input",e=>{
   if(n==="akkoord")hpAkkoordVelden();
   if(n==="naam"){const p=$("hpToestTekst");if(p)p.textContent=hpToestemming(e.target.value.trim())}
   if(n==="insta"||n==="d")hpPostKiesTeken();
+  if(["d","t","plek","naam","insta","email","akkoord"].includes(n))hpAgendaTeken();
   if(n==="post_sel"){HPF.post=e.target.value||null;const f=$("hpF");
     if(HPF.post&&f.status.value!=="gepost"){hpZetStatus("gepost");f.tekst_status.value="gepost";hpMeld("Status op Gepost gezet (pas aan als dat nie klopt).")}
     hpPostKiesTeken()}

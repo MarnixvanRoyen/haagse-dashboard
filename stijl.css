@@ -1177,3 +1177,8 @@ nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
 .p48versie,.p48rest{display:flex;gap:8px}
 .p48versie .btn,.p48rest .btn{flex:1;min-height:44px}
 .p48rest{margin-top:8px}
+/* agenda-knoppen in het plekkie-formulier (chat 50.2) */
+.hpagenda{margin-top:10px}
+.hpagenda .sub{margin:6px 0 0;font-size:12.5px}
+.hpagendaknop{display:flex;flex-wrap:wrap;gap:8px}
+.btn.hpics{color:var(--ink-2)}
