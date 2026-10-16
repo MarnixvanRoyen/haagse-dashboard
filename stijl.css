@@ -1146,3 +1146,21 @@ nav.hoofdmenu .menu-kies{display:none}
 @media (max-width:360px){#hpStats .ytstat .k{font-size:9px}#hpStats .ytstat .v{font-size:18px}}
 @media (max-width:360px){#s-plekkies .ooi-kaart{padding:12px}#hpStats{gap:3px}#hpStats .ytstat{padding:6px 1px}#hpStats .ytstat .k{font-size:9px;letter-spacing:-.01em}}
 nav.hoofdmenu button{-webkit-tap-highlight-color:transparent}
+
+/* ---------- Plekkies: bedankkaart voor een deelnemer (chat 50.3, plekbedank.js) ---------- */
+.btn.hpbedank{color:var(--hy)}
+.vnpopkaart.pbkaart{max-width:760px}
+.pbgrid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px;align-items:start}
+#pbCanvas{width:100%;height:auto;border-radius:12px;display:block;border:2px solid var(--line)}
+.pbkeuze{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pbveld{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:14px}
+.pbveld small{font-weight:400;color:var(--muted)}
+.pbveld input{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px;font:inherit;font-weight:600;color:var(--ink)}
+.pbvink{display:flex;gap:8px;align-items:center;font-weight:700;font-size:14px;cursor:pointer}
+.pbvink input{width:18px;height:18px;accent-color:var(--hy);margin:0}
+.pbvink:has(input:disabled){color:var(--muted);cursor:not-allowed}
+.pbknoppen{display:flex;gap:8px}
+.pbknoppen .btn{flex:1;min-height:44px;font-size:16px}
+.pbknoppen .btn[hidden]{display:none}
+.pbknoppen .btn:disabled{opacity:.5;cursor:not-allowed}
+@media (max-width:640px){.pbgrid{grid-template-columns:1fr}#pbCanvas{max-width:240px;margin:0 auto}}

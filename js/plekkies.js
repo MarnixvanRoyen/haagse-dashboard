@@ -13,6 +13,7 @@
 //  * Archief → "Alles wisse" (rpc hp_alles_wissen): persoon helemaal weg; een geposte shoot blijft als "gewiste persoon".
 // Post-cijfers: alleen bestaande functies (pdEind uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
 // Tik op het postje in een regel = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
+// Knop ♥ Bedankje bij een geposte kaart (16-10-2026, chat 50.3): story-bedankkaart, zie js/plekbedank.js.
 // Route/kaart-link weggehaald (16-10-2026, chat 50.1). De kolom kaart_link blijft in hp_shoots staan, maar het dashboard leest en schrijft hem nie meer.
 
 let HP={mensen:[],shoots:[],geladen:false,laden:null,err:null,filter:"alles"};
@@ -164,6 +165,7 @@ function hpKaart(k,nu){
         ${lo.map(w=>`<span class="chip warn pc">${w[0]}</span>`).join("")}
         ${lo.length?`<span class="chip warn tel">${lo[0][1]}${lo.length>1?` +${lo.length-1}`:""}</span>`:""}</div></div>
     <div class="hpacties">${mini}
+      ${typeof pbKan==="function"&&pbKan(k)?`<button class="btn hpklein hpbedank" type="button" data-hpbedank="${esc(s.id)}" title="Bedankkaart maken" aria-label="Bedankkaart voor ${esc(m.naam)}">♥<span class="pc">&nbsp;Bedankje</span></button>`:""}
       ${voorbij?`<button class="btn hpklein" type="button" data-hpgeschoten="${esc(s.id)}" title="Markeer als geschoten">✓<span class="pc">&nbsp;Geschoten</span></button>`:""}
       <span class="hppijl" aria-hidden="true">›</span></div></div>`;
 }
@@ -269,6 +271,10 @@ function hpPostKiesTeken(){
     ${HPF.post&&!gekozen?`<option value="${esc(HPF.post)}" selected>Post ${esc(HPF.post)} (nie meâh in je Insta-cijfâhs)</option>`:""}</select></label>`;
   if(gekozen)h+=`<div class="hpgekozen"><span class="igthumb hpthumb">${gekozen.plaatje?`<img src="${esc(gekozen.plaatje)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
     <span class="sub">${esc(String(gekozen.bijschrift||"").split("\n")[0].slice(0,120))}</span></div>`;
+  // bedankkaart (chat 50.3): alleen als deze post al is opgeslagen met status Gepost
+  const kk=HPF.sid&&hpKaartVan(HPF.mid,HPF.sid);
+  if(gekozen&&typeof pbKan==="function"&&pbKan(kk)&&kk.s.media_id===HPF.post)
+    h+=`<button class="btn hpklein hpbedank" type="button" data-hpbedank="${esc(HPF.sid)}">♥ Bedankkaart make</button>`;
   if(!alle.length)h+=`<p class="sub">Nog geen Insta-posts geladen.</p>`;
   el.innerHTML=h;
 }
