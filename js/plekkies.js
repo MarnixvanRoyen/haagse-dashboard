@@ -14,9 +14,9 @@
 // Post-cijfers: alleen bestaande functies (pdEind uit postdetail.js; igNormaalEind, igPartnersVan uit insta.js).
 // Tik op het postje in een regel = de pop-up "Post in detail" van chat 44 (via data-pd; postdetail.js regelt de klik).
 // Knop ♥ Bedankje bij een geposte kaart (16-10-2026, chat 50.3): story-bedankkaart, zie js/plekbedank.js.
-// Agenda (16-10-2026, chat 50.2): onder Datum/Tijd "📅 In mèn agenda" (Google Agenda, jouw account), "✉️ Uitnodige" (alleen met
+// Agenda (16-10-2026, chat 50.2): onder Datum/Tijd "📅 Zet in agenda" (.ics-bestandje; de Google-link werkte nie op de iPhone), "✉️ Uitnodige" (alleen met
 //  e-mail + akkoord: Google Agenda van HP_UITNODIG_VAN met de deelnemer + jou als gast; Google vraagt bij Opslaan of hij de uitnodiging stuurt)
-//  en ".ics" als reserve. Zie js/agenda.js. Telefoon, e-mail en verhaal gaan nooit in je eigen afspraak.
+//  Zie js/agenda.js. Telefoon, e-mail en verhaal gaan nooit in je eigen afspraak.
 // Route/kaart-link weggehaald (16-10-2026, chat 50.1). De kolom kaart_link blijft in hp_shoots staan, maar het dashboard leest en schrijft hem nie meer.
 
 let HP={mensen:[],shoots:[],geladen:false,laden:null,err:null,filter:"alles"};
@@ -266,14 +266,14 @@ function hpAfspraken(){
 }
 function hpAgendaTeken(){
   const el=$("hpAgenda");if(!el)return;
-  if(typeof agGoogleLink!=="function"){el.innerHTML="";return}
+  if(typeof agIcs!=="function"){el.innerHTML="";return}
   const a=hpAfspraken();
   if(!a){el.innerHTML=`<p class="sub">📅 Vul plek, datum én tijd in, dan zet je de shoot met één tik in je agenda.</p>`;return}
-  let h=`<div class="hpagendaknop"><a class="btn hpklein" id="hpAgEigen" target="_blank" rel="noopener" href="${esc(agGoogleLink(a.eigen))}">📅 In mèn agenda</a>`;
+  let h=`<div class="hpagendaknop"><button class="btn hpklein" type="button" id="hpIcs">📅 Zet in agenda</button>`;
   if(a.uit)h+=`<a class="btn hpklein" id="hpAgUit" target="_blank" rel="noopener" href="${esc(agGoogleLink(a.uit))}">✉️ Uitnodige</a>`;
-  h+=`<button class="btn hpklein hpics" type="button" id="hpIcs" title="Agenda-bestandje (als de Google-link nie werkt)">.ics</button></div>`;
-  h+=`<p class="sub">${a.uit?`✉️ opent Google Agenda van ${esc(HP_UITNODIG_VAN)} met ${esc(a.naam||"de deelnemer")} als gast (en jij ook, dus dan hoef je 📅 nie meer). Tik daar op <b>Opslaan</b> en dan op <b>Versturen</b>.`
-    :`Google Agenda opent met alles ingevuld: tik daar op <b>Opslaan</b>.${HPF.mid||$("hpF").naam?` Uitnodige kan als er een e-mail + akkoord is.`:""}`} Shoot = ${HP_SHOOT_MIN} min.</p>`;
+  h+=`</div><p class="sub">📅 maakt een agenda-bestandje: tik erop en kies <b>Voeg toe</b>. Shoot = ${HP_SHOOT_MIN} min, herinnering 1 uur vooraf.`+
+    (a.uit?` ✉️ opent Google Agenda van ${esc(HP_UITNODIG_VAN)} met ${esc(a.naam||"de deelnemer")} als gast: tik daar op <b>Opslaan</b> en dan <b>Versturen</b>.`
+      :(HPF.mid||$("hpF").naam?` Uitnodige kan als er een e-mail + akkoord is.`:""))+`</p>`;
   el.innerHTML=h;
 }
 // status zetten (knoppen bovenaan + verborgen veld dat wordt opgeslagen)
