@@ -182,10 +182,10 @@ function pdMuziekHTML(x){
 function pdVoorspelHTML(p){
   if(typeof igVoorspelVan!=="function"||p.bereik==null||pdLeeftijdMin(p)<IG_GROEI.eindNa*1440)return "";
   const v=igVoorspelVan(p);
-  if(!v)return `<p class="sub pdvc"><b>Voorspel-check:</b> geen metingen uit de eerste dage van deze post (meten per uur en per dag bestaat pas sinds eind septembâh).</p>`;
+  if(!v)return `<p class="sub pdvc pc"><b>Voorspel-check:</b> geen metingen uit de eerste dage van deze post (meten per uur en per dag bestaat pas sinds eind septembâh).</p>`;
   const voorkeur=[1440,2880,5760,720,360],k=voorkeur.find(m=>v.pt[m]),x=v.pt[k],naam=IG_VC.leeftijden.find(([m])=>m===k)[1];
   const pct=Math.round(Math.abs(x.fout)*100);
-  return `<p class="sub pdvc"><b>Voorspel-check:</b> na ${naam} verwacht ± ${pdF(x.verw)}, echt ${pdF(+p.bereik)} (${pct?`${pct}% ${x.fout>0?"te hoog":"te laag"}`:"precies goed"}).</p>`;
+  return `<p class="sub pdvc pc"><b>Voorspel-check:</b> na ${naam} verwacht ± ${pdF(x.verw)}, echt ${pdF(+p.bereik)} (${pct?`${pct}% ${x.fout>0?"te hoog":"te laag"}`:"precies goed"}).</p>`;
 }
 /* ---------- POST ---------- */
 function pdPostHTML(p){

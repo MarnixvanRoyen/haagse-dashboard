@@ -638,9 +638,20 @@ function renderIgVoorspel(){
   // de dagmetingen (ig_media_dag) komen via Kansâh binnen; nog bezig? dan straks opnieuw tekenen
   if(!IG_VC_WACHT&&typeof KM_LAADT!=="undefined"&&KM_LAADT){IG_VC_WACHT=true;KM_LAADT.then(()=>renderIgVoorspel())}
   const V=igVoorspelCheck(),R=V.rijen;
-  $("igVcSub").innerHTML=`Hoe ver zat de verwachte eindstand d'rnaast? Elke post van ${IG_GROEI.eindNa} dage of oudâh met metingen uit z'n eerste dage telt mee `
-    +`(<b>${nf0.format(V.n)}</b> van ${nf0.format(V.klaar)}; meten per uur en per dag bestaat pas sinds eind septembâh, dus dit groeit vanzelf). `
-    +`Eerlijk gerekend: elke post is voorspeld met een groeicurve <b>zónder</b> die post zelf. <b>Echt</b> = het bereik van nu.`;
+  $("igVcSub").innerHTML=`Klopt de verwachte eindstand achteraf? Getest op <b>${nf0.format(V.n)}</b> posts van ${IG_GROEI.eindNa} dage of oudâh `
+    +`die in hun eerste dage gemete zijn (dat kan pas sinds eind septembâh, dus dit worre er vanzelf meer).`;
+  // in gewone zinnen: rijen met hetzelfde oordeel samen
+  const tijd={360:"6 uur",720:"12 uur",1440:"1 dag",2880:"2 dagen",5760:"4 dagen"};
+  const en=a=>a.length<2?a[0]:a.slice(0,-1).join(", ")+" en "+a[a.length-1];
+  const richting=f=>Math.abs(f)<.02?"raadt hij bijna precies goed":`zit de verwachting meestal ${nf0.format(Math.abs(f*100))}% te ${f>0?"hoog":"laag"}`;
+  const pc=x=>nf0.format(x*100)+"%";
+  const zinnen=["past","ruim","krap","weinig"].map(o=>{const g=R.filter(r=>r.oordeel===o);if(!g.length)return "";
+    const na=`<b>Na ${en(g.map(r=>tijd[r.k]||r.naam))}</b>`,m=med(g.map(r=>r.med)),sp=Math.max(...g.map(r=>r.spreid||0)),mg=g.map(r=>"± "+pc(r.marge)).join(" / ");
+    if(o==="weinig")return `<li class="w">${na}: nog te weinig posts om iets te zegge. Komt vanzelf.</li>`;
+    if(o==="krap")return `<li class="k">${na} ${richting(m)}, maar soms tot ${pc(sp)} d'rnaast, terwijl het dashboard ${mg} belooft. Iets te zeker van zichzelf (wordt bijgesteld in chat 17.1).</li>`;
+    if(o==="ruim")return `<li class="g">${na} ${richting(m)}, en bijna altijd binnen ${pc(sp)}: zelfs betâh dan het dashboard belooft (${mg}).</li>`;
+    return `<li class="g">${na} ${richting(m)}, en bijna altijd binnen ${pc(sp)}. Klopt met wat het dashboard belooft (${mg}).</li>`}).join("");
+  $("igVcZin").innerHTML=zinnen;
   const o2=(c,pc,tel)=>`<span class="chip ${c}"><span class="pc">${pc}</span><span class="tel">${tel}</span></span>`;
   const oord={past:o2("good","marge klopt","klopt"),krap:o2("warn","marge te krap","te krap"),ruim:o2("mute","marge ruim","ruim"),weinig:o2("mute","nog te weinig","weinig")};
   $("igVc").innerHTML=`<thead><tr><th>Na</th><th class="n pc">Posts</th><th class="n">Meestal</th><th class="n"><span class="pc">8 op 10 binnen</span><span class="tel">8 v/d 10</span></th><th class="n pc">Te hoog · laag</th><th class="n"><span class="pc">Marge nu</span><span class="tel">Marge</span></th><th><span class="pc">Oordeel</span></th></tr></thead><tbody>`
@@ -659,10 +670,8 @@ function renderIgVoorspel(){
       +`<td class="n">${nf0.format(+p.bereik)}<br><span class="sub">${nf0.format(dagen)} <span class="pc">dage</span><span class="tel">d</span></span></td>`
       +kol.map(([k])=>{const x=pt[k];return `<td${tel(k)}>${x?`${nf0.format(x.verw)}<br><span class="igvcf${Math.abs(x.fout)>igGroeiMarge(k)?" buiten":""}">${igVcPct(x.fout)}</span>`:"—"}</td>`}).join("")+"</tr>").join("")+"</tbody>"
     :`<tbody><tr><td class="sub">Nog geen posts van ${IG_GROEI.eindNa} dage oud met metingen uit de eerste dage.</td></tr></tbody>`;
-  $("igVcNoot").innerHTML=`<b>Meestal</b> = de middelste fout (+ = te hoog geschat, − = te laag). <b>8 op 10 binnen</b> = zo ver zat 8 van de 10 posts d'r hooguit naast; `
-    +`dat hoort binnen de <b>marge</b> te valle die het dashboard nu bij een verwachting zet (± in de hittemetâh, Kansâh en Post in detail). `
-    +`Oordeel pas vanaf ${IG_VC.zeker} posts. Posts groeie na dag ${IG_GROEI.eindNa} nog wat door (meestal ± 3%), dus "echt" loopt nog een tikkie op. `
-    +`Curve en marges worre hier nie aangepast: dat gebeurt in chat 17.1. Tik op een post voor alle cijfâhs.`;
+  $("igVcNoot").innerHTML=`<b>Meestal</b> = de middelste fout (+ = te hoog geschat). <b>8 op 10 binnen</b> = zo ver zat 8 van de 10 posts d'r hooguit naast. `
+    +`<b>Marge nu</b> = wat het dashboard belooft bij een verwachting. Eerlijk gerekend: elke post is voorspeld zónder die post zelf. Echt = bereik van nu.`;
 }
 
 /* ---------- grafiek per post: likes per kijkâh of kwaliteit (knop) ---------- */
