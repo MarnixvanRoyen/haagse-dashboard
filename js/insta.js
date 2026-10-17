@@ -1183,9 +1183,9 @@ const IG_GROEI={
 const igInterp=(c,x)=>{if(x<=c[0][0])return c[0][1];for(let i=1;i<c.length;i++)if(x<=c[i][0]){const [x0,y0]=c[i-1],[x1,y1]=c[i];return y0+(y1-y0)*(x-x0)/(x1-x0)}return c[c.length-1][1]};
 const igPctl=(a,p)=>{const s=[...a].sort((x,y)=>x-y);if(!s.length)return null;const i=(s.length-1)*p/100,l=Math.floor(i);return s[l]+(s[Math.min(l+1,s.length-1)]-s[l])*(i-l)};
 // stand van een post op leeftijd k (minuten): uurmeting (tot 48 u, ig_post_uur) of dagmeting (vanaf 24 u, ig_media_dag)
-// → {r, bron:"uur"/"dag"} of null. pu = metingen [{m, r}] (IG.pu), dg = dagmetingen [{m, r}] op leeftijd, oplopend (igDagRij).
+// → {r, bron:"uur"/"dag"} of null. pu = metingen [{m, r}] (IG.pu), dg = dagmetingen [{m, r}] op leeftijd, oplopend (igDagRij). (Heette eerst ook igStandOp → overschreef die van Bereik vandaag; hernoemd 17-10, chat 57.)
 // Zelfde regel voor het eigen groeilijstje én de Voorspel-check (chat 17.2).
-function igStandOp(pu,dg,k){
+function igPostStandOp(pu,dg,k){
   if(k<=IG_LEKKER.kaartUur*60&&pu.length){const x=igPuStand(pu,k);if(x)return {r:x.r,bron:"uur"}}
   if(k>=1440&&dg.length){let lo=null,hi=null;for(const x of dg){if(x.m<=k)lo=x;else{hi=x;break}}
     if(lo&&Math.abs(k-lo.m)<=60)return {r:lo.r,bron:"dag"};
@@ -1206,7 +1206,7 @@ function igGroeiPunten(){
     const t0=Date.parse(p.gepost_om),eind=+p.bereik/igInterp(IG_GROEI.std,(nu-t0)/6e4);   // stand nu ÷ wat hij op die leeftijd meestal heeft
     const pu=(IG.pu&&IG.pu.get(p.media_id))||[],dg=igDagRij(perDag,p,t0);
     IG_GROEI.std.forEach(([k],i)=>{if(!k||k>=28800)return;
-      const s=igStandOp(pu,dg,k);
+      const s=igPostStandOp(pu,dg,k);
       if(s&&eind>0)per[i].push({id:p.media_id,v:Math.min(1,s.r/eind)})});
   }
   return IG_GROEI_P={posts:IG.posts,pu:IG.pu,dag,perDag,klaar,per};
@@ -1263,7 +1263,7 @@ function igVoorspelCheck(){
     const t0=Date.parse(p.gepost_om),pu=(IG.pu&&IG.pu.get(p.media_id))||[],dg=igDagRij(P.perDag,p,t0);
     const c=igGroeiCurveVan(P,p.media_id).curve,pt={};let heeft=false;
     for(const [k] of IG_VC.leeftijden){
-      const s=igStandOp(pu,dg,k);if(!s)continue;
+      const s=igPostStandOp(pu,dg,k);if(!s)continue;
       const deel=igInterp(c,k);if(!(deel>0))continue;
       const verw=deel>=.99?s.r:s.r/deel;
       pt[k]={stand:s.r,verw,fout:verw/+p.bereik-1,bron:s.bron};heeft=true;
